@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>게시판</h1>
+<a href="{% url 'board:post_create' %}">글쓰기</a>
+<ul>
+{% for post in posts %}
+  <li>
+    <a href="{% url 'board:post_detail' pk=post.pk %}">{{ post.title }}</a>
+    — {{ post.author }} ({{ post.created_at }})
+  </li>
+{% empty %}
+  <li>게시물이 없습니다.</li>
+{% endfor %}
+</ul>
+{% endblock %}

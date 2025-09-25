@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ post.title }}</h1>
+<p>작성자: {{ post.author }} / 작성일: {{ post.created_at }}</p>
+<div>{{ post.content }}</div>
+{% if user == post.author %}
+  <a href="{% url 'board:post_edit' pk=post.pk %}">수정</a> |
+  <a href="{% url 'board:post_delete' pk=post.pk %}">삭제</a>
+{% endif %}
+<a href="{% url 'board:post_list' %}">목록으로</a>
+{% endblock %}

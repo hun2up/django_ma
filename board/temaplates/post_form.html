@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{% if form.instance.pk %}글 수정{% else %}새 글 쓰기{% endif %}</h1>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">저장</button>
+</form>
+<a href="{% url 'board:post_list' %}">취소</a>
+{% endblock %}
