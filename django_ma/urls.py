@@ -20,5 +20,6 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('hello.urls')),  # hello 앱의 urls 연결
+    path('', include('hello.urls')),
+    path('board/', include('board.urls')),  # hello 앱의 urls 연결
 ]
