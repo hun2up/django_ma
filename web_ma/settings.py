@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 import dj_database_url
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-b%gy-7(=gmup)_fylo+a*)c61s3^clha6kb_$q6gwvikl%*^rg'
+SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-default-key-for-dev")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get("RENDER", None) is None
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".onrender.com", "django-ma.onrender.com"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.environ.get("RENDER_EXTERNAL_HOSTNAME", "django-ma.onrender.com")]
 
 
 # Application definition
@@ -79,8 +80,7 @@ WSGI_APPLICATION = 'web_ma.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",   # 로컬 개발용
-        conn_max_age=600,
+        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
     )
 }
 
