@@ -1,4 +1,5 @@
 # join/views.py
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from .models import JoinInfo
@@ -9,9 +10,11 @@ from django.http import JsonResponse
 from django.db import connection
 import os
 
+@login_required
 def db_test_view(request):
     return HttpResponse("DB 테스트 뷰입니다.")
 
+@login_required
 def join_form(request):
     if request.method == 'POST':
         form = JoinForm(request.POST)
