@@ -6,6 +6,19 @@ import os
 from .forms import JoinForm
 from .pdf_utils import fill_pdf  # fill_pdf 함수는 utils 파일에 정의
 
+# join/views.py
+from django.http import JsonResponse
+from django.db import connection
+
+def db_test_view(request):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            row = cursor.fetchone()
+        return JsonResponse({"db_connection": "ok", "result": row[0]})
+    except Exception as e:
+        return JsonResponse({"db_connection": "error", "message": str(e)})
+
 def join_form(request):
     if request.method == 'POST':
         form = JoinForm(request.POST)
