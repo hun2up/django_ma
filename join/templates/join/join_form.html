@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>가입 폼</title>
+</head>
+<body>
+    <h1>방문자 정보 입력</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">제출</button>
+    </form>
+</body>
+</html>
