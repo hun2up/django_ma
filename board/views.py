@@ -1,8 +1,12 @@
+from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Post
 
 def post_list(request):
-    posts = Post.objects.order_by('-created_at')
+    post_list = Post.objects.order_by('-created_at')
+    paginator = Paginator(post_list, 10)  # 10개씩
+    page = request.GET.get('page')
+    posts = paginator.get_page(page)
     return render(request, 'board/post_list.html', {'posts': posts})
 
 def post_detail(request, pk):
