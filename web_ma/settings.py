@@ -78,7 +78,10 @@ WSGI_APPLICATION = 'web_ma.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(conn_max_age=600)
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',  # SQLite 엔진
+        'NAME': BASE_DIR / 'db.sqlite3',         # DB 파일 경로
+    }
 }
 
 
