@@ -22,7 +22,7 @@ from home import views as home_views  # 메인 페이지 뷰
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home_views.index, name='home'),  # 메인 페이지
-    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
