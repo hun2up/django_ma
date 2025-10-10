@@ -7,8 +7,48 @@ import io
 import os
 import tempfile
 
-# detect_pdf_type_from_text(), is_sensitive_sentence() 그대로 사용
 
+# ✅ 보험사명 감지 함수
+def detect_pdf_type_from_text(page):
+    text = page.get_text("text")
+    all_keywords = [
+        "DB생명", "삼성생명", "신한라이프", "한화생명", "카디프생명",
+        "메트라이프생명", "교보생명", "KDB생명",
+        "IBK연금보험", "푸본현대생명", "KB라이프생명",
+        "DGB생명", "흥국생명", "미래에셋", "ABL생명", "농협생명", "Chubb"
+    ]
+    detected = [kw for kw in all_keywords if kw in text]
+    if len(detected) > 3:
+        return ("보험사 목록 페이지", 85)
+    if any(k in text for k in ["DB생명","삼성생명","신한라이프","한화생명","카디프생명","메트라이프생명","교보생명","KDB생명"]):
+        return ("그룹180", 180)
+    if any(k in text for k in ["IBK연금보험","푸본현대생명","KB라이프생명","DGB생명","흥국생명"]):
+        return ("그룹100", 100)
+    if any(k in text for k in ["미래에셋","ABL생명"]):
+        return ("그룹140", 140)
+    if "농협생명" in text:
+        return ("농협생명", 35)
+    if "Chubb" in text:
+        return ("Chubb", 85)
+    return ("기타", 85)
+
+
+# ✅ 쉼표 기반 인적사항 문장 감지 함수
+def is_sensitive_sentence(sentence):
+    info_words = [
+        "성명", "이름", "생년월일", "성별", "주소", "우편번호", "전화번호",
+        "휴대전화번호", "휴대폰번호", "E-mail", "전자우편주소", "주민등록번호",
+        "운전면허증번호", "외국인등록번호", "여권번호", "경력", "계좌번호",
+        "보험업계", "고유번호"
+    ]
+    if "," in sentence:
+        count = sum(1 for w in info_words if w in sentence)
+        if count >= 2:
+            return True
+    return False
+
+
+# ✅ PDF 자동입력 함수
 def fill_pdf(pdf_template_path, data) -> str:
     doc = fitz.open(pdf_template_path)
     pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
@@ -20,16 +60,14 @@ def fill_pdf(pdf_template_path, data) -> str:
 
     OFFSET_Y = -3
     FONT_SIZE = 12
-
-    # 임시 경로에 파일 저장
     fd, output_path = tempfile.mkstemp(suffix=".pdf")
     os.close(fd)
 
     for page_index, page in enumerate(doc):
         doc_type, OFFSET_X = detect_pdf_type_from_text(page)
-        page_height = page.rect.height
         text_page = page.get_text("text")
         is_report_form = "신고신청서" in text_page or "신고 신청서" in text_page
+        page_height = page.rect.height
 
         blocks = page.get_text("blocks")
         table_blocks = [b for b in blocks if (b[2]-b[0]) < 250 and (b[3]-b[1]) < 40]
@@ -69,11 +107,13 @@ def fill_pdf(pdf_template_path, data) -> str:
                     return True
             return False
 
+        # ✅ 데이터 입력
         draw_right(name_keywords, data["name"])
         draw_right(ssn_keywords, data["ssn"])
         draw_right(birth_keywords, data["ssn"][:6])
         draw_right(phone_keywords, data["phone"])
 
+        # ✅ 주소 처리
         if is_report_form:
             addr_rects = page.search_for("우편번호")
             if addr_rects:
@@ -94,7 +134,7 @@ def fill_pdf(pdf_template_path, data) -> str:
             addr_rects = page.search_for("주       소")
             if addr_rects:
                 rect = addr_rects[0]
-                x = rect.x1 + OFFSET_X + 10
+                x = rect.x1 + 10
                 y = page_height - rect.y1 + OFFSET_Y
                 c.drawString(x, y, data["address"])
 
@@ -105,4 +145,4 @@ def fill_pdf(pdf_template_path, data) -> str:
 
     doc.save(output_path)
     doc.close()
-    return output_path  # PDF 경로 반환
+    return output_path
