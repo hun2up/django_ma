@@ -1,5 +1,10 @@
+<!-- templates/registration/login.html -->
+<h2>로그인</h2>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}
+  {% if form.errors %}
+    <p style="color:red;">아이디 또는 비밀번호가 잘못되었습니다.</p>
+  {% endif %}
   <button type="submit">로그인</button>
 </form>
