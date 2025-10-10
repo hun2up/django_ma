@@ -1,0 +1,18 @@
+# 가상환경 폴더
+venv/
+.env/
+
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+
+# 로그 파일
+*.log
+
+# IDE/에디터 설정 파일
+.vscode/
+.idea/
+
+# OS별 불필요 파일
+.DS_Store
+Thumbs.db
