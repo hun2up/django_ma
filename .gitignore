@@ -1,6 +1,10 @@
 # 가상환경 폴더
 venv/
-.env/
+# dotenv files
+.env
+.env.*
+*.env
+!*.example.env   # (선택) 예시 파일은 계속 추적하고 싶을 때
 
 # Python 캐시 파일
 __pycache__/
