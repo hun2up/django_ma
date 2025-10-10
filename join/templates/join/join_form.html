@@ -1,14 +1,42 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>가입 폼</title>
-</head>
-<body>
-    <h1>방문자 정보 입력</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">제출</button>
-    </form>
-</body>
-</html>
+<form method="POST">
+    {% csrf_token %}
+    
+    <label for="name">이름</label>
+    <input type="text" name="name" required><br>
+
+    <label for="ssn">주민번호</label>
+    <input type="text" name="ssn" required><br>
+
+    <label for="phone">전화번호</label>
+    <input type="text" name="phone" required><br>
+
+    <label for="email">이메일 (선택)</label>
+    <input type="email" name="email"><br>
+
+    <label for="postcode">우편번호</label>
+    <input type="text" id="postcode" name="postcode" readonly required>
+    <button type="button" onclick="execDaumPostcode()">주소 찾기</button><br>
+
+    <label for="address">도로명 주소</label>
+    <input type="text" id="address" name="address" readonly required><br>
+
+    <label for="address_detail">상세주소</label>
+    <input type="text" id="address_detail" name="address_detail"><br>
+
+    <button type="submit">제출</button>
+</form>
+
+<!-- ✅ 팝업 API 스크립트 추가 -->
+<script src="https://ssl.daumcdn.net/dmaps/map_js_init/postcode.v2.js"></script>
+<script>
+function execDaumPostcode() {
+    new daum.Postcode({
+        oncomplete: function(data) {
+            // 우편번호와 주소 정보를 받아와서 입력란에 넣기
+            document.getElementById('postcode').value = data.zonecode;
+            document.getElementById('address').value = data.roadAddress;
+            document.getElementById('address_detail').focus(); // 상세주소로 포커스 이동
+        }
+    }).open();
+}
+</script>
