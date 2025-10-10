@@ -1,8 +1,13 @@
 <h1>게시판 목록</h1>
+
+<a href="{% url 'post_create' %}">[+] 작성하기</a>
+
 <ul>
   {% for post in posts %}
     <li>
       <a href="{% url 'post_detail' post.pk %}">{{ post.title }}</a> - {{ post.created_at }}
     </li>
+  {% empty %}
+    <li>작성된 글이 없습니다.</li>
   {% endfor %}
 </ul>
