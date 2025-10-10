@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from home import views as home_views  # 메인 페이지 뷰
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('home.urls')),
-    path('join', include('join.urls')),
+    path('', home_views.index, name='home'),  # 메인 페이지
+    path('join/', include('join.urls')),
     path('board/', include('board.urls')),
 ]

@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.shortcuts import render
 
-def home(request):
-    return HttpResponse("인카금융서비스 MA부문 업무지원 홈페이지 입니다.")
+def index(request):
+    return render(request, 'home/index.html')
