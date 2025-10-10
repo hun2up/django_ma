@@ -1,13 +1,107 @@
-<h1>업무요청 게시판</h1>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>업무요청 게시판</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
 
-<a href="{% url 'post_create' %}">[+] 작성하기</a>
+        .table-container {
+            width: 80%;
+            margin: 50px auto;
+        }
 
-<ul>
-  {% for post in posts %}
-    <li>
-      <a href="{% url 'post_detail' post.pk %}">{{ post.title }}</a> - {{ post.created_at }}
-    </li>
-  {% empty %}
-    <li>작성된 글이 없습니다.</li>
-  {% endfor %}
-</ul>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background-color: #f2f2f2;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+        }
+
+        th {
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .pagination {
+            margin-top: 20px;
+        }
+
+        .pagination a {
+            margin: 0 5px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 업무요청 게시판</h1>
+
+    <div class="table-container">
+        <a href="{% url 'post_create' %}">[+] 작성하기</a>
+        <a href="{% url 'home' %}" style="
+            display: inline-block;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #555;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        ">🏠 메인으로</a>
+        <table>
+            <thead>
+                <tr>
+                    <th>접수번호</th>
+                    <th>접수일자</th>
+                    <th>구분</th>
+                    <th>제목</th>
+                    <th>요청자</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>상태변경일</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                    <tr>
+                        <td>{{ post.id }}</td>
+                        <td>{{ post.created_at|date:"Y-m-d" }}</td>
+                        <td>-</td>
+                        <td><a href="{% url 'post_detail' post.pk %}">{{ post.title }}</a></td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8">게시글이 없습니다.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            {% if posts.has_previous %}
+                <a href="?page={{ posts.previous_page_number }}">이전</a>
+            {% endif %}
+
+            <span>Page {{ posts.number }} of {{ posts.paginator.num_pages }}</span>
+
+            {% if posts.has_next %}
+                <a href="?page={{ posts.next_page_number }}">다음</a>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
