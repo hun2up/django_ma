@@ -19,8 +19,8 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     # 기본 필드
     id = models.CharField(max_length=30, unique=True, primary_key=True)  # 로그인 ID
-    name = models.CharField(max_length=50, verbose_name="이름")
-    branch = models.CharField(max_length=100, verbose_name="지점")
+    name = models.CharField(max_length=50, verbose_name="Name")
+    branch = models.CharField(max_length=100, verbose_name="Branch")
     
     # grade는 Django의 권한 시스템과 연계
     grade = models.CharField(
@@ -31,7 +31,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             ('active', 'Active'),
         ],
         default='active',
-        verbose_name="직급"
+        verbose_name="Grade"
     )
 
     status = models.CharField(
@@ -42,7 +42,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             ('휴직', '휴직'),
         ],
         default='재직',
-        verbose_name="상태"
+        verbose_name="Status"
     )
 
     # Django 권한 관련 기본 필드
