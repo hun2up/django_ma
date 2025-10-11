@@ -143,3 +143,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'  # 로그인하지 않은 사용자가 리디렉션될 URL
 LOGIN_REDIRECT_URL = '/home/'  # 로그인 후 이동할 URL
 LOGOUT_REDIRECT_URL = '/'  # 로그아웃 후 이동할 URL
+
+AUTH_USER_MODEL = 'accounts.CustomUser'
