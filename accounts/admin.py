@@ -1,10 +1,11 @@
 from openpyxl import Workbook
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.http import HttpResponse
 from django.urls import path
+from django.shortcuts import render, redirect
 from .models import CustomUser
-
+from .forms import ExcelUploadForm
 
 # ✅ 공통 엑셀 생성 함수
 def export_users_as_excel(queryset, filename):
@@ -36,6 +37,37 @@ def export_users_as_excel(queryset, filename):
     wb.save(response)
     return response
 
+
+def upload_users_from_excel_view(request):
+    if request.method == "POST":
+        form = ExcelUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            excel_file = request.FILES["file"]
+            wb = load_workbook(excel_file)
+            ws = wb.active
+
+            # assume first row is header
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                user_id, password, name, branch, grade, status = row[:6]
+                try:
+                    CustomUser.objects.create_user(
+                        id=user_id,
+                        password=password,
+                        name=name,
+                        branch=branch,
+                        grade=grade,
+                        status=status,
+                    )
+                except Exception as e:
+                    messages.error(request, f"Error on row {row}: {str(e)}")
+                    continue
+
+            messages.success(request, "Users uploaded successfully.")
+            return redirect("..")
+    else:
+        form = ExcelUploadForm()
+
+    return render(request, "admin/accounts/customuser/upload_excel.html", {"form": form})
 
 # ✅ 선택된 사용자만 엑셀로 다운로드 (Action)
 def export_selected_users_to_excel(modeladmin, request, queryset):
@@ -81,6 +113,7 @@ class CustomUserAdmin(UserAdmin):
         urls = super().get_urls()
         custom_urls = [
             path('export-all/', self.admin_site.admin_view(export_all_users_excel_view), name='export_all_users_excel'),
+            path('upload-excel/', self.admin_site.admin_view(upload_users_from_excel_view), name='upload_users_excel'),
         ]
         return custom_urls + urls
 
