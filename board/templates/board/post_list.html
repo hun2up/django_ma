@@ -3,50 +3,55 @@
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
-<h1>📋 업무요청 게시판</h1>
+<h2 class="text-center mb-4" style="color:#003f7d; font-weight:700;">업무요청 게시판</h2>
 
-<div class="table-container">
-    <a href="{% url 'post_create' %}" class="btn">[+] 작성하기</a>
+<div class="card p-4">
+  <div class="d-flex justify-content-between mb-3">
+    <a href="{% url 'post_create' %}" class="btn btn-primary">[+] 새 글 작성</a>
+  </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>접수번호</th>
-                <th>접수일자</th>
-                <th>구분</th>
-                <th>제목</th>
-                <th>요청자</th>
-                <th>담당자</th>
-                <th>상태</th>
-                <th>상태변경일</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for post in posts %}
-                <tr>
-                    <td>{{ post.id }}</td>
-                    <td>{{ post.created_at|date:"Y-m-d" }}</td>
-                    <td>-</td>
-                    <td><a href="{% url 'post_detail' post.pk %}">{{ post.title }}</a></td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>-</td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="8">게시글이 없습니다.</td></tr>
-            {% endfor %}
-        </tbody>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr class="text-center">
+          <th>접수번호</th>
+          <th>접수일자</th>
+          <th>구분</th>
+          <th>제목</th>
+          <th>요청자</th>
+          <th>담당자</th>
+          <th>상태</th>
+          <th>상태변경일</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for post in posts %}
+        <tr>
+          <td class="text-center">{{ post.id }}</td>
+          <td class="text-center">{{ post.created_at|date:"Y-m-d" }}</td>
+          <td class="text-center">-</td>
+          <td><a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">{{ post.title }}</a></td>
+          <td class="text-center">-</td>
+          <td class="text-center">-</td>
+          <td class="text-center">-</td>
+          <td class="text-center">-</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
 
-    <div class="pagination">
-        {% if posts.has_previous %}
-            <a href="?page={{ posts.previous_page_number }}">이전</a>
-        {% endif %}
-        <span>Page {{ posts.number }} of {{ posts.paginator.num_pages }}</span>
-        {% if posts.has_next %}
-            <a href="?page={{ posts.next_page_number }}">다음</a>
-        {% endif %}
-    </div>
+  <!-- 페이지네이션 -->
+  <div class="text-center mt-3">
+    {% if posts.has_previous %}
+      <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
+    {% endif %}
+    <span class="mx-2">Page {{ posts.number }} / {{ posts.paginator.num_pages }}</span>
+    {% if posts.has_next %}
+      <a href="?page={{ posts.next_page_number }}" class="btn btn-outline-primary btn-sm">다음</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
