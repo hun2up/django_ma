@@ -1,10 +1,69 @@
-<!-- templates/registration/login.html -->
-<h2>로그인</h2>
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  {% if form.errors %}
-    <p style="color:red;">아이디 또는 비밀번호가 잘못되었습니다.</p>
-  {% endif %}
-  <button type="submit">로그인</button>
-</form>
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}로그인{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width:400px;">
+  <div class="card p-4 shadow">
+    <h3 class="text-center mb-4" style="color:#003f7d; font-weight:700;">로그인</h3>
+
+    <form method="POST" novalidate>
+      {% csrf_token %}
+      
+      <!-- 아이디 -->
+      <div class="mb-3">
+        {{ form.username|add_class:"form-control"|attr:"placeholder:아이디" }}
+      </div>
+
+      <!-- 비밀번호 -->
+      <div class="mb-3">
+        {{ form.password|add_class:"form-control"|attr:"placeholder:비밀번호" }}
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">로그인</button>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* placeholder 스타일 (회색 톤 & 크기 조정) */
+  input::placeholder {
+    color: #a5a5a5;
+    font-size: 0.95rem;
+  }
+
+  /* 포커스 시 */
+  input:focus::placeholder {
+    color: transparent;
+  }
+
+  /* 입력 필드 디자인 */
+  .form-control {
+    border-radius: 10px;
+    border: 1px solid #d2ddec;
+    transition: all 0.25s ease;
+    height: 45px;
+    padding-left: 15px;
+  }
+
+  .form-control:focus {
+    border-color: #005BAC;
+    box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+    border: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
+  }
+</style>
+{% endblock %}
