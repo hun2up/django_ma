@@ -81,9 +81,17 @@ WSGI_APPLICATION = 'web_ma.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'incar_ma_6fjd',
+        'USER': 'incar_ma',
+        'PASSWORD': 'ci4lbQyePjiNVFTLzImq3kYAS3ENRcUo',
+        'HOST': 'dpg-d3k8lmffte5s73876dt0-a.oregon-postgres.render.com',
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',  # ✅ 이 줄이 SSL 인증 handshake 필수
+        },
+    }
 }
 
 
