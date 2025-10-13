@@ -1,13 +1,87 @@
 {% extends "base.html" %}
 {% load static %}
+{% load widget_tweaks %}
+
+{{ form.name|add_class:"form-control" }}
 
 {% block title %}위촉서류 출력{% endblock %}
 
 {% block content %}
+<style>
+  /* 전체 컨테이너 */
+  body {
+    background-color: #f9fbfd;
+  }
+
+  h2 {
+    color: #003f7d;
+    font-weight: 700;
+  }
+
+  /* 카드 디자인 */
+  .card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  /* 입력창 디자인 */
+  .form-control {
+    border-radius: 10px;
+    border: 1px solid #d2ddec;
+    transition: all 0.25s ease;
+  }
+
+  .form-control:focus {
+    border-color: #005BAC;
+    box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
+  }
+
+  /* 버튼 디자인 */
+  .btn-primary {
+    background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+    border: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
+  }
+
+  /* 주소찾기 버튼 */
+  .btn-outline-secondary {
+    border-radius: 10px;
+    color: #005BAC;
+    border-color: #005BAC;
+    transition: all 0.25s ease;
+  }
+
+  .btn-outline-secondary:hover {
+    background-color: #005BAC;
+    color: #fff;
+  }
+
+  /* 입력 라벨 */
+  label {
+    font-weight: 500;
+    color: #333;
+  }
+
+  /* 반응형 마진 보정 */
+  @media (max-width: 768px) {
+    .container {
+      padding: 0 1rem;
+    }
+  }
+</style>
+
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 600px;">
-    <h2 class="mb-4 text-center">위촉서류 출력 페이지</h2>
-
+    
     <div class="card shadow p-4">
       <form method="POST" novalidate>
         {% csrf_token %}
@@ -16,7 +90,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.name.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.name.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.name }}
+            {{ form.name|add_class:"form-control" }}
             {% if form.name.errors %}
               <div class="text-danger small">{{ form.name.errors.as_text }}</div>
             {% endif %}
@@ -27,7 +101,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.ssn.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.ssn.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.ssn }}
+            {{ form.ssn|add_class:"form-control" }}
             {% if form.ssn.errors %}
               <div class="text-danger small">{{ form.ssn.errors.as_text }}</div>
             {% endif %}
@@ -38,7 +112,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.phone.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.phone.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.phone }}
+            {{ form.phone|add_class:"form-control" }}
             {% if form.phone.errors %}
               <div class="text-danger small">{{ form.phone.errors.as_text }}</div>
             {% endif %}
@@ -49,7 +123,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.email.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.email.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.email }}
+            {{ form.email|add_class:"form-control" }}
             {% if form.email.errors %}
               <div class="text-danger small">{{ form.email.errors.as_text }}</div>
             {% endif %}
@@ -60,7 +134,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.postcode.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.postcode.label }}</label>
           <div class="col-7 col-md-5">
-            {{ form.postcode }}
+            {{ form.postcode|add_class:"form-control" }}
             {% if form.postcode.errors %}
               <div class="text-danger small">{{ form.postcode.errors.as_text }}</div>
             {% endif %}
@@ -74,7 +148,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address }}
+            {{ form.address|add_class:"form-control" }}
             {% if form.address.errors %}
               <div class="text-danger small">{{ form.address.errors.as_text }}</div>
             {% endif %}
@@ -85,7 +159,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address_detail.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address_detail.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address_detail }}
+            {{ form.address_detail|add_class:"form-control" }}
             {% if form.address_detail.errors %}
               <div class="text-danger small">{{ form.address_detail.errors.as_text }}</div>
             {% endif %}
@@ -94,8 +168,7 @@
 
         <!-- 버튼 -->
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-          <a href="{% url 'home' %}" class="btn btn-secondary w-100 w-md-auto">🏠 메인으로</a>
-          <button type="submit" class="btn btn-primary w-100 w-md-auto">📄 신청서 PDF 다운로드</button>
+          <button type="submit" class="btn btn-primary w-100 w-md-auto">위촉서류 출력하기</button>
         </div>
       </form>
     </div>
