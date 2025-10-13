@@ -1,10 +1,10 @@
-# join/urls.py
 from django.urls import path
 from . import views
-from .views import db_test_view
+
+app_name = 'join'  # ✅ 추가: URL 이름에 네임스페이스 붙이기
 
 urlpatterns = [
-    path('', views.join_form, name='join_form'),
-    path('dbtest/', db_test_view, name='db_test'),  # /join/
+    path('', views.join_form, name='form'),                # ✅ name 변경
+    path('success/', views.success_view, name='success'),  # ✅ success 페이지 추가
+    path('dbtest/', views.db_test_view, name='db_test'),
 ]
-
