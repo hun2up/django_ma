@@ -1,44 +1,101 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}위촉서류 출력{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-  <div class="mx-auto" style="max-width: 600px;">  <!-- ✅ 모바일 대응을 위한 max-width -->
+  <div class="mx-auto" style="max-width: 600px;">
     <h2 class="mb-4 text-center">위촉서류 출력 페이지</h2>
 
     <div class="card shadow p-4">
       <form method="POST" novalidate>
         {% csrf_token %}
 
-        <!-- 공통 필드 렌더링 -->
-        {% for field in form %}
-          <div class="row mb-3 align-items-center">
-            <label for="{{ field.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ field.label }}</label>
-            <div class="col-12 col-md-9">
-              {{ field }}
-              {% if field.errors %}
-                <div class="text-danger small">{{ field.errors.as_text }}</div>
-              {% endif %}
-            </div>
-          </div>
-        {% endfor %}
-
-        <!-- 주소 찾기 버튼 (우편번호 필드 옆에만) -->
+        <!-- 이름 -->
         <div class="row mb-3 align-items-center">
-          <div class="offset-md-3 col-12 col-md-9">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="execDaumPostcode()">주소 찾기</button>
+          <label for="{{ form.name.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.name.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.name }}
+            {% if form.name.errors %}
+              <div class="text-danger small">{{ form.name.errors.as_text }}</div>
+            {% endif %}
           </div>
         </div>
 
-        <!-- 버튼들 -->
+        <!-- 주민번호 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.ssn.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.ssn.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.ssn }}
+            {% if form.ssn.errors %}
+              <div class="text-danger small">{{ form.ssn.errors.as_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 전화번호 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.phone.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.phone.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.phone }}
+            {% if form.phone.errors %}
+              <div class="text-danger small">{{ form.phone.errors.as_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 이메일 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.email.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.email.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.email }}
+            {% if form.email.errors %}
+              <div class="text-danger small">{{ form.email.errors.as_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 우편번호 + 주소찾기 버튼 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.postcode.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.postcode.label }}</label>
+          <div class="col-7 col-md-5">
+            {{ form.postcode }}
+            {% if form.postcode.errors %}
+              <div class="text-danger small">{{ form.postcode.errors.as_text }}</div>
+            {% endif %}
+          </div>
+          <div class="col-5 col-md-4">
+            <button type="button" class="btn btn-outline-secondary w-100" onclick="execDaumPostcode()">주소 찾기</button>
+          </div>
+        </div>
+
+        <!-- 도로명 주소 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.address.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.address }}
+            {% if form.address.errors %}
+              <div class="text-danger small">{{ form.address.errors.as_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 상세주소 -->
+        <div class="row mb-3 align-items-center">
+          <label for="{{ form.address_detail.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address_detail.label }}</label>
+          <div class="col-12 col-md-9">
+            {{ form.address_detail }}
+            {% if form.address_detail.errors %}
+              <div class="text-danger small">{{ form.address_detail.errors.as_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 버튼 -->
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-          <a href="{% url 'home' %}" class="btn btn-secondary w-100 w-md-auto">
-            🏠 메인으로
-          </a>
-          <button type="submit" class="btn btn-primary w-100 w-md-auto">
-            📄 신청서 PDF 다운로드
-          </button>
+          <a href="{% url 'home' %}" class="btn btn-secondary w-100 w-md-auto">🏠 메인으로</a>
+          <button type="submit" class="btn btn-primary w-100 w-md-auto">📄 신청서 PDF 다운로드</button>
         </div>
       </form>
     </div>
