@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+  <h1>Upload Users via Excel</h1>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" class="default" value="Upload">
+  </form>
+  <br>
+  <p><strong>Excel format:</strong> ID | Password | Name | Branch | Grade | Status</p>
+{% endblock %}
