@@ -1,89 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
-{% load widget_tweaks %}
-
-{{ form.name|add_class:"form-control" }}
 
 {% block title %}위촉서류 출력{% endblock %}
 
 {% block content %}
-<h2 class="text-center mb-4" style="color:#003f7d; font-weight:700;">위촉서류 출력</h2>
-
-<style>
-  /* 전체 컨테이너 */
-  body {
-    background-color: #f9fbfd;
-  }
-
-  h2 {
-    color: #003f7d;
-    font-weight: 700;
-  }
-
-  /* 카드 디자인 */
-  .card {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-  }
-
-  /* 입력창 디자인 */
-  .form-control {
-    border-radius: 10px;
-    border: 1px solid #d2ddec;
-    transition: all 0.25s ease;
-  }
-
-  .form-control:focus {
-    border-color: #005BAC;
-    box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
-  }
-
-  /* 버튼 디자인 */
-  .btn-primary {
-    background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
-    border: none;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    font-weight: 600;
-  }
-
-  .btn-primary:hover {
-    background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
-  }
-
-  /* 주소찾기 버튼 */
-  .btn-outline-secondary {
-    border-radius: 10px;
-    color: #005BAC;
-    border-color: #005BAC;
-    transition: all 0.25s ease;
-  }
-
-  .btn-outline-secondary:hover {
-    background-color: #005BAC;
-    color: #fff;
-  }
-
-  /* 입력 라벨 */
-  label {
-    font-weight: 500;
-    color: #333;
-  }
-
-  /* 반응형 마진 보정 */
-  @media (max-width: 768px) {
-    .container {
-      padding: 0 1rem;
-    }
-  }
-</style>
-
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 600px;">
-    
+    <h2 class="mb-4 text-center">위촉서류 출력 페이지</h2>
+
     <div class="card shadow p-4">
       <form method="POST" novalidate>
         {% csrf_token %}
@@ -92,7 +16,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.name.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.name.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.name|add_class:"form-control" }}
+            {{ form.name }}
             {% if form.name.errors %}
               <div class="text-danger small">{{ form.name.errors.as_text }}</div>
             {% endif %}
@@ -103,7 +27,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.ssn.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.ssn.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.ssn|add_class:"form-control" }}
+            {{ form.ssn }}
             {% if form.ssn.errors %}
               <div class="text-danger small">{{ form.ssn.errors.as_text }}</div>
             {% endif %}
@@ -114,7 +38,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.phone.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.phone.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.phone|add_class:"form-control" }}
+            {{ form.phone }}
             {% if form.phone.errors %}
               <div class="text-danger small">{{ form.phone.errors.as_text }}</div>
             {% endif %}
@@ -125,7 +49,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.email.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.email.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.email|add_class:"form-control" }}
+            {{ form.email }}
             {% if form.email.errors %}
               <div class="text-danger small">{{ form.email.errors.as_text }}</div>
             {% endif %}
@@ -136,7 +60,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.postcode.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.postcode.label }}</label>
           <div class="col-7 col-md-5">
-            {{ form.postcode|add_class:"form-control" }}
+            {{ form.postcode }}
             {% if form.postcode.errors %}
               <div class="text-danger small">{{ form.postcode.errors.as_text }}</div>
             {% endif %}
@@ -150,7 +74,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address|add_class:"form-control" }}
+            {{ form.address }}
             {% if form.address.errors %}
               <div class="text-danger small">{{ form.address.errors.as_text }}</div>
             {% endif %}
@@ -161,7 +85,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address_detail.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address_detail.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address_detail|add_class:"form-control" }}
+            {{ form.address_detail }}
             {% if form.address_detail.errors %}
               <div class="text-danger small">{{ form.address_detail.errors.as_text }}</div>
             {% endif %}
@@ -170,7 +94,17 @@
 
         <!-- 버튼 -->
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-          <button type="submit" class="btn btn-primary w-100 w-md-auto">위촉서류 출력하기</button>
+        <button id="pdfButton" type="submit" class="btn btn-primary w-100 w-md-auto">위촉서류 출력하기</button>
+        </div>
+
+        <!-- ✅ 진행 상태 게이지 영역 -->
+        <div id="progressWrapper" class="mt-3" style="display:none;">
+        <div class="progress" style="height: 20px;">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            0%
+            </div>
+        </div>
         </div>
       </form>
     </div>
@@ -189,5 +123,32 @@ function execDaumPostcode() {
         }
     }).open();
 }
+</script>
+
+<script>
+const pdfButton = document.getElementById('pdfButton');
+const progressWrapper = document.getElementById('progressWrapper');
+const progressBar = document.getElementById('progressBar');
+
+pdfButton.addEventListener('click', function() {
+    // 게이지 표시
+    progressWrapper.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.innerText = '0%';
+    
+    // 애니메이션 시뮬레이션 (5초 동안 0→90%)
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 5;
+        if (progress >= 90) {
+            clearInterval(interval);
+            return;
+        }
+        progressBar.style.width = progress + '%';
+        progressBar.innerText = progress + '%';
+    }, 250);
+    
+    // 사용자가 PDF 다운로드 완료(페이지 리로드) 후 게이지가 초기화됨
+});
 </script>
 {% endblock %}

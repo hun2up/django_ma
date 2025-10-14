@@ -41,6 +41,7 @@ def join_form(request):
             combined_address = f"{address}, {address_detail}" if address_detail else address
 
             # ✅ PDF 템플릿 경로 설정
+            # ✅ PDF 템플릿 경로 설정
             pdf_template_path = os.path.join(settings.BASE_DIR, 'static', 'pdf', 'template.pdf')
 
             # ✅ PDF 데이터 구성
