@@ -1,13 +1,28 @@
-<h1>{{ post.title }}</h1>
-<p>{{ post.content }}</p>
-<p><em>{{ post.created_at }}</em></p>
-<a href="{% url 'post_list' %}">← 목록으로</a>
-<a href="{% url 'home' %}" style="
-    display: inline-block;
-    margin: 20px 0;
-    padding: 10px 20px;
-    background-color: #555;
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
-">🏠 메인으로</a>
+{% extends "base.html" %}
+{% load static %}
+{% block title %}업무요청 상세보기{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="mx-auto" style="max-width: 700px;">
+
+    <div class="card shadow p-4 border-0 rounded-4">
+      <!-- 제목 -->
+      <h2 class="fw-bold mb-3" style="color:#003f7d;">{{ post.title }}</h2>
+
+      <!-- 작성일 -->
+      <p class="text-muted small text-end mb-4">{{ post.created_at }}</p>
+
+      <!-- 본문 내용 -->
+      <p class="fs-5" style="white-space: pre-wrap;">{{ post.content }}</p>
+
+      <!-- 버튼 그룹 -->
+      <div class="d-flex justify-content-between mt-4">
+        <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">← 목록으로</a>
+        <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

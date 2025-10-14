@@ -14,18 +14,71 @@
         </div>
       {% endif %}
 
+      <!-- 🔴 필수 항목 안내 문구 -->
+      <div class="text-end text-danger mb-3" style="font-size: 0.875rem;">
+        * 표시 항목은 필수 입력 항목 칸 입니다
+      </div>
+
       <form method="post" novalidate>
         {% csrf_token %}
 
+        <!-- ✅ 추가된 영역 -->
+        <div class="row">
+          <!-- 구분 -->
+          <div class="mb-3 col-md-6">
+            <label for="category" class="form-label fw-semibold text-danger">구분<span class="text-danger">*</span></label>
+            <select name="category" id="category" class="form-select" required>
+              <option value="">선택</option>
+              <option value="위해촉">위해촉</option>
+              <option value="리스크/유지율">리스크/유지율</option>
+              <option value="수수료/채권">수수료/채권</option>
+              <option value="운영자금">운영자금</option>
+              <option value="전산">전산</option>
+              <option value="전산">기타</option>
+            </select>
+          </div>
+
+          <!-- 손생 -->
+          <div class="mb-3 col-md-6">
+            <label for="insurance_type" class="form-label fw-semibold">손생</label>
+            <select name="insurance_type" id="insurance_type" class="form-select" required>
+              <option value="">선택</option>
+              <option value="손해보험">손해보험</option>
+              <option value="생명보험">생명보험</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 증권번호 -->
+        <div class="mb-3">
+          <label for="policy_number" class="form-label fw-semibold">증권번호</label>
+          <input type="text" name="policy_number" id="policy_number" class="form-control" placeholder="증권번호를 입력하세요">
+        </div>
+
+        <!-- 대상자 성명 + 사번 (한 줄에 나란히) -->
+        <div class="row">
+          <!-- 대상자(성명) -->
+          <div class="mb-3 col-md-6">
+            <label for="target_name" class="form-label fw-semibold">대상자(성명)</label>
+            <input type="text" name="target_name" id="target_name" class="form-control" placeholder="성명을 입력하세요">
+          </div>
+
+          <!-- 대상자(사번) -->
+          <div class="mb-3 col-md-6">
+            <label for="target_id" class="form-label fw-semibold">대상자(사번)</label>
+            <input type="text" name="target_id" id="target_id" class="form-control" placeholder="사번을 입력하세요">
+          </div>
+        </div>
+
         <!-- 제목 -->
         <div class="mb-3">
-          <label for="title" class="form-label fw-semibold">제목</label>
+          <label for="title" class="form-label fw-semibold text-danger">제목<span class="text-danger">*</span></label>
           <input type="text" name="title" id="title" class="form-control" placeholder="제목을 입력하세요" required>
         </div>
 
         <!-- 내용 -->
         <div class="mb-3">
-          <label for="content" class="form-label fw-semibold">내용</label>
+          <label for="content" class="form-label fw-semibold text-danger">내용<span class="text-danger">*</span></label>
           <textarea name="content" id="content" class="form-control" rows="6" placeholder="요청 내용을 구체적으로 작성해주세요." required></textarea>
         </div>
 
