@@ -3,9 +3,9 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse, FileResponse
 from django.conf import settings
 from django.db import connection
+from join.tasks import delete_file_task
 import os
 import tempfile
-
 from .models import JoinInfo
 from .forms import JoinForm
 from join.tasks import generate_pdf_task
@@ -98,23 +98,24 @@ def task_status(request, task_id):
 def download_pdf(request, task_id):
     """
     작업이 완료된 PDF 파일을 다운로드합니다.
+    삭제는 Celery를 통해 일정 시간 후에 처리됩니다.
     """
     from celery.result import AsyncResult
     result = AsyncResult(task_id)
     pdf_path = result.get() if result.state == 'SUCCESS' else None
 
     if pdf_path and os.path.exists(pdf_path):
+        # ✅ 파일 응답
         response = FileResponse(open(pdf_path, 'rb'), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="가입신청서.pdf"'
 
-        # ✅ 파일 삭제 (임시파일 정리)
-        try:
-            os.remove(pdf_path)
-        except Exception as e:
-            print(f"[임시파일 삭제 실패]: {e}")
+        # ✅ 삭제 예약 (Celery 비동기 작업으로)
+        delete_file_task.delay(pdf_path, delay=10)  # 10초 뒤 삭제
 
         return response
+
     return HttpResponse("PDF 파일을 찾을 수 없습니다.", status=404)
+
 
 
 @login_required
