@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block title %}위촉서류 출력{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 600px;">
-    <h2 class="mb-4 text-center">위촉서류 출력 페이지</h2>
+    <h2 class="mb-4 text-center fw-bold" style="font-family:'맑은 고딕', sans-serif; color:#2d3436;">
+      위촉서류 출력 페이지
+    </h2>
 
-    <div class="card shadow p-4">
+    <div class="card shadow p-4 border-0 rounded-4">
       <form method="POST" novalidate>
         {% csrf_token %}
 
@@ -16,7 +19,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.name.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.name.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.name }}
+            {{ form.name|add_class:"form-control" }}
             {% if form.name.errors %}
               <div class="text-danger small">{{ form.name.errors.as_text }}</div>
             {% endif %}
@@ -27,7 +30,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.ssn.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.ssn.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.ssn }}
+            {{ form.ssn|add_class:"form-control" }}
             {% if form.ssn.errors %}
               <div class="text-danger small">{{ form.ssn.errors.as_text }}</div>
             {% endif %}
@@ -38,7 +41,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.phone.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.phone.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.phone }}
+            {{ form.phone|add_class:"form-control" }}
             {% if form.phone.errors %}
               <div class="text-danger small">{{ form.phone.errors.as_text }}</div>
             {% endif %}
@@ -49,7 +52,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.email.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.email.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.email }}
+            {{ form.email|add_class:"form-control" }}
             {% if form.email.errors %}
               <div class="text-danger small">{{ form.email.errors.as_text }}</div>
             {% endif %}
@@ -60,7 +63,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.postcode.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.postcode.label }}</label>
           <div class="col-7 col-md-5">
-            {{ form.postcode }}
+            {{ form.postcode|add_class:"form-control" }}
             {% if form.postcode.errors %}
               <div class="text-danger small">{{ form.postcode.errors.as_text }}</div>
             {% endif %}
@@ -74,7 +77,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address }}
+            {{ form.address|add_class:"form-control" }}
             {% if form.address.errors %}
               <div class="text-danger small">{{ form.address.errors.as_text }}</div>
             {% endif %}
@@ -85,7 +88,7 @@
         <div class="row mb-3 align-items-center">
           <label for="{{ form.address_detail.id_for_label }}" class="col-12 col-md-3 col-form-label text-md-end">{{ form.address_detail.label }}</label>
           <div class="col-12 col-md-9">
-            {{ form.address_detail }}
+            {{ form.address_detail|add_class:"form-control" }}
             {% if form.address_detail.errors %}
               <div class="text-danger small">{{ form.address_detail.errors.as_text }}</div>
             {% endif %}
@@ -94,17 +97,19 @@
 
         <!-- 버튼 -->
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-        <button id="pdfButton" type="submit" class="btn btn-primary w-100 w-md-auto">위촉서류 출력하기</button>
+          <button id="pdfButton" type="submit" class="btn btn-primary w-100 w-md-auto fw-bold">
+            위촉서류 출력하기
+          </button>
         </div>
 
-        <!-- ✅ 진행 상태 게이지 영역 -->
+        <!-- ✅ 진행 상태 게이지 -->
         <div id="progressWrapper" class="mt-3" style="display:none;">
-        <div class="progress" style="height: 20px;">
+          <div class="progress" style="height: 20px;">
             <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
                 role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-            0%
+              0%
             </div>
-        </div>
+          </div>
         </div>
       </form>
     </div>
@@ -115,13 +120,13 @@
 <script src="https://ssl.daumcdn.net/dmaps/map_js_init/postcode.v2.js"></script>
 <script>
 function execDaumPostcode() {
-    new daum.Postcode({
-        oncomplete: function(data) {
-            document.getElementById('postcode').value = data.zonecode;
-            document.getElementById('address').value = data.roadAddress;
-            document.getElementById('address_detail').focus();
-        }
-    }).open();
+  new daum.Postcode({
+    oncomplete: function(data) {
+      document.getElementById('postcode').value = data.zonecode;
+      document.getElementById('address').value = data.roadAddress;
+      document.getElementById('address_detail').focus();
+    }
+  }).open();
 }
 </script>
 
@@ -131,24 +136,20 @@ const progressWrapper = document.getElementById('progressWrapper');
 const progressBar = document.getElementById('progressBar');
 
 pdfButton.addEventListener('click', function() {
-    // 게이지 표시
-    progressWrapper.style.display = 'block';
-    progressBar.style.width = '0%';
-    progressBar.innerText = '0%';
-    
-    // 애니메이션 시뮬레이션 (5초 동안 0→90%)
-    let progress = 0;
-    const interval = setInterval(() => {
-        progress += 5;
-        if (progress >= 90) {
-            clearInterval(interval);
-            return;
-        }
-        progressBar.style.width = progress + '%';
-        progressBar.innerText = progress + '%';
-    }, 250);
-    
-    // 사용자가 PDF 다운로드 완료(페이지 리로드) 후 게이지가 초기화됨
+  progressWrapper.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressBar.innerText = '0%';
+  
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += 5;
+    if (progress >= 90) {
+      clearInterval(interval);
+      return;
+    }
+    progressBar.style.width = progress + '%';
+    progressBar.innerText = progress + '%';
+  }, 250);
 });
 </script>
 {% endblock %}
