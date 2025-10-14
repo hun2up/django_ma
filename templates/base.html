@@ -60,7 +60,7 @@
 
         .nav-link {
             color: #333 !important;
-            font-weight: 500;
+            font-weight: 600;
             margin: 0 10px;
         }
 
@@ -99,8 +99,9 @@
     <div class="collapse navbar-collapse justify-content-center" id="navbarContent">
       <ul class="navbar-nav mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">메인</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'post_list' %}">업무요청 게시판</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}join/">위촉서류 출력</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'post_list' %}">업무요청</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}join/">위촉서류</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}admin/">관리자</a></li>
       </ul>
     </div>
 
