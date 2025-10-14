@@ -1,14 +1,14 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.conf import settings
 from django.db import connection
-from django.http import JsonResponse
 import os
+import tempfile
 
 from .models import JoinInfo
 from .forms import JoinForm
-from .pdf_utils import fill_pdf
+from join.tasks import generate_pdf_task
 
 
 @login_required
@@ -18,19 +18,20 @@ def db_test_view(request):
 
 @login_required
 def join_form(request):
+    """
+    사용자가 가입신청서를 제출하면, PDF 생성 작업을 Celery에 비동기로 위임합니다.
+    메인 서버는 즉시 응답하여 서버 부하 없이 안정적인 처리를 보장합니다.
+    """
     if request.method == 'POST':
         form = JoinForm(request.POST)
         if form.is_valid():
-            # ✅ join_info 객체 생성, DB 저장은 보류
+            # ✅ join_info 객체 생성 및 저장
             join_info = form.save(commit=False)
-
-            # ✅ cleaned_data 기반으로 안전하게 값 추출
             postcode = form.cleaned_data.get('postcode', '').strip()
             address = form.cleaned_data.get('address', '').strip()
             address_detail = form.cleaned_data.get('address_detail', '').strip()
-            email = form.cleaned_data.get('email') or None  # 선택 항목 정리
+            email = form.cleaned_data.get('email') or None
 
-            # 값 주입
             join_info.postcode = postcode
             join_info.address = address
             join_info.address_detail = address_detail
@@ -40,7 +41,6 @@ def join_form(request):
             # ✅ 전체 주소 조합
             combined_address = f"{address}, {address_detail}" if address_detail else address
 
-            # ✅ PDF 템플릿 경로 설정
             # ✅ PDF 템플릿 경로 설정
             pdf_template_path = os.path.join(settings.BASE_DIR, 'static', 'pdf', 'template.pdf')
 
@@ -55,25 +55,16 @@ def join_form(request):
                 "address_detail": address_detail,
             }
 
-            # ✅ PDF 생성 함수 호출
-            filled_pdf_path = fill_pdf(pdf_template_path, data)
+            # ✅ Celery에 비동기 작업 위임
+            task = generate_pdf_task.delay(pdf_template_path, data)
 
-            # ✅ 응답으로 PDF 전송
-            with open(filled_pdf_path, 'rb') as f:
-                pdf_data = f.read()
+            # ✅ 즉시 사용자에게 응답 (서버 부하 X)
+            return render(request, 'join/pdf_processing.html', {
+                'task_id': task.id,
+                'join_info': join_info,
+            })
 
-            response = HttpResponse(pdf_data, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="{join_info.name}_가입신청서.pdf"'
-
-            # ✅ 임시 파일 삭제 시도
-            try:
-                os.remove(filled_pdf_path)
-            except Exception as e:
-                print(f"[임시파일 삭제 실패]: {e}")
-
-            return response  # PDF 파일 다운로드
-
-        # 폼 검증 실패 → 에러 포함해서 다시 렌더링
+        # 폼 검증 실패
         return render(request, 'join/join_form.html', {'form': form})
 
     # GET 요청 → 빈 폼 렌더링
@@ -81,7 +72,51 @@ def join_form(request):
     return render(request, 'join/join_form.html', {'form': form})
 
 
-# ✅ 추가: success_view (누락되어 있던 함수)
+@login_required
+def task_status(request, task_id):
+    """
+    Celery Task 상태를 조회하는 API (AJAX 요청용)
+    """
+    from celery.result import AsyncResult
+    result = AsyncResult(task_id)
+
+    if result.state == 'SUCCESS':
+        pdf_path = result.get()  # fill_pdf가 반환한 경로
+        if os.path.exists(pdf_path):
+            return JsonResponse({'status': 'SUCCESS', 'pdf_ready': True})
+        else:
+            return JsonResponse({'status': 'SUCCESS', 'pdf_ready': False})
+    elif result.state == 'PENDING':
+        return JsonResponse({'status': 'PENDING'})
+    elif result.state == 'FAILURE':
+        return JsonResponse({'status': 'FAILURE'})
+    else:
+        return JsonResponse({'status': result.state})
+
+
+@login_required
+def download_pdf(request, task_id):
+    """
+    작업이 완료된 PDF 파일을 다운로드합니다.
+    """
+    from celery.result import AsyncResult
+    result = AsyncResult(task_id)
+    pdf_path = result.get() if result.state == 'SUCCESS' else None
+
+    if pdf_path and os.path.exists(pdf_path):
+        response = FileResponse(open(pdf_path, 'rb'), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="가입신청서.pdf"'
+
+        # ✅ 파일 삭제 (임시파일 정리)
+        try:
+            os.remove(pdf_path)
+        except Exception as e:
+            print(f"[임시파일 삭제 실패]: {e}")
+
+        return response
+    return HttpResponse("PDF 파일을 찾을 수 없습니다.", status=404)
+
+
 @login_required
 def success_view(request):
     """PDF 생성 완료 또는 가입 성공 후 보여줄 안내 페이지"""

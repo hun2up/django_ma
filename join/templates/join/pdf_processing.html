@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>PDF 생성 중입니다...</h2>
+<p>잠시만 기다려주세요. 완료되면 자동으로 다운로드가 시작됩니다.</p>
+
+<script>
+  const taskId = "{{ task_id }}";
+  const checkStatus = async () => {
+    const res = await fetch(`/join/status/${taskId}/`);
+    const data = await res.json();
+    if (data.status === 'SUCCESS' && data.pdf_ready) {
+      window.location.href = `/join/download/${taskId}/`;
+    } else if (data.status === 'FAILURE') {
+      alert('PDF 생성에 실패했습니다.');
+    } else {
+      setTimeout(checkStatus, 2000);
+    }
+  };
+  checkStatus();
+</script>
+{% endblock %}
