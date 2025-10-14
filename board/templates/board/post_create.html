@@ -1,29 +1,47 @@
-<h1>글 작성하기</h1>
+{% extends "base.html" %}
+{% load static %}
+{% block title %}업무요청 글 작성{% endblock %}
 
-{% if error %}
-  <p style="color: red;">{{ error }}</p>
-{% endif %}
+{% block content %}
+<div class="container mt-5">
+  <div class="mx-auto" style="max-width: 700px;">
+    <h2 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 작성</h2>
 
-<form method="post">
-  {% csrf_token %}
-  <p>
-    <label>제목:</label><br>
-    <input type="text" name="title" required>
-  </p>
-  <p>
-    <label>내용:</label><br>
-    <textarea name="content" rows="5" required></textarea>
-  </p>
-  <button type="submit">제출</button>
-</form>
+    <div class="card shadow p-4 border-0 rounded-4">
+      {% if error %}
+        <div class="alert alert-danger text-center" role="alert">
+          {{ error }}
+        </div>
+      {% endif %}
 
-<a href="{% url 'post_list' %}">← 목록으로</a>
-<a href="{% url 'home' %}" style="
-    display: inline-block;
-    margin: 20px 0;
-    padding: 10px 20px;
-    background-color: #555;
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
-">🏠 메인으로</a>
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- 제목 -->
+        <div class="mb-3">
+          <label for="title" class="form-label fw-semibold">제목</label>
+          <input type="text" name="title" id="title" class="form-control" placeholder="제목을 입력하세요" required>
+        </div>
+
+        <!-- 내용 -->
+        <div class="mb-3">
+          <label for="content" class="form-label fw-semibold">내용</label>
+          <textarea name="content" id="content" class="form-control" rows="6" placeholder="요청 내용을 구체적으로 작성해주세요." required></textarea>
+        </div>
+
+        <!-- 버튼 영역 -->
+        <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
+          <a href="{% url 'post_list' %}" class="btn btn-outline-secondary w-100 w-md-auto">← 목록으로</a>
+          <button type="submit" class="btn btn-primary w-100 w-md-auto fw-bold">글 등록하기</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">
+        메인으로 돌아가기
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
