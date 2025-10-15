@@ -17,73 +17,72 @@
       {% endfor %}
     </div>
   {% endif %}
-  
+
   <div class="mx-auto" style="max-width: 700px;">
 
     <!-- 🔹 카드 시작 -->
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <!-- 🔸 제목 + 작성일자 -->
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0" style="color:#003f7d;">{{ post.title }}</h5>
-        <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
-      </div>
+    <!-- 🔸 제목 + 작성일자 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0" style="color:#003f7d;">{{ post.title }}</h5>
+      <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
+    </div>
 
-      <!-- 🔸 구분선 -->
-      <hr class="mb-4 mt-2">
+    <!-- 🔸 요청 내용 -->
+    <div class="mb-4 mt-3 p-3 rounded-3" style="background-color: #f8f9fa;">
+      <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
+        {{ post.content }}
+      </p>
+    </div>
 
-      <!-- 🔸 필드 요약 정보 (1줄 3개 배치) -->
-      <div class="mb-3">
-        <div class="row">
-          <!-- 구분 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">구분:</strong>
-            {% if post.category and post.category != "선택" %}
-              {{ post.category }}
-            {% else %}
-              -
-            {% endif %}
-          </div>
+    <!-- 🔸 구분선 -->
+    <hr class="mt-4 mb-3">
 
-          <!-- 대상자 성명 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">성명(대상자):</strong>
-            {{ post.fa|default:"-" }}
-          </div>
+    <!-- 🔸 필드 요약 정보 -->
+    <div class="mb-3 small">
+      <div class="row">
+        <!-- 구분 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">구분:</strong>
+          {% if post.category and post.category != "선택" %}
+            {{ post.category }}
+          {% else %}
+            -
+          {% endif %}
+        </div>
 
-          <!-- 대상자 사번 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">사번(대상자):</strong>
-            {{ post.code|default:"-" }}
-          </div>
+        <!-- 대상자 성명 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">성명(대상자):</strong>
+          {{ post.fa|default:"-" }}
+        </div>
 
-          <!-- 요청자 소속 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">소속(요청자):</strong>
-            {{ post.user_branch }}
-          </div>
-          
-          <!-- 요청자 성명 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">성명(요청자):</strong>
-            {{ post.user_name }}
-          </div>
+        <!-- 대상자 사번 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">사번(대상자):</strong>
+          {{ post.code|default:"-" }}
+        </div>
 
-          <!-- 요청자 사번 -->
-          <div class="col-md-4 mb-2">
-            <strong class="text-muted">요청자(사번):</strong>
-            {{ post.user_id }}
-          </div>
+        <!-- 요청자 소속 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">소속(요청자):</strong>
+          {{ post.user_branch }}
+        </div>
 
+        <!-- 요청자 성명 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">성명(요청자):</strong>
+          {{ post.user_name }}
+        </div>
+
+        <!-- 요청자 사번 -->
+        <div class="col-md-4 mb-2">
+          <strong class="text-muted">요청자(사번):</strong>
+          {{ post.user_id }}
         </div>
       </div>
-
-      <!-- 🔸 요청 내용 -->
-      <hr class="my-3">
-      <div class="mb-3">
-        <strong class="text-muted">요청 내용:</strong>
-        <p class="fs-6 mt-2" style="white-space: pre-wrap;">{{ post.content }}</p>
-      </div>
+    </div>
 
       <!-- 🔸 담당자, 상태, 상태변경일 -->
       <hr class="my-3">
