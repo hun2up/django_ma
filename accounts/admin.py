@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import ExcelUploadForm
 from .models import CustomUser
+from .custom_admin import custom_admin_site
 
 # ✅ 공통 엑셀 생성 함수
 def export_users_as_excel(queryset, filename):
@@ -128,6 +129,7 @@ def export_all_users_excel_view(request):
 
 # ✅ 관리자 등록
 @admin.register(CustomUser)
+@admin.register(CustomUser, site=custom_admin_site)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
 

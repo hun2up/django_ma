@@ -110,7 +110,9 @@
         <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">메인</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'post_list' %}">업무요청</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'home' %}join/">위촉서류</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}admin/">관리자</a></li>
+        {% if user.grade == 'superuser' %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}admin/">관리자</a></li>
+        {% endif %}
       </ul>
     </div>
 
