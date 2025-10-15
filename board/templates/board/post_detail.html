@@ -34,19 +34,34 @@
 
           <!-- 대상자 성명 -->
           <div class="col-md-4 mb-2">
-            <strong class="text-muted">대상자 성명:</strong>
+            <strong class="text-muted">성명(대상자):</strong>
             {{ post.fa|default:"-" }}
           </div>
 
           <!-- 대상자 사번 -->
           <div class="col-md-4 mb-2">
-            <strong class="text-muted">대상자 사번:</strong>
-            {% if post.code %}
-              {{ post.code }}
-            {% else %}
-              -
-            {% endif %}
+            <strong class="text-muted">사번(대상자):</strong>
+            {{ post.code|default:"-" }}
           </div>
+
+          <!-- 요청자 소속 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">소속(요청자):</strong>
+            {{ post.user_branch }}
+          </div>
+          
+          <!-- 요청자 성명 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">성명(요청자):</strong>
+            {{ post.user_name }}
+          </div>
+
+          <!-- 요청자 사번 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">요청자(사번):</strong>
+            {{ post.user_id }}
+          </div>
+
         </div>
       </div>
 

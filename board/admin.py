@@ -78,7 +78,7 @@ class PostAdmin(admin.ModelAdmin):
 
     def export_selected_posts_to_excel(self, request, queryset):
         return export_posts_as_excel(queryset, filename="selected_posts.xlsx")
-    export_selected_posts_to_excel.short_description = "선택한 게시글 엑셀 다운로드"
+    export_selected_posts_to_excel.short_description = "Download selected posts to excel"
 
     def export_all_posts_view(self, request):
         posts = self.model.objects.all()
@@ -98,23 +98,23 @@ class PostAdmin(admin.ModelAdmin):
     # ✅ 사용자 정의 컬럼 출력 메서드들 (컬럼명 포함)
     def get_user_id(self, obj):
         return obj.user_id
-    get_user_id.short_description = "요청자(사번)"
+    get_user_id.short_description = "사번(요청자)"
 
     def get_user_name(self, obj):
         return obj.user_name
-    get_user_name.short_description = "요청자(성명)"
+    get_user_name.short_description = "성명(요청자)"
 
     def get_user_branch(self, obj):
         return obj.user_branch
-    get_user_branch.short_description = "요청자(소속)"
+    get_user_branch.short_description = "소속(요청자)"
 
     def get_fa(self, obj):
         return obj.fa
-    get_fa.short_description = "대상자(성명)"
+    get_fa.short_description = "성명(대상자)"
 
     def get_code(self, obj):
         return obj.code
-    get_code.short_description = "대상자(사번)"
+    get_code.short_description = "사번(대상자)"
 
     def get_created_at(self, obj):
         return obj.created_at.strftime('%Y-%m-%d %H:%M')
