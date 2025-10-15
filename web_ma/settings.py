@@ -119,13 +119,17 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
+# ====== 시간대 관련 설정 ======
+LANGUAGE_CODE = 'ko-kr'
+TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
+USE_L10N = True
+USE_TZ = True  # ✅ True 유지! (시간대 인식형 datetime 사용)
 
-USE_TZ = True
+# 선택: 표시 형식 조정
+DATETIME_FORMAT = 'Y-m-d H:i'
+DATE_FORMAT = 'Y-m-d'
 
 
 # Static files (CSS, JavaScript, Images)

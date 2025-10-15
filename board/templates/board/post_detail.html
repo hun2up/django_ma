@@ -6,6 +6,18 @@
 
 {% block content %}
 <div class="container mt-5">
+
+  {% if messages %}
+    <div class="container mt-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  
   <div class="mx-auto" style="max-width: 700px;">
 
     <!-- 🔹 카드 시작 -->
@@ -72,6 +84,69 @@
         <strong class="text-muted">요청 내용:</strong>
         <p class="fs-6 mt-2" style="white-space: pre-wrap;">{{ post.content }}</p>
       </div>
+
+      <!-- 🔸 담당자, 상태, 상태변경일 -->
+      <hr class="my-3">
+      <div class="mb-3">
+        <div class="row align-items-center">
+          <!-- 담당자 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">담당자:</strong>
+            {% if is_superuser %}
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="handler">
+                <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                  <option value="선택" {% if not post.handler %}selected{% endif %}>선택</option>
+                  {% for h in handlers %}
+                    <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">변경</button>
+              </form>
+            {% else %}
+              {{ post.handler|default:"-" }}
+            {% endif %}
+          </div>
+
+          <!-- 상태 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">상태:</strong>
+            {% if is_superuser %}
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="status">
+                <select name="status" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                  {% for s in status_choices %}
+                    <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">변경</button>
+              </form>
+            {% else %}
+              <span
+                style="
+                  {% if post.status == '확인중' %}color:orange;
+                  {% elif post.status == '진행중' %}color:green;
+                  {% elif post.status == '보완요청' %}color:red;
+                  {% elif post.status == '완료' %}color:black;
+                  {% elif post.status == '반려' %}color:gray;
+                  {% endif %}
+                  font-weight:600;
+                ">
+                {{ post.status }}
+              </span>
+            {% endif %}
+          </div>
+
+          <!-- 상태변경일 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">상태변경일:</strong>
+            {{ post.status_updated_at|date:"Y-m-d H:i" }}
+          </div>
+        </div>
+      </div>
+
 
       <!-- 🔸 버튼 영역 -->
       <div class="d-flex justify-content-between mt-4">
