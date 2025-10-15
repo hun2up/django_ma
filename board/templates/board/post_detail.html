@@ -1,30 +1,70 @@
 {% extends "base.html" %}
 {% load static %}
+
 {% block title %}업무요청 상세보기{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
 
+    <!-- 🔹 카드 시작 -->
     <div class="card shadow p-4 border-0 rounded-4">
-      <!-- 제목 + 작성일 (한 줄 배치) -->
+
+      <!-- 🔸 제목 + 작성일자 -->
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">{{ post.title }}</h5>
-        <p class="text-muted small mb-0">{{ post.created_at }}</p>
+        <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
       </div>
 
-      <!-- 구분선 -->
+      <!-- 🔸 구분선 -->
       <hr class="mb-4 mt-2">
 
-      <!-- 본문 내용 -->
-      <p class="fs-6" style="white-space: pre-wrap;">{{ post.content }}</p>
+      <!-- 🔸 필드 요약 정보 (1줄 3개 배치) -->
+      <div class="mb-3">
+        <div class="row">
+          <!-- 구분 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">구분:</strong>
+            {% if post.category and post.category != "선택" %}
+              {{ post.category }}
+            {% else %}
+              -
+            {% endif %}
+          </div>
 
-      <!-- 버튼 그룹 -->
+          <!-- 대상자 성명 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">대상자 성명:</strong>
+            {{ post.fa|default:"-" }}
+          </div>
+
+          <!-- 대상자 사번 -->
+          <div class="col-md-4 mb-2">
+            <strong class="text-muted">대상자 사번:</strong>
+            {% if post.code %}
+              {{ post.code }}
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- 🔸 요청 내용 -->
+      <hr class="my-3">
+      <div class="mb-3">
+        <strong class="text-muted">요청 내용:</strong>
+        <p class="fs-6 mt-2" style="white-space: pre-wrap;">{{ post.content }}</p>
+      </div>
+
+      <!-- 🔸 버튼 영역 -->
       <div class="d-flex justify-content-between mt-4">
         <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">← 목록으로</a>
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
       </div>
+
     </div>
+    <!-- 🔹 카드 끝 -->
 
   </div>
 </div>
