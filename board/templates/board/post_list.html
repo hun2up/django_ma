@@ -1,19 +1,30 @@
+<!--django_ma/board/templates/board/post_list.html-->
 {% extends 'base.html' %}
 
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
-<h2 class="text-center mb-4" style="color:#003f7d; font-weight:700;">업무요청 게시판</h2>
+<h3 class="mb-4 text-center" style="font-family:'Noto Sans KR', sans-serif; color:#003f7d; font-weight:700;">업무요청 게시판</h3>
 
-<div class="card p-4">
+<div class="card p-4 board-font">
   <div class="d-flex justify-content-between mb-3">
     <a href="{% url 'post_create' %}" class="btn btn-primary">[+] 새 글 작성</a>
   </div>
 
   <div class="table-responsive">
     <table class="table table-hover align-middle">
-      <thead class="table-light">
-        <tr class="text-center">
+      <colgroup>
+        <col style="width: 8%;">   <!-- 접수번호 -->
+        <col style="width: 10%;">  <!-- 접수일자 -->
+        <col style="width: 10%;">  <!-- 구분 -->
+        <col style="width: 30%;">  <!-- 제목 -->
+        <col style="width: 10%;">  <!-- 요청자 -->
+        <col style="width: 10%;">  <!-- 담당자 -->
+        <col style="width: 10%;">  <!-- 상태 -->
+        <col style="width: 12%;">  <!-- 상태변경일 -->
+      </colgroup>
+      <thead class="table-light text-center">
+        <tr>
           <th>접수번호</th>
           <th>접수일자</th>
           <th>구분</th>
@@ -26,32 +37,21 @@
       </thead>
       <tbody>
         {% for post in posts %}
-        <tr>
-          <td class="text-center">{{ post.id }}</td>
-          <td class="text-center">{{ post.created_at|date:"Y-m-d" }}</td>
-
-          <!-- ✅ 구분 (category) 출력 -->
-          <td class="text-center">
-            {% if post.category and post.category != "선택" %}
-              {{ post.category }}
-            {% else %}
-              -
-            {% endif %}
-          </td>
-
-          <!-- ✅ 제목 -->
+        <tr class="text-center">
+          <td>{{ post.receipt_number }}</td>
+          <td>{{ post.created_at|date:"Y-m-d" }}</td>
           <td>
+            {{ post.category|default:"-" }}
+          </td>
+          <td class="text-start">
             <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
               {{ post.title }}
             </a>
           </td>
-
-          <td class="text-center">{{ post.user_name|default:"-" }}</td>
-
-          <td class="text-center">-</td>
-          <td class="text-center">-</td>
-          <td class="text-center">-</td>
-          <td class="text-center">-</td>
+          <td>{{ post.user_name|default:"-" }}</td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
         </tr>
         {% empty %}
         <tr>

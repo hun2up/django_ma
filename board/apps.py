@@ -1,3 +1,4 @@
+# django_ma/board/apps.py
 from django.apps import AppConfig
 
 
