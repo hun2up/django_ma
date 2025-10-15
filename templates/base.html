@@ -103,6 +103,13 @@
         .nav-link:hover {
             color: #005BAC !important;
         }
+
+        .status-select {
+          font-weight: 600;
+          border-width: 2px;
+          border-radius: 6px;
+          padding: 4px 8px;
+        }
     </style>
 </head>
 <body>
@@ -156,5 +163,24 @@
     });
   }, 2500);
 </script>
+
+<!-- ✅ 상태 드롭다운 색상 자동 적용 -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const selects = document.querySelectorAll('.status-select');
+    selects.forEach(sel => {
+      const applyColor = () => {
+        const selected = sel.options[sel.selectedIndex];
+        if (!selected) return;
+        const color = selected.getAttribute('data-color');
+        sel.style.color = color || 'inherit';
+        sel.style.fontWeight = '600';
+      };
+      applyColor();
+      sel.addEventListener('change', applyColor);
+    });
+  });
+</script>
+
 </body>
 </html>
