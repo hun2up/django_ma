@@ -29,16 +29,25 @@ def post_create(request):
     """
     - GET 요청 → 빈 폼 표시
     - POST 요청 → 입력 데이터 검증 후 저장
+    - 로그인한 사용자 정보(id, name, branch)를 게시글에 자동 저장
     """
     if request.method == 'POST':
         form = PostForm(request.POST)
         if form.is_valid():
-            form.save()  # ✅ Django ModelForm을 통한 자동 저장
+            post = form.save(commit=False)  # 저장을 미루고...
+
+            # ✅ 로그인한 사용자 정보 추가
+            post.user_id = request.user.id
+            post.user_name = request.user.name
+            post.user_branch = request.user.branch
+
+            post.save()  # 실제 저장
             return redirect('post_list')
-        else:
-            # 에러 발생 시 동일 페이지로 폼+에러 메시지 전달
-            return render(request, 'board/post_create.html', {'form': form})
+
+        # ❌ 유효성 실패 시
+        return render(request, 'board/post_create.html', {'form': form})
 
     else:
-        form = PostForm()  # 빈 폼 생성
+        form = PostForm()
         return render(request, 'board/post_create.html', {'form': form})
+

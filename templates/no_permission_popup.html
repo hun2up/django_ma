@@ -1,0 +1,34 @@
+<!-- templates/no_permission_popup.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>접근 권한 없음</title>
+    <script>
+        function closePopup() {
+            window.location.href = '/';  // 홈으로 이동
+        }
+    </script>
+    <style>
+        .popup {
+            width: 300px;
+            margin: 100px auto;
+            padding: 20px;
+            background: #fff3f3;
+            border: 1px solid #ff0000;
+            text-align: center;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        .popup button {
+            margin-top: 15px;
+            padding: 8px 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup">
+        <p>접근 권한이 없는 페이지입니다.</p>
+        <button onclick="closePopup()">닫기</button>
+    </div>
+</body>
+</html>

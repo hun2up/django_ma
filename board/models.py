@@ -11,4 +11,10 @@ class Post(models.Model):
     )
     title = models.CharField(max_length=200)
     content = models.TextField()
+    user_id = models.CharField(max_length=30, blank=True, null=True)       # 사번
+    user_name = models.CharField(max_length=100, blank=True, null=True)    # 성명
+    user_branch = models.CharField(max_length=100, blank=True, null=True)  # 소속
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
