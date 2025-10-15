@@ -27,6 +27,11 @@ def join_form(request):
         if form.is_valid():
             # ✅ join_info 객체 생성 및 저장
             join_info = form.save(commit=False)
+
+            join_info.user_id = request.user.id
+            join_info.user_name = request.user.name
+            join_info.user_branch = request.user.branch
+
             postcode = form.cleaned_data.get('postcode', '').strip()
             address = form.cleaned_data.get('address', '').strip()
             address_detail = form.cleaned_data.get('address_detail', '').strip()
@@ -36,6 +41,7 @@ def join_form(request):
             join_info.address = address
             join_info.address_detail = address_detail
             join_info.email = email
+            
             join_info.save()
 
             # ✅ 전체 주소 조합
