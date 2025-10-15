@@ -1,10 +1,20 @@
-<!--django_ma/board/templates/board/post_list.html-->
 {% extends 'base.html' %}
 
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
 <h3 class="mb-4 text-center" style="font-family:'Noto Sans KR', sans-serif; color:#003f7d; font-weight:700;">업무요청 게시판</h3>
+
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-success alert-dismissible fade show text-center" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
 
 <div class="card p-4 board-font">
   <div class="d-flex justify-content-between mb-3">
@@ -14,15 +24,16 @@
   <div class="table-responsive">
     <table class="table table-hover align-middle">
       <colgroup>
-        <col style="width: 8%;">   <!-- 접수번호 -->
-        <col style="width: 10%;">  <!-- 접수일자 -->
-        <col style="width: 10%;">  <!-- 구분 -->
-        <col style="width: 30%;">  <!-- 제목 -->
-        <col style="width: 10%;">  <!-- 요청자 -->
-        <col style="width: 10%;">  <!-- 담당자 -->
-        <col style="width: 10%;">  <!-- 상태 -->
-        <col style="width: 12%;">  <!-- 상태변경일 -->
+        <col style="width: 8%;">
+        <col style="width: 8%;">
+        <col style="width: 10%;">
+        <col style="width: 25%;">
+        <col style="width: 10%;">
+        <col style="width: 13%;">
+        <col style="width: 13%;">
+        <col style="width: 13%;">
       </colgroup>
+
       <thead class="table-light text-center">
         <tr>
           <th>접수번호</th>
@@ -35,23 +46,72 @@
           <th>상태변경일</th>
         </tr>
       </thead>
+
       <tbody>
         {% for post in posts %}
         <tr class="text-center">
           <td>{{ post.receipt_number }}</td>
           <td>{{ post.created_at|date:"Y-m-d" }}</td>
-          <td>
-            {{ post.category|default:"-" }}
-          </td>
+          <td>{{ post.category|default:"-" }}</td>
           <td class="text-start">
-            <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
-              {{ post.title }}
-            </a>
+            <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">{{ post.title }}</a>
           </td>
           <td>{{ post.user_name|default:"-" }}</td>
-          <td>-</td>
-          <td>-</td>
-          <td>-</td>
+
+          <!-- 담당자 -->
+          <td>
+            {% if is_superuser %}
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="handler">
+                <input type="hidden" name="post_id" value="{{ post.id }}">
+                <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                  <option value="선택" {% if not post.handler %}selected{% endif %}>선택</option>
+                  {% for h in handlers %}
+                    <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-primary">변경</button>
+              </form>
+            {% else %}
+              {{ post.handler|default:"-" }}
+            {% endif %}
+          </td>
+
+          <!-- 상태 -->
+          <td>
+            {% if is_superuser %}
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="status">
+                <input type="hidden" name="post_id" value="{{ post.id }}">
+                <select name="status" class="form-select form-select-sm status-select d-inline-block" style="width:auto;">
+                  {% for s in status_choices %}
+                    <option value="{{ s }}"
+                      {% if post.status == s %}selected{% endif %}
+                      data-color="{% if s == '확인중' %}orange{% elif s == '진행중' %}green{% elif s == '보완요청' %}red{% elif s == '완료' %}black{% elif s == '반려' %}gray{% endif %}">
+                      {{ s }}
+                    </option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-primary">변경</button>
+              </form>
+            {% else %}
+              <span
+                style="
+                  {% if post.status == '확인중' %}color:orange;
+                  {% elif post.status == '진행중' %}color:green;
+                  {% elif post.status == '보완요청' %}color:red;
+                  {% elif post.status == '완료' %}color:black;
+                  {% elif post.status == '반려' %}color:gray;
+                  {% endif %}
+                  font-weight:600;">
+                {{ post.status }}
+              </span>
+            {% endif %}
+          </td>
+
+          <td>{{ post.status_updated_at|date:"Y-m-d H:i" }}</td>
         </tr>
         {% empty %}
         <tr>
@@ -62,7 +122,6 @@
     </table>
   </div>
 
-  <!-- 페이지네이션 -->
   <div class="text-center mt-3">
     {% if posts.has_previous %}
       <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
