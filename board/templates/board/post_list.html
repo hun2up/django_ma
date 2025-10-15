@@ -29,15 +29,32 @@
         <tr>
           <td class="text-center">{{ post.id }}</td>
           <td class="text-center">{{ post.created_at|date:"Y-m-d" }}</td>
-          <td class="text-center">-</td>
-          <td><a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">{{ post.title }}</a></td>
+
+          <!-- ✅ 구분 (category) 출력 -->
+          <td class="text-center">
+            {% if post.category and post.category != "선택" %}
+              {{ post.category }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <!-- ✅ 제목 -->
+          <td>
+            <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
+              {{ post.title }}
+            </a>
+          </td>
+
           <td class="text-center">-</td>
           <td class="text-center">-</td>
           <td class="text-center">-</td>
           <td class="text-center">-</td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td></tr>
+        <tr>
+          <td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
