@@ -1,4 +1,4 @@
-# board/forms.py
+# django_ma/board/forms.py
 from django import forms
 from .models import Post
 

@@ -8,9 +8,8 @@
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- 브랜드 폰트 -->
+    <!-- Noto Sans KR 폰트 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-
 
     <style>
         html {
@@ -21,13 +20,28 @@
         body, button, input, textarea, select {
             font-family: 'Noto Sans KR', sans-serif;
         }
-        
+
         body {
             background-color: #f9fbfd;
             padding-top: 70px;
         }
 
-        /* 공통 버튼 */
+        /* 게시판 폰트 크기 조절용 */
+        .board-font {
+            font-size: 15px;
+        }
+
+        .board-font th {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .board-font td,
+        .board-font a {
+            font-size: 14px;
+        }
+
+        /* 버튼 */
         .btn-primary {
             background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
             border: none;
@@ -42,14 +56,27 @@
             box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
         }
 
-        /* 카드 공통 */
+        .btn-logout {
+            background-color: #dc3545;
+            color: white;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.9rem;
+            border: none;
+        }
+
+        .btn-logout:hover {
+            background-color: #b02a37;
+        }
+
+        /* 카드 */
         .card {
             border: none;
             border-radius: 15px;
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
         }
 
-        /* 인풋 필드 */
+        /* 인풋 */
         .form-control {
             border-radius: 10px;
             border: 1px solid #d2ddec;
@@ -76,24 +103,11 @@
         .nav-link:hover {
             color: #005BAC !important;
         }
-
-        .btn-logout {
-            background-color: #dc3545;
-            color: white;
-            border-radius: 8px;
-            padding: 6px 14px;
-            font-size: 0.9rem;
-            border: none;
-        }
-
-        .btn-logout:hover {
-            background-color: #b02a37;
-        }
     </style>
 </head>
 <body>
 
-<!-- ✅ 상단 메뉴 -->
+<!-- 네비게이션 -->
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg fixed-top">
   <div class="container-fluid">
@@ -126,6 +140,7 @@
 </nav>
 {% endif %}
 
+<!-- 콘텐츠 영역 -->
 <div class="container my-5">
   {% block content %}{% endblock %}
 </div>
