@@ -21,19 +21,9 @@
     <a href="{% url 'post_create' %}" class="btn btn-primary">[+] 새 글 작성</a>
   </div>
 
+  <!-- ✅ 게시판 테이블 -->
   <div class="table-responsive">
     <table class="table table-hover align-middle">
-      <colgroup>
-        <col style="width: 8%;">
-        <col style="width: 8%;">
-        <col style="width: 10%;">
-        <col style="width: 25%;">
-        <col style="width: 10%;">
-        <col style="width: 13%;">
-        <col style="width: 13%;">
-        <col style="width: 13%;">
-      </colgroup>
-
       <thead class="table-light text-center">
         <tr>
           <th>접수번호</th>
@@ -98,14 +88,13 @@
               </form>
             {% else %}
               <span
-                style="
+                style="font-weight:600;
                   {% if post.status == '확인중' %}color:orange;
                   {% elif post.status == '진행중' %}color:green;
                   {% elif post.status == '보완요청' %}color:red;
                   {% elif post.status == '완료' %}color:black;
                   {% elif post.status == '반려' %}color:gray;
-                  {% endif %}
-                  font-weight:600;">
+                  {% endif %}">
                 {{ post.status }}
               </span>
             {% endif %}
@@ -122,6 +111,7 @@
     </table>
   </div>
 
+  <!-- ✅ 페이지네이션 -->
   <div class="text-center mt-3">
     {% if posts.has_previous %}
       <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
@@ -131,5 +121,87 @@
       <a href="?page={{ posts.next_page_number }}" class="btn btn-outline-primary btn-sm">다음</a>
     {% endif %}
   </div>
+
+<!-- ✅ 검색/필터 폼 -->
+<form method="get" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
+  <div class="d-flex flex-wrap align-items-center justify-content-center gap-4">
+
+    <!-- 🔹 검색유형 + 검색어 -->
+    <div class="d-flex align-items-center" style="gap: 8px;">
+      <select name="search_type" class="form-select form-select-sm category-select" style="width: 90px;">
+        <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
+        <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
+        <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
+        <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
+        <option value="category" {% if search_type == 'category' %}selected{% endif %}>구분</option>
+      </select>
+      <input type="text" name="keyword" value="{{ keyword }}" 
+             class="form-control form-control-sm"
+             placeholder="검색어 입력"
+             style="width: 200px;">
+    </div>
+
+    <!-- 🔹 담당자 -->
+    <div class="d-flex align-items-center" style="gap: 8px;">
+      <label class="search-label mb-0">담당자</label>
+      <select name="handler" class="form-select form-select-sm" style="width: 120px;">
+        <option value="전체">전체</option>
+        {% for h in handlers %}
+          <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 🔹 상태 -->
+    <div class="d-flex align-items-center" style="gap: 8px;">
+      <label class="search-label mb-0">상태</label>
+      <select name="status" class="form-select form-select-sm" style="width: 120px;">
+        <option value="전체">전체</option>
+        {% for s in status_choices %}
+          <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 🔹 버튼 -->
+    <div class="d-flex align-items-center" style="gap: 6px;">
+      <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
+      <a href="{% url 'post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
+    </div>
+
+  </div>
+</form>
+
+<!-- ✅ 스타일 -->
+<style>
+  .search-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #555;
+    white-space: nowrap;
+  }
+
+  .category-select {
+    background-color: #f3f3f3;
+    border-radius: 8px;
+    border: 1px solid #d2ddec;
+    font-size: 0.85rem;
+  }
+
+  .category-select:focus {
+    border-color: #005BAC;
+    box-shadow: 0 0 4px rgba(0, 91, 172, 0.4);
+  }
+
+  /* ✅ 반응형 (작은 화면에서는 2줄 정렬) */
+  @media (max-width: 768px) {
+    form .d-flex.flex-wrap {
+      justify-content: start !important;
+    }
+    form .d-flex.flex-wrap > div {
+      flex: 1 1 100%;
+    }
+  }
+</style>
 </div>
 {% endblock %}
