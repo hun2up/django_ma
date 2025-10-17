@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+# django_ma > web_ma > settings.py
 import os
 from pathlib import Path
 import dj_database_url
@@ -192,3 +193,7 @@ LOGGING = {
         },
     },
 }
+
+# 파일첨부 기능을 위한 media url 설정
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

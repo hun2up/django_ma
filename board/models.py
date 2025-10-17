@@ -1,9 +1,8 @@
-# django_ma > board > models.py
-
+# django_ma/board/models.py
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-
+import mimetypes
 
 class Post(models.Model):
     """
@@ -68,7 +67,6 @@ class Post(models.Model):
         help_text="상태나 담당자가 변경된 시점"
     )
 
-    # === 메서드 ===
     def save(self, *args, **kwargs):
         """저장 시 접수번호 및 상태/담당자 변경일 자동 처리"""
         now = timezone.localtime()
@@ -99,3 +97,32 @@ class Post(models.Model):
         ordering = ['-created_at']
         verbose_name = "Posts"
         verbose_name_plural = "Posts"
+
+
+# === 첨부파일 관련 ===
+def attachment_upload_to(instance, filename):
+    """업로드 경로: media/attachments/연도/월/일/파일명"""
+    return f"attachments/{timezone.now():%Y/%m/%d}/{filename}"
+
+
+class Attachment(models.Model):
+    post = models.ForeignKey(Post, related_name='attachments', on_delete=models.CASCADE)
+    file = models.FileField(upload_to=attachment_upload_to)
+    original_name = models.CharField(max_length=255, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    content_type = models.CharField(max_length=120, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        """파일 저장 시 원본 이름, 용량, MIME 타입 자동 기록"""
+        if self.file and not self.original_name:
+            self.original_name = getattr(self.file, 'name', '')
+        if self.file and hasattr(self.file, 'size'):
+            self.size = self.file.size or 0
+        if self.file and not self.content_type:
+            guessed, _ = mimetypes.guess_type(self.original_name or '')
+            self.content_type = guessed or ''
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.original_name or self.file.name

@@ -14,11 +14,15 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
+# django_ma > web_ma > urls.py
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from accounts.custom_admin import custom_admin_site
 from home import views as home_views  # 메인 페이지 뷰
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', custom_admin_site.urls),
@@ -28,3 +32,7 @@ urlpatterns = [
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
 ]
+
+# 개발 모드(DEBUG=True)에서만 업로드 파일 서빙
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
