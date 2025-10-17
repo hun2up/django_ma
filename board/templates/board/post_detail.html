@@ -1,3 +1,4 @@
+<!--django_ma/board/templates/board/post_detail.html-->
 {% extends "base.html" %}
 {% load static %}
 
@@ -20,6 +21,9 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
+      <!-- 공통 CSS 불러오기 -->
+      <link rel="stylesheet" href="{% static 'css/label-style.css' %}">
+
       <!-- 제목 + 작성일자 -->
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">{{ post.title }}</h5>
@@ -36,14 +40,38 @@
       <hr class="mt-4 mb-3">
 
       <!-- 필드 요약 정보 -->
-      <div class="mb-3 small">
-        <div class="row">
-          <div class="col-md-4 mb-2"><strong class="text-muted">구분:</strong> {{ post.category|default:"-" }}</div>
-          <div class="col-md-4 mb-2"><strong class="text-muted">성명(대상자):</strong> {{ post.fa|default:"-" }}</div>
-          <div class="col-md-4 mb-2"><strong class="text-muted">사번(대상자):</strong> {{ post.code|default:"-" }}</div>
-          <div class="col-md-4 mb-2"><strong class="text-muted">소속(요청자):</strong> {{ post.user_branch }}</div>
-          <div class="col-md-4 mb-2"><strong class="text-muted">성명(요청자):</strong> {{ post.user_name }}</div>
-          <div class="col-md-4 mb-2"><strong class="text-muted">요청자(사번):</strong> {{ post.user_id }}</div>
+      <div class="mb-3">
+        <div class="row gy-2 gx-3">
+
+          <div class="col-md-4">
+            <span class="info-label">구분</span>
+            <span class="info-value">{{ post.category|default:"-" }}</span>
+          </div>
+
+          <div class="col-md-4">
+            <span class="info-label">성명(대상자)</span>
+            <span class="info-value">{{ post.fa|default:"-" }}</span>
+          </div>
+
+          <div class="col-md-4">
+            <span class="info-label">사번(대상자)</span>
+            <span class="info-value">{{ post.code|default:"-" }}</span>
+          </div>
+
+          <div class="col-md-4">
+            <span class="info-label">소속(요청자)</span>
+            <span class="info-value">{{ post.user_branch }}</span>
+          </div>
+
+          <div class="col-md-4">
+            <span class="info-label">성명(요청자)</span>
+            <span class="info-value">{{ post.user_name }}</span>
+          </div>
+
+          <div class="col-md-4">
+            <span class="info-label">사번(요청자)</span>
+            <span class="info-value">{{ post.user_id }}</span>
+          </div>
         </div>
       </div>
 
@@ -54,7 +82,7 @@
 
           <!-- 담당자 -->
           <div class="col-md-4 mb-2">
-            <strong class="text-muted">담당자:</strong>
+            <span class="info-label">담당자</span>
             {% if is_superuser %}
               <form method="post" style="display:inline;">
                 {% csrf_token %}
@@ -74,7 +102,7 @@
 
           <!-- 상태 -->
           <div class="col-md-4 mb-2">
-            <strong class="text-muted">상태:</strong>
+            <span class="info-label">상태</span>
             {% if is_superuser %}
               <form method="post" style="display:inline;">
                 {% csrf_token %}
@@ -107,12 +135,15 @@
 
           <!-- 상태변경일 -->
           <div class="col-md-4 mb-2">
-            <strong class="text-muted">상태변경일:</strong> {{ post.status_updated_at|date:"Y-m-d H:i" }}
+            <span class="info-label">상태변경</span> <span class="small-text">{{ post.status_updated_at|date:"Y-m-d H:i" }}</span>
           </div>
         </div>
+
+        <hr class="my-3">
+
         {% if post.attachments.exists %}
           <div class="mt-4">
-            <h6 class="fw-bold">첨부파일</h6>
+            <span class="info-value">첨부파일</span>
             <ul class="list-group">
               {% for att in post.attachments.all %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -133,7 +164,15 @@
       </div>
 
       <div class="d-flex justify-content-between mt-4">
-        <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">← 목록으로</a>
+        <div class="d-flex gap-2">
+          <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">목록으로</a>
+
+          {% if user.is_authenticated and user == post.author or user.is_superuser %}
+            <!-- 수정 버튼 -->
+            <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
+          {% endif %}
+        </div>
+
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
       </div>
 

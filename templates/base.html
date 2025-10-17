@@ -1,3 +1,5 @@
+<!-- django_ma > templates > base.html -->
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="ko">
@@ -12,105 +14,144 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        html {
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
+      html {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+      }
 
-        body, button, input, textarea, select {
-            font-family: 'Noto Sans KR', sans-serif;
-        }
+      body, button, input, textarea, select {
+          font-family: 'Noto Sans KR', sans-serif;
+      }
 
-        body {
-            background-color: #f9fbfd;
-            padding-top: 70px;
-        }
+      body {
+          background-color: #f9fbfd;
+          padding-top: 70px;
+      }
 
-        /* 게시판 폰트 크기 조절용 */
-        .board-font {
-            font-size: 15px;
-        }
+      hr {
+        border: none;
+        border-top: 1px solid #e0e6ed; /* 기존보다 연한 색상 */
+        opacity: 0.7; /* 조금 더 투명하게 */
+      }
 
-        .board-font th {
-            font-size: 13px;
-            font-weight: 600;
-        }
+      /* 게시판 폰트 크기 조절용 */
+      .board-font {
+          font-size: 15px;
+      }
 
-        .board-font td,
-        .board-font a {
-            font-size: 14px;
-        }
-
-        /* 버튼 */
-        .btn-primary {
-            background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
-            border: none;
-            border-radius: 10px;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
-        }
-
-        .btn-logout {
-            background-color: #dc3545;
-            color: white;
-            border-radius: 8px;
-            padding: 6px 14px;
-            font-size: 0.9rem;
-            border: none;
-        }
-
-        .btn-logout:hover {
-            background-color: #b02a37;
-        }
-
-        /* 카드 */
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        /* 인풋 */
-        .form-control {
-            border-radius: 10px;
-            border: 1px solid #d2ddec;
-            transition: all 0.25s ease;
-        }
-
-        .form-control:focus {
-            border-color: #005BAC;
-            box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
-        }
-
-        /* Navbar */
-        .navbar {
-            background-color: #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-
-        .nav-link {
-            color: #333 !important;
-            font-weight: 600;
-            margin: 0 10px;
-        }
-
-        .nav-link:hover {
-            color: #005BAC !important;
-        }
-
-        .status-select {
+      .board-font th {
+          font-size: 13px;
           font-weight: 600;
-          border-width: 2px;
-          border-radius: 6px;
-          padding: 4px 8px;
-        }
+      }
+
+      .board-font td,
+      .board-font a {
+          font-size: 14px;
+      }
+
+      /* 버튼 */
+      .btn-primary {
+          background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+          border: none;
+          border-radius: 10px;
+          transition: all 0.3s ease;
+          font-weight: 600;
+      }
+
+      .btn-primary:hover {
+          background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
+      }
+
+      .btn-logout {
+          background-color: #dc3545;
+          color: white;
+          border-radius: 8px;
+          padding: 6px 14px;
+          font-size: 0.9rem;
+          border: none;
+      }
+
+      .btn-logout:hover {
+          background-color: #b02a37;
+      }
+
+      /* 카드 */
+      .card {
+          border: none;
+          border-radius: 15px;
+          box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      /* 인풋 */
+      .form-control {
+          border-radius: 10px;
+          border: 1px solid #d2ddec;
+          transition: all 0.25s ease;
+      }
+
+      .form-control:focus {
+          border-color: #005BAC;
+          box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
+      }
+
+      /* Navbar */
+      .navbar {
+          background-color: #fff;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      }
+
+      .nav-link {
+          color: #333 !important;
+          font-weight: 600;
+          margin: 0 10px;
+      }
+
+      .nav-link:hover {
+          color: #005BAC !important;
+      }
+
+      .status-select {
+        font-weight: 600;
+        border-width: 2px;
+        border-radius: 6px;
+        padding: 4px 8px;
+      }
+
+      .info-label {
+        font-size: 0.80rem;
+        font-weight: 400;
+        color: #333;
+        background-color: #fdfdfd;
+        border-radius: 8px;
+        padding: 4px 10px;
+        display: inline-block;
+      }
+
+      .info-value {
+        background-color: #F8F8F8;
+        border-radius: 10px;
+        padding: 5px 10px;
+        font-size: 0.80rem;
+        font-weight: 600;
+        display: inline-block;
+        min-width: 90px;
+        text-align: center;
+        margin-right: 6px;
+      }
+
+      .small-text {
+        font-size: 0.85rem;   /* 기본보다 작게 */
+        color: #555;           /* 살짝 흐리게 (선택사항) */
+      }
+      
+      /* 첨부파일 목록 폰트 크기 줄이기 */
+      .list-group-item {
+        font-size: 0.9rem; /* 기본 대비 약 90% */
+      }
     </style>
+
 </head>
 <body>
 
