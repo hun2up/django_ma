@@ -110,6 +110,26 @@
             <strong class="text-muted">상태변경일:</strong> {{ post.status_updated_at|date:"Y-m-d H:i" }}
           </div>
         </div>
+        {% if post.attachments.exists %}
+          <div class="mt-4">
+            <h6 class="fw-bold">첨부파일</h6>
+            <ul class="list-group">
+              {% for att in post.attachments.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="text-truncate" style="max-width: 80%;">
+                    <i class="bi bi-paperclip"></i>
+                    <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
+                      {{ att.original_name|default:att.file.name }}
+                    </a>
+                  </div>
+                  <span class="badge bg-light text-dark border">
+                    {{ att.size|filesizeformat }}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
       </div>
 
       <div class="d-flex justify-content-between mt-4">

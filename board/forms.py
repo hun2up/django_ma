@@ -22,11 +22,16 @@ class PostForm(forms.ModelForm):
             'fa': forms.TextInput(attrs={'class': 'form-control'}),
             'code': forms.NumberInput(attrs={'class': 'form-control'}),
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '제목을 입력하세요'}),
-            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 6, 'placeholder': (
-            '요청 내용을 구체적으로 작성해주세요.\n\n'
-            '개별 계약 건별 요청인 경우\n'
-            '증권번호 및 보험사 전산화면 캡처본(촬영본)을 첨부해주시면\n'
-            '더 빠르고 정확하게 안내드릴 수 있습니다.')}),
+            'content': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 6,
+                'placeholder': (
+                    '요청 내용을 구체적으로 작성해주세요.\n\n'
+                    '개별 계약 건별 요청인 경우\n'
+                    '증권번호 및 보험사 전산화면 캡처본(촬영본)을 첨부해주시면\n'
+                    '더 빠르고 정확하게 안내드릴 수 있습니다.'
+                )
+            }),
         }
 
     def __init__(self, *args, **kwargs):

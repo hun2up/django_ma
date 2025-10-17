@@ -1,6 +1,7 @@
-<!--django_ma/board/templates/board/post_create.html-->
+<!-- django_ma/board/templates/board/post_create.html -->
 {% extends "base.html" %}
 {% load static %}
+{% load widget_tweaks %}
 {% block title %}업무요청 글 작성{% endblock %}
 
 {% block content %}
@@ -13,28 +14,26 @@
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <form method="post" novalidate>
+      <form method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
 
-      <div class="row mb-3">
-        <!-- 구분 -->
-        <div class="col-md-4">
-          <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">구분</label>
-          {{ form.category }}
-        </div>
+        <!-- 구분 / 대상자 -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">구분</label>
+            {{ form.category }}
+          </div>
 
-        <!-- 대상자 성명 -->
-        <div class="col-md-4">
-          <label for="{{ form.fa.id_for_label }}" class="form-label fw-semibold">대상자(성명)</label>
-          {{ form.fa }}
-        </div>
+          <div class="col-md-4">
+            <label for="{{ form.fa.id_for_label }}" class="form-label fw-semibold">대상자(성명)</label>
+            {{ form.fa }}
+          </div>
 
-        <!-- 대상자 사번 -->
-        <div class="col-md-4">
-          <label for="{{ form.code.id_for_label }}" class="form-label fw-semibold">대상자(사번)</label>
-          {{ form.code }}
+          <div class="col-md-4">
+            <label for="{{ form.code.id_for_label }}" class="form-label fw-semibold">대상자(사번)</label>
+            {{ form.code }}
+          </div>
         </div>
-      </div>
 
         <!-- 제목 -->
         <div class="mb-3">
@@ -46,6 +45,21 @@
         <div class="mb-3">
           <label for="{{ form.content.id_for_label }}" class="form-label fw-semibold text-danger">내용*</label>
           {{ form.content }}
+        </div>
+
+        <!-- 첨부파일 -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">첨부파일</label>
+
+          {# ✅ 방법 1: forms.py에 attachments 필드가 있을 경우 자동 렌더링 #}
+          {% if form.attachments %}
+            {{ form.attachments }}
+          {% else %}
+          {# ✅ 방법 2: 수동 input (forms.py에 attachments 없음) #}
+            <input type="file" name="attachments" class="form-control" multiple>
+          {% endif %}
+
+          <div class="form-text">여러 파일을 한 번에 선택할 수 있습니다.</div>
         </div>
 
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
