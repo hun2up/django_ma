@@ -1,6 +1,7 @@
 <!--django_ma/board/templates/board/post_detail.html-->
 {% extends "base.html" %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block title %}업무요청 상세보기{% endblock %}
 
@@ -21,7 +22,6 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <!-- 공통 CSS 불러오기 -->
       <link rel="stylesheet" href="{% static 'css/label-style.css' %}">
 
       <!-- 제목 + 작성일자 -->
@@ -31,16 +31,86 @@
       </div>
 
       <!-- 요청 내용 -->
-      <div class="mb-4 mt-3 p-3 rounded-3" style="background-color: #f8f9fa;">
+      <div class="my-3 mt-3 p-3 rounded-3 bg-light">
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
           {{ post.content }}
         </p>
       </div>
 
-      <hr class="mt-4 mb-3">
+      <hr class="my-3">
+
+      <!-- 댓글 라벨 -->
+      <div class="my-3">
+        <span class="info-value">댓글</span>
+
+        <!-- 댓글 리스트 -->
+        <div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
+
+          {% for comment in comments %}
+          <div class="mb-3 position-relative">
+
+            <!-- 작성일시 -->
+            <small class="text-muted d-block mb-1" style="font-size:12px;">
+              {{ comment.created_at|date:"Y-m-d H:i" }}
+            </small>
+
+            <!-- 댓글 본문 (공통 CSS 구조) -->
+            <div class="comment-box">
+
+              <!-- 좌측 내용 -->
+              <div class="comment-content position-relative">
+                <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.content }}</p>
+
+                {% if user == comment.author %}
+                <div class="position-absolute top-0 end-0 mt-1 me-2 edit-delete-btns">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
+                          data-id="{{ comment.id }}"
+                          style="font-size:12px;">수정</button>
+
+                  <form method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action_type" value="delete_comment">
+                    <input type="hidden" name="comment_id" value="{{ comment.id }}">
+                    <button type="submit"
+                            class="btn btn-sm btn-outline-danger px-2 py-0"
+                            style="font-size:12px;">삭제</button>
+                  </form>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- 우측 작성자 -->
+              <span class="info-label">{{ comment.author.name }}</span>
+            </div>
+
+          </div>
+          {% empty %}
+          <p class="comment-empty mb-0">아직 댓글이 없습니다.</p>
+          {% endfor %}
+        </div>
+
+        <!-- 댓글 입력 폼 -->
+        {% if user.is_authenticated %}
+        <form method="post" class="mt-3">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="comment">
+          <div class="d-flex align-items-center gap-1">
+            {{ form.content|add_class:"form-control form-control-sm flex-grow-1" }}
+            <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px; line-height:1;">등록</button>
+          </div>
+        </form>
+        {% else %}
+        <p class="comment-login mt-3">
+          댓글을 작성하려면 <a href="{% url 'login' %}" class="text-primary fw-semibold">로그인</a> 하세요.
+        </p>
+        {% endif %}
+      </div>
+
+      <hr class="my-3">
 
       <!-- 필드 요약 정보 -->
-      <div class="mb-3">
+      <div class="my-3">
         <div class="row gy-2 gx-3">
 
           <div class="col-md-4">
@@ -74,10 +144,11 @@
           </div>
         </div>
       </div>
-
-      <!-- 담당자, 상태, 상태변경일 -->
+      
       <hr class="my-3">
-      <div class="mb-3">
+      
+      <!-- 담당자, 상태, 상태변경일 -->
+      <div class="my-3">
         <div class="row align-items-center">
 
           <!-- 담당자 -->
@@ -139,28 +210,28 @@
           </div>
         </div>
 
-        <hr class="my-3">
+      <hr class="my-3">
 
-        {% if post.attachments.exists %}
-          <div class="mt-4">
-            <span class="info-value">첨부파일</span>
-            <ul class="list-group">
-              {% for att in post.attachments.all %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <div class="text-truncate" style="max-width: 80%;">
-                    <i class="bi bi-paperclip"></i>
-                    <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
-                      {{ att.original_name|default:att.file.name }}
-                    </a>
-                  </div>
-                  <span class="badge bg-light text-dark border">
-                    {{ att.size|filesizeformat }}
-                  </span>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
+      {% if post.attachments.exists %}
+        <div class="my-3">
+          <span class="info-value">첨부파일</span>
+          <ul class="list-group">
+            {% for att in post.attachments.all %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="text-truncate" style="max-width: 80%;">
+                  <i class="bi bi-paperclip"></i>
+                  <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
+                    {{ att.original_name|default:att.file.name }}
+                  </a>
+                </div>
+                <span class="badge bg-light text-dark border">
+                  {{ att.size|filesizeformat }}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
       </div>
 
       <div class="d-flex justify-content-between mt-4">
@@ -176,7 +247,37 @@
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
       </div>
 
-    </div>
+    </div>  
   </div>
 </div>
+
+<!-- 댓글 수정 JS -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const commentId = btn.dataset.id;
+      const container = btn.closest('.comment-content');
+      const textP = container.querySelector('p');
+      const oldText = textP.innerText.trim();
+      const actionBtns = container.querySelector('.edit-delete-btns');
+      if (actionBtns) actionBtns.style.display = 'none';
+
+      textP.outerHTML = `
+        <form method="post" class="d-flex align-items-center gap-1 w-100">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="edit_comment">
+          <input type="hidden" name="comment_id" value="${commentId}">
+          <textarea name="content" class="form-control form-control-sm flex-grow-1" rows="1">${oldText}</textarea>
+          <button type="submit" class="btn btn-sm btn-primary px-2 py-1" style="font-size:12px;">저장</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1 cancel-edit" style="font-size:12px;">취소</button>
+        </form>
+      `;
+      const cancelBtn = container.querySelector('.cancel-edit');
+      cancelBtn.addEventListener('click', () => window.location.reload());
+    });
+  });
+});
+</script>
+
 {% endblock %}

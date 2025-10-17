@@ -1,6 +1,5 @@
-# django_ma/board/forms.py
 from django import forms
-from .models import Post
+from .models import Post, Comment
 
 class PostForm(forms.ModelForm):
     class Meta:
@@ -37,7 +36,7 @@ class PostForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in ['category', 'fa', 'code']:
-            self.fields[field].required = False  # 선택 항목 설정
+            self.fields[field].required = False
 
     def clean(self):
         cleaned_data = super().clean()
@@ -45,3 +44,17 @@ class PostForm(forms.ModelForm):
             if cleaned_data.get(field) in [None, '', '선택']:
                 cleaned_data[field] = ''
         return cleaned_data
+
+
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = Comment
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'rows': 1,
+                'placeholder': '댓글을 입력하세요...',
+                'class': 'form-control-sm',
+                'style': 'resize:none; min-height:38px; font-size:14px; line-height:1.4;',
+            }),
+        }
