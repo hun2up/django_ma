@@ -61,6 +61,7 @@ class PostAdmin(admin.ModelAdmin):
     # ✅ 목록 표시 필드 (요청자 사번 추가, 컬럼명 한글화)
     list_display = (
         'get_receipt_number',
+        'get_category',
         'get_title',
         'get_user_id',
         'get_user_name',
@@ -135,6 +136,10 @@ class PostAdmin(admin.ModelAdmin):
     def get_receipt_number(self, obj):
         return obj.receipt_number
     get_receipt_number.short_description = "접수번호"
+
+    def get_category(self, obj):
+        return obj.category
+    get_category.short_description = "구분"
 
     def get_title(self, obj):
         return obj.title
