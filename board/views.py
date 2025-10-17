@@ -134,3 +134,59 @@ def post_create(request):
         form = PostForm()
 
     return render(request, "board/post_create.html", {"form": form})
+
+
+# -----------------------------------------------------------------------------
+# 📝 게시글 수정
+# -----------------------------------------------------------------------------
+@login_required
+def post_edit(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    is_superuser = (request.user.grade == "superuser")
+
+    # ✅ 본인 글 또는 관리자만 수정 가능
+    if request.user.id != post.user_id and not is_superuser:
+        messages.error(request, "수정 권한이 없습니다.")
+        return redirect("post_detail", pk=post.pk)
+
+    if request.method == "POST":
+        form = PostForm(request.POST, request.FILES, instance=post)
+
+        # ✅ 1. 첨부파일 삭제 처리
+        delete_files = request.POST.getlist("delete_files")
+        if delete_files:
+            Attachment.objects.filter(id__in=delete_files, post=post).delete()
+
+        # ✅ 2. 게시글 수정 및 새 첨부파일 추가 처리
+        if form.is_valid():
+            updated_post = form.save(commit=False)
+            updated_post.user_id = request.user.id
+            updated_post.user_name = getattr(request.user, "name", "")
+            updated_post.user_branch = getattr(request.user, "branch", "")
+            updated_post.save()
+
+            # ✅ 새 첨부파일 추가 저장
+            for f in request.FILES.getlist("attachments"):
+                Attachment.objects.create(
+                    post=post,
+                    file=f,
+                    original_name=f.name,
+                    size=getattr(f, "size", 0),
+                    content_type=getattr(f, "content_type", "") or "",
+                )
+
+            messages.success(request, "게시글이 성공적으로 수정되었습니다.")
+            return redirect("post_detail", pk=post.pk)
+        else:
+            messages.error(request, "입력값을 다시 확인해주세요.")
+    else:
+        form = PostForm(instance=post)
+
+    # ✅ 첨부파일 목록을 같이 전달
+    attachments = post.attachments.all()
+
+    return render(request, "board/post_edit.html", {
+        "form": form,
+        "post": post,
+        "attachments": attachments,
+    })
