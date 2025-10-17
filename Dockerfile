@@ -15,5 +15,6 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 
 # 기본 실행 명령 (웹 서버는 docker-compose에서 override)
-CMD ["gunicorn", "web_ma.wsgi:application", "--bind", "0.0.0.0:${PORT}"]
+CMD ["gunicorn", "web_ma.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:${PORT}"]
+
 

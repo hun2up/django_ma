@@ -1,168 +1,196 @@
-<!-- django_ma > templates > base.html -->
-
 {% load static %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}업무시스템{% endblock %}</title>
+  <meta charset="UTF-8">
+  <title>{% block title %}업무시스템{% endblock %}</title>
 
-    <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Noto Sans KR 폰트 -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- Noto Sans KR 폰트 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 
-    <style>
-      html {
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-      }
+  <style>
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body, button, input, textarea, select {
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    body {
+      background-color: #f9fbfd;
+      padding-top: 70px;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #e0e6ed;
+      opacity: 0.7;
+    }
 
-      body, button, input, textarea, select {
-          font-family: 'Noto Sans KR', sans-serif;
-      }
+    /* 게시판 폰트 크기 조절용 */
+    .board-font { font-size: 15px; }
+    .board-font th { font-size: 13px; font-weight: 600; }
+    .board-font td, .board-font a { font-size: 14px; }
 
-      body {
-          background-color: #f9fbfd;
-          padding-top: 70px;
-      }
+    /* ✅ 버튼 (gradient 일관화) */
+    .btn-primary, .btn-sm.btn-primary {
+      background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+      border: none;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    .btn-primary:hover, .btn-sm.btn-primary:hover {
+      background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
+    }
+    .btn-sm {
+      padding: 4px 10px !important;
+      font-size: 13px !important;
+      border-radius: 8px;
+      line-height: 1 !important;
+      white-space: nowrap;
+    }
+    .btn-logout {
+      background-color: #dc3545;
+      color: white;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.9rem;
+      border: none;
+    }
+    .btn-logout:hover { background-color: #b02a37; }
 
-      hr {
-        border: none;
-        border-top: 1px solid #e0e6ed; /* 기존보다 연한 색상 */
-        opacity: 0.7; /* 조금 더 투명하게 */
-      }
+    /* 카드 */
+    .card {
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+    }
 
-      /* 게시판 폰트 크기 조절용 */
-      .board-font {
-          font-size: 15px;
-      }
+    /* 인풋 */
+    .form-control {
+      border-radius: 10px;
+      border: 1px solid #d2ddec;
+      transition: all 0.25s ease;
+    }
+    .form-control:focus {
+      border-color: #005BAC;
+      box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
+    }
 
-      .board-font th {
-          font-size: 13px;
-          font-weight: 600;
-      }
+    /* ✅ 댓글용 인풋 (작은 높이) */
+    .form-control-sm {
+      height: 36px !important;
+      font-size: 13px;
+      border-radius: 8px;
+      padding: 4px 8px;
+    }
+    .form-control-sm:focus {
+      border-color: #005BAC;
+      box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
+    }
 
-      .board-font td,
-      .board-font a {
-          font-size: 14px;
-      }
+    /* ✅ 댓글 안내문 스타일 */
+    .comment-empty {
+      font-size: 13px;
+      color: #999;
+    }
+    .comment-login {
+      font-size: 13px;
+      color: #888;
+    }
 
-      /* 버튼 */
-      .btn-primary {
-          background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
-          border: none;
-          border-radius: 10px;
-          transition: all 0.3s ease;
-          font-weight: 600;
-      }
+    /* Navbar */
+    .navbar {
+      background-color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .nav-link {
+      color: #333 !important;
+      font-weight: 600;
+      margin: 0 10px;
+    }
+    .nav-link:hover { color: #005BAC !important; }
 
-      .btn-primary:hover {
-          background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
-          transform: translateY(-2px);
-          box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
-      }
+    .status-select {
+      font-weight: 600;
+      border-width: 2px;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
 
-      .btn-logout {
-          background-color: #dc3545;
-          color: white;
-          border-radius: 8px;
-          padding: 6px 14px;
-          font-size: 0.9rem;
-          border: none;
-      }
+    .info-label {
+      font-size: 0.80rem;
+      font-weight: 400;
+      color: #333;
+      background-color: #fdfdfd;
+      border-radius: 8px;
+      padding: 4px 10px;
+      display: inline-block;
+    }
 
-      .btn-logout:hover {
-          background-color: #b02a37;
-      }
+    .info-value {
+      background-color: #F8F8F8;
+      border-radius: 10px;
+      padding: 5px 10px;
+      font-size: 0.80rem;
+      font-weight: 600;
+      display: inline-block;
+      min-width: 90px;
+      text-align: center;
+      margin-right: 6px;
+    }
 
-      /* 카드 */
-      .card {
-          border: none;
-          border-radius: 15px;
-          box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-      }
+    /* ✅ 댓글 박스 구조 */
+    .comment-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px; /* 두 박스 사이 여백 */
+    }
 
-      /* 인풋 */
-      .form-control {
-          border-radius: 10px;
-          border: 1px solid #d2ddec;
-          transition: all 0.25s ease;
-      }
+    .comment-content {
+      flex: 1 1 auto;
+      background-color: #f8f9fa;
+      border: 1px solid #d2ddec;
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      position: relative;
+    }
 
-      .form-control:focus {
-          border-color: #005BAC;
-          box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
-      }
+    .comment-author {
+      background-color: #f8f9fa;
+      border: 1px solid #d2ddec;
+      color: #fff;
+      font-weight: 600;
+      border-radius: 12px;
+      padding: 8px 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: fit-content;
+    }
 
-      /* Navbar */
-      .navbar {
-          background-color: #fff;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      }
+    .small-text { font-size: 0.85rem; color: #555; }
 
-      .nav-link {
-          color: #333 !important;
-          font-weight: 600;
-          margin: 0 10px;
-      }
-
-      .nav-link:hover {
-          color: #005BAC !important;
-      }
-
-      .status-select {
-        font-weight: 600;
-        border-width: 2px;
-        border-radius: 6px;
-        padding: 4px 8px;
-      }
-
-      .info-label {
-        font-size: 0.80rem;
-        font-weight: 400;
-        color: #333;
-        background-color: #fdfdfd;
-        border-radius: 8px;
-        padding: 4px 10px;
-        display: inline-block;
-      }
-
-      .info-value {
-        background-color: #F8F8F8;
-        border-radius: 10px;
-        padding: 5px 10px;
-        font-size: 0.80rem;
-        font-weight: 600;
-        display: inline-block;
-        min-width: 90px;
-        text-align: center;
-        margin-right: 6px;
-      }
-
-      .small-text {
-        font-size: 0.85rem;   /* 기본보다 작게 */
-        color: #555;           /* 살짝 흐리게 (선택사항) */
-      }
-      
-      /* 첨부파일 목록 폰트 크기 줄이기 */
-      .list-group-item {
-        font-size: 0.9rem; /* 기본 대비 약 90% */
-      }
-    </style>
-
+    /* 첨부파일 목록 폰트 */
+    .list-group-item { font-size: 0.9rem; }
+  </style>
 </head>
-<body>
 
-<!-- 네비게이션 -->
+<body>
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg fixed-top">
   <div class="container-fluid">
     <a class="navbar-brand" href="{% url 'home' %}">
       <img src="{% static 'images/logo.png' %}" alt="인카 로고" style="height: 40px;">
     </a>
-
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -179,16 +207,15 @@
     </div>
 
     <div class="d-none d-lg-flex">
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit" class="btn-logout">로그아웃</button>
-        </form>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-logout">로그아웃</button>
+      </form>
     </div>
   </div>
 </nav>
 {% endif %}
 
-<!-- 콘텐츠 영역 -->
 <div class="container my-5">
   {% block content %}{% endblock %}
 </div>
@@ -198,22 +225,16 @@
 <script>
   setTimeout(() => {
     const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(el => {
-      const bsAlert = new bootstrap.Alert(el);
-      bsAlert.close();
-    });
+    alerts.forEach(el => new bootstrap.Alert(el).close());
   }, 2500);
 </script>
 
-<!-- ✅ 상태 드롭다운 색상 자동 적용 -->
+<!-- 상태 드롭다운 색상 -->
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const selects = document.querySelectorAll('.status-select');
-    selects.forEach(sel => {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.status-select').forEach(sel => {
       const applyColor = () => {
-        const selected = sel.options[sel.selectedIndex];
-        if (!selected) return;
-        const color = selected.getAttribute('data-color');
+        const color = sel.selectedOptions[0]?.getAttribute('data-color');
         sel.style.color = color || 'inherit';
         sel.style.fontWeight = '600';
       };
@@ -221,6 +242,36 @@
       sel.addEventListener('change', applyColor);
     });
   });
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const commentId = btn.dataset.id;
+      const parent = btn.closest('.flex-grow-1');
+      const contentP = parent.querySelector('p');
+      const oldText = contentP.innerText.trim();
+
+      // textarea로 변경
+      contentP.outerHTML = `
+        <form method="post" class="d-flex align-items-center">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="edit_comment">
+          <input type="hidden" name="comment_id" value="${commentId}">
+          <textarea name="content" class="form-control form-control-sm flex-grow-1 me-1" rows="1">${oldText}</textarea>
+          <button type="submit" class="btn btn-sm btn-primary px-2 py-1" style="font-size:12px;">저장</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1 cancel-edit" style="font-size:12px;">취소</button>
+        </form>
+      `;
+
+      // 취소 버튼 이벤트
+      parent.querySelector('.cancel-edit').addEventListener('click', () => {
+        location.reload();
+      });
+    });
+  });
+});
 </script>
 
 </body>
