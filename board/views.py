@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Q
 
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
@@ -18,54 +19,48 @@ User = get_user_model()
 # -------------------------------------------------------------------
 @login_required
 def post_list(request):
-    """게시글 목록 + (슈퍼유저용) 담당자/상태 변경 + 검색 필터"""
-    posts_qs = Post.objects.all().order_by('-created_at')
+    """게시글 목록 + 검색/필터 + (슈퍼유저용) 담당자/상태 변경"""
+    posts_qs = Post.objects.order_by('-created_at')
+    is_superuser = (request.user.grade == "superuser")
 
-    # ===========================
+    handlers = list(User.objects.filter(grade="superuser").values_list("name", flat=True))
+    status_choices = ['확인중', '진행중', '보완요청', '완료', '반려']
+
     # ✅ 검색/필터 파라미터
-    # ===========================
     search_type = request.GET.get("search_type", "title")
     keyword = request.GET.get("keyword", "").strip()
-    handler_filter = request.GET.get("handler", "")
-    status_filter = request.GET.get("status", "")
+    selected_handler = request.GET.get("handler", "전체")
+    selected_status = request.GET.get("status", "전체")
 
-    # 🔍 검색어 필터
+    # ✅ 검색 조건
     if keyword:
         if search_type == "title":
             posts_qs = posts_qs.filter(title__icontains=keyword)
         elif search_type == "content":
             posts_qs = posts_qs.filter(content__icontains=keyword)
         elif search_type == "title_content":
-            posts_qs = posts_qs.filter(Q(title__icontains=keyword) | Q(content__icontains=keyword))
+            # 🟢 제목 또는 내용에 키워드가 포함된 경우 (OR 검색)
+            posts_qs = posts_qs.filter(
+                Q(title__icontains=keyword) | Q(content__icontains=keyword)
+            )
         elif search_type == "user_name":
             posts_qs = posts_qs.filter(user_name__icontains=keyword)
         elif search_type == "category":
             posts_qs = posts_qs.filter(category__icontains=keyword)
 
-    # 👩 담당자 필터
-    if handler_filter and handler_filter != "전체":
-        posts_qs = posts_qs.filter(handler=handler_filter)
+    # ✅ 담당자 필터
+    if selected_handler and selected_handler != "전체":
+        posts_qs = posts_qs.filter(handler=selected_handler)
 
-    # 📊 상태 필터
-    if status_filter and status_filter != "전체":
-        posts_qs = posts_qs.filter(status=status_filter)
+    # ✅ 상태 필터
+    if selected_status and selected_status != "전체":
+        posts_qs = posts_qs.filter(status=selected_status)
 
-    # ===========================
     # ✅ 페이지네이션
-    # ===========================
     paginator = Paginator(posts_qs, 10)
     posts = paginator.get_page(request.GET.get('page'))
 
-    # ===========================
-    # ✅ 슈퍼유저 여부 및 선택목록
-    # ===========================
-    is_superuser = (request.user.grade == "superuser")
-    handlers = list(User.objects.filter(grade="superuser").values_list("name", flat=True))
-    status_choices = ['확인중', '진행중', '보완요청', '완료', '반려']
-
-    # ===========================
-    # ✅ 담당자 / 상태 변경 (슈퍼유저)
-    # ===========================
+    # ✅ 담당자/상태 변경 (슈퍼유저 전용)
     if request.method == "POST" and is_superuser:
         post = get_object_or_404(Post, id=request.POST.get("post_id"))
         action_type = request.POST.get("action_type")
@@ -84,9 +79,6 @@ def post_list(request):
 
         return redirect("post_list")
 
-    # ===========================
-    # ✅ 템플릿 렌더링
-    # ===========================
     return render(request, "board/post_list.html", {
         "posts": posts,
         "is_superuser": is_superuser,
@@ -94,8 +86,8 @@ def post_list(request):
         "status_choices": status_choices,
         "search_type": search_type,
         "keyword": keyword,
-        "selected_handler": handler_filter,
-        "selected_status": status_filter,
+        "selected_handler": selected_handler,
+        "selected_status": selected_status,
     })
 
 # -----------------------------------------------------------------------------
