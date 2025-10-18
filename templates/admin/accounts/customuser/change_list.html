@@ -2,6 +2,6 @@
 
 {% block object-tools %}
     {{ block.super }}
-        <a href="{% url 'admin:export_all_users_excel' %}" class="button">Download all users to Excel</a>
-        <a href="{% url 'admin:upload_users_excel' %}" class="button" >Add with Excel file</a>
+        <a href="{% url 'admin:export_all_users_excel' %}" class="button">엑셀 다운로드</a>
+        <a href="{% url 'admin:upload_users_excel' %}" class="button" >엑셀 업로드</a>
 {% endblock %}

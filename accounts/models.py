@@ -1,3 +1,4 @@
+# django_ma/accounts/models.py
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
@@ -21,25 +22,27 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     GRADE_CHOICES = [
-        ('superuser', 'Superuser'),  # 최고 관리자
-        ('admin', 'Admin'),          # 관리자
-        ('basic', 'Basic'),          # 일반 사용자
-        ('inactive', 'Inactive'),    # 퇴사자 또는 비활성화
+        ('superuser', 'Superuser'),
+        ('admin', 'Admin'),
+        ('basic', 'Basic'),
+        ('inactive', 'Inactive'),
     ]
 
     id = models.CharField(max_length=30, unique=True, primary_key=True)
     name = models.CharField(max_length=100)
     branch = models.CharField(max_length=100, blank=True, null=True)
-    grade = models.CharField(
-        max_length=20,
-        choices=GRADE_CHOICES,
-        default='basic',  # ✅ 존재하는 choice 값으로 수정
-    )
-    status = models.CharField(max_length=20, default='재직')  # 예: 재직, 퇴사 등
+    grade = models.CharField(max_length=20, choices=GRADE_CHOICES, default='basic')
+    status = models.CharField(max_length=20, default='재직')
 
-    is_active = models.BooleanField(default=True)   # 로그인 가능 여부
-    is_staff = models.BooleanField(default=False)   # admin site 접근 가능 여부
-    is_superuser = models.BooleanField(default=False)  # 전체 권한 여부
+    # ✅ 새로 추가되는 4개 필드
+    regist = models.CharField(max_length=50, blank=True, null=True)
+    birth = models.DateField("생년월일", blank=True, null=True)
+    enter = models.DateField("입사일자", blank=True, null=True)
+    quit = models.DateField("퇴사일자", blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'id'
     REQUIRED_FIELDS = ['name']
@@ -52,3 +55,4 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "users"
         verbose_name_plural = "users"
+
