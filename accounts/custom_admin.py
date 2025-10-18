@@ -1,11 +1,11 @@
-# accounts/custom_admin.py
+# django_ma/accounts/custom_admin.py
 from django.contrib.admin import AdminSite
 from django.shortcuts import render
 
 class CustomAdminSite(AdminSite):
     site_header = "관리자 페이지"
     site_title = "관리자 포털"
-    index_title = "Welcome to Admin Panel"
+    index_title = "MA 업무지원 사이트 관리자 페이지 입니다."
 
     def has_permission(self, request):
         user = request.user
