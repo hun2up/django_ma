@@ -4,4 +4,5 @@
     {{ block.super }}
         <a href="{% url 'admin:export_all_users_excel' %}" class="button">엑셀 다운로드</a>
         <a href="{% url 'admin:upload_users_excel' %}" class="button" >엑셀 업로드</a>
+        <a href="{% url 'admin:upload_excel_template' %}" class="button" style="background:#4CAF50; color:white;">양식 다운로드</a>
 {% endblock %}

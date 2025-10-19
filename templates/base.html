@@ -181,6 +181,24 @@
 
     /* 첨부파일 목록 폰트 */
     .list-group-item { font-size: 0.9rem; }
+
+    /* 현재 페이지 강조 */
+    .nav-link.active {
+      color: #005BAC !important;
+      font-weight: 700;
+    }
+
+    /* 선택되지 않은 페이지 */
+    .nav-link.inactive {
+      color: #aaa !important;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    .nav-link.inactive:hover {
+      color: #005BAC !important;
+    }
+
   </style>
 </head>
 
@@ -197,11 +215,11 @@
 
     <div class="collapse navbar-collapse justify-content-center" id="navbarContent">
       <ul class="navbar-nav mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">메인</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'post_list' %}">업무요청</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}join/">위촉서류</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% else %}inactive{% endif %}" href="{% url 'home' %}">메인</a></li>
+        <li class="nav-item"><a class="nav-link {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'post_list' %}">업무요청</a></li>
+        <li class="nav-item"><a class="nav-link {% if '/join' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}join/">위촉서류</a></li>
         {% if user.grade == 'superuser' %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}admin/">관리자</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}admin/">관리자</a></li>
         {% endif %}
       </ul>
     </div>

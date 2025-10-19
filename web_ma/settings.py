@@ -170,6 +170,33 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
+# --- 세션 관리 설정 (Render 배포용 최종본) ---
+
+# ✅ 1. 브라우저 닫으면 즉시 로그아웃
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# ✅ 2. 1시간(3600초) 동안 활동 없으면 자동 로그아웃
+SESSION_COOKIE_AGE = 3600  # 초 단위
+SESSION_SAVE_EVERY_REQUEST = True  # 요청 있을 때마다 만료 시간 갱신
+
+# ✅ 3. 세션 저장소: DB
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# ✅ 4. 보안 강화를 위한 쿠키 설정
+SESSION_COOKIE_HTTPONLY = True       # 자바스크립트에서 접근 불가
+SESSION_COOKIE_SECURE = True         # HTTPS 전용 (Render는 자동 HTTPS)
+CSRF_COOKIE_SECURE = True            # CSRF 쿠키도 HTTPS 전용
+CSRF_COOKIE_HTTPONLY = True          # JS 접근 차단 (보안 강화)
+
+# ✅ 5. 추가 옵션 (권장)
+# 세션 쿠키 이름 (기본값: 'sessionid', 필요 시 커스터마이징 가능)
+# SESSION_COOKIE_NAME = 'ma_session'
+
+# ✅ 6. 개발 중에는 아래처럼 조정 가능 (DEBUG=True일 경우)
+# if DEBUG:
+#     SESSION_COOKIE_SECURE = False
+#     CSRF_COOKIE_SECURE = False
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -197,3 +224,4 @@ LOGGING = {
 # 파일첨부 기능을 위한 media url 설정
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
