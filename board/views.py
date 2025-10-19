@@ -8,6 +8,7 @@ from django.db.models import Q
 
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
+from datetime import datetime
 
 
 # ✅ 전역에서 한 번만 로드
@@ -31,6 +32,9 @@ def post_list(request):
     keyword = request.GET.get("keyword", "").strip()
     selected_handler = request.GET.get("handler", "전체")
     selected_status = request.GET.get("status", "전체")
+    start_date = request.GET.get("start_date", "")
+    end_date = request.GET.get("end_date", "")
+    date_field = request.GET.get("date_field", "created_at")
 
     # ✅ 검색 조건
     if keyword:
@@ -55,6 +59,21 @@ def post_list(request):
     # ✅ 상태 필터
     if selected_status and selected_status != "전체":
         posts_qs = posts_qs.filter(status=selected_status)
+
+    # ✅ 날짜 필터 (created_at 기준)
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            posts_qs = posts_qs.filter(created_at__date__gte=start_dt)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            posts_qs = posts_qs.filter(created_at__date__lte=end_dt)
+        except ValueError:
+            pass
 
     # ✅ 페이지네이션
     paginator = Paginator(posts_qs, 10)
@@ -88,6 +107,7 @@ def post_list(request):
         "keyword": keyword,
         "selected_handler": selected_handler,
         "selected_status": selected_status,
+        "date_field": date_field,
     })
 
 # -----------------------------------------------------------------------------

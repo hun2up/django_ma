@@ -199,6 +199,32 @@
       color: #005BAC !important;
     }
 
+    .search-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    .category-select {
+      background-color: #f3f3f3;
+      border-radius: 8px;
+      border: 1px solid #d2ddec;
+      font-size: 0.85rem;
+    }
+
+    .category-select:focus,
+    form select:focus,
+    form input[type="date"]:focus {
+      border-color: #005BAC;
+      box-shadow: 0 0 4px rgba(0, 91, 172, 0.4);
+    }
+
+    /* ✅ 한 줄 고정 레이아웃 */
+    form .d-flex.flex-wrap {
+      flex-wrap: nowrap !important;
+      overflow-x: auto;
+    }
   </style>
 </head>
 

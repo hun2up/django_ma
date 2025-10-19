@@ -135,11 +135,11 @@
 
 <!-- ✅ 검색/필터 폼 -->
 <form method="get" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
-  <div class="d-flex flex-wrap align-items-center justify-content-center gap-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
 
     <!-- 🔹 검색유형 + 검색어 -->
-    <div class="d-flex align-items-center" style="gap: 8px;">
-      <select name="search_type" class="form-select form-select-sm category-select" style="width: 90px;">
+    <div class="d-flex align-items-center" style="gap: 6px;">
+      <select name="search_type" class="form-select form-select-sm category-select" style="width: 80px;">
         <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
         <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
         <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
@@ -149,13 +149,13 @@
       <input type="text" name="keyword" value="{{ keyword }}" 
              class="form-control form-control-sm"
              placeholder="검색어 입력"
-             style="width: 200px;">
+             style="width: 180px;">
     </div>
 
     <!-- 🔹 담당자 -->
-    <div class="d-flex align-items-center" style="gap: 8px;">
+    <div class="d-flex align-items-center" style="gap: 6px;">
       <label class="search-label mb-0">담당자</label>
-      <select name="handler" class="form-select form-select-sm" style="width: 120px;">
+      <select name="handler" class="form-select form-select-sm" style="width: 100px;">
         <option value="전체">전체</option>
         {% for h in handlers %}
           <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
@@ -164,14 +164,28 @@
     </div>
 
     <!-- 🔹 상태 -->
-    <div class="d-flex align-items-center" style="gap: 8px;">
+    <div class="d-flex align-items-center" style="gap: 6px;">
       <label class="search-label mb-0">상태</label>
-      <select name="status" class="form-select form-select-sm" style="width: 120px;">
+      <select name="status" class="form-select form-select-sm" style="width: 100px;">
         <option value="전체">전체</option>
         {% for s in status_choices %}
           <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
       </select>
+    </div>
+
+    <!-- 🔹 기간 필터 -->
+    <div class="d-flex align-items-center" style="gap: 6px;">
+      <label class="search-label mb-0">기간</label>
+      <select name="date_field" class="form-select form-select-sm category-select" style="width: 100px;">
+        <option value="created_at" {% if date_field == 'created_at' %}selected{% endif %}>접수일자</option>
+        <option value="status_updated_at" {% if date_field == 'status_updated_at' %}selected{% endif %}>상태변경일</option>
+      </select>
+      <input type="date" name="start_date" value="{{ start_date }}" 
+             class="form-control form-control-sm" style="width: 120px;">
+      <span class="mx-1">~</span>
+      <input type="date" name="end_date" value="{{ end_date }}" 
+             class="form-control form-control-sm" style="width: 120px;">
     </div>
 
     <!-- 🔹 버튼 -->
