@@ -31,12 +31,16 @@ def home_redirect(request):
     return redirect('post_list')
 
 urlpatterns = [
+    # ✅ 일반 사용자 로그아웃 (admin.site.logout 제거)
+    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
+    # ✅ 커스텀 관리자
     path('admin/', custom_admin_site.urls),
+    
     path('', home_redirect, name='home'),
     path('login/', SessionCloseLoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('logout/', admin.site.logout, name='logout'),
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
+    path('commission/', include('commission.urls')),
 ]
 
 # 개발 모드(DEBUG=True)에서만 업로드 파일 서빙

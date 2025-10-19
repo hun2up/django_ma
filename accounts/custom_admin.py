@@ -1,6 +1,8 @@
 # django_ma/accounts/custom_admin.py
 from django.contrib.admin import AdminSite
 from django.shortcuts import render
+from django.shortcuts import redirect
+from django.contrib.auth import logout as auth_logout
 
 class CustomAdminSite(AdminSite):
     site_header = "관리자 페이지"
@@ -18,5 +20,10 @@ class CustomAdminSite(AdminSite):
             else:
                 return render(request, 'no_permission_popup.html')
         return super().login(request, extra_context)
+    
+    def logout(self, request, extra_context=None):
+        """관리자 로그아웃 시 / 로 이동"""
+        auth_logout(request)
+        return redirect('/')
 
 custom_admin_site = CustomAdminSite(name='custom_admin')

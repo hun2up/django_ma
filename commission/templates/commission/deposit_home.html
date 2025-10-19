@@ -1,0 +1,210 @@
+<!-- django_ma/commission/templates/commission/deposit_home.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}채권관리{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="mx-auto" style="max-width: 1100px;">
+    <div class="card shadow p-4 border-0 rounded-4">
+
+      <!-- 제목 -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
+      </div>
+
+      <!-- ✅ 인적사항 -->
+      <div class="info-section my-3">
+        <div class="info-box">인적사항</div>
+        <div class="info-row">
+          <div class="info-item">
+            <span class="info-label">사번</span>
+            <span class="info-value">1611851</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">성명</span>
+            <span class="info-value">김상헌</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">소속</span>
+            <span class="info-value">MA본부</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">입사일</span>
+            <span class="info-value">2020-03-01</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">퇴사일</span>
+            <span class="info-value">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 주요지표 -->
+      <div class="info-section my-3">
+        <div class="info-box">주요지표</div>
+
+          <div class="info-row">
+            <div class="info-item">
+              <span class="info-label">최종지급액</span>
+              <span class="info-value">600,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">환수예상</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">지급예상</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">필요채권</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">최종초과금액</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-item">
+              <span class="info-label">총채권합계</span>
+              <span class="info-value">600,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">보증합계</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">기타합계</span>
+              <span class="info-value">300,000,000</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">25회손보통산</span>
+              <span class="info-value">94.61%</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">25회생보통산</span>
+              <span class="info-value">89.77%</span>
+            </div>
+          </div>
+      </div>
+
+      <!-- ✅ 수수료 현황 -->
+      <div class="info-section my-3">
+        <div class="info-box">수수료현황</div>
+
+        <!-- 라밸 (환수예상수수료) -->
+        <div class="info-row-label mt-3">
+          <div class="info-cell"><span class="info-label">환수손보</span></div>
+          <div class="info-cell"><span class="info-label">환수생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)환수생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)환수생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)환수합계</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)환수손보</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)환수생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)환수합계</span></div>
+        </div>
+
+        <!-- 밸류 (환수예상수수료) -->
+        <div class="info-row-value mt-2">
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+        </div>
+
+        <!-- 라밸 (지급예상수수료) -->
+        <div class="info-row-label mt-3">
+          <div class="info-cell"><span class="info-label">지급손보</span></div>
+          <div class="info-cell"><span class="info-label">지급생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)지급손보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)지급생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(O)지급합계</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)지급손보</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)지급생보</span></div>
+          <div class="info-cell"><span class="info-label">보증(X)지급합계</span></div>
+        </div>
+
+        <!-- 밸류 (지급예상수수료) -->
+        <div class="info-row-value mt-2">
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+        </div>
+
+        <hr class="my-3">
+
+        <!-- 라밸 (채권증액) -->
+        <div class="info-row-label mt-3">
+          <div class="info-cell"><span class="info-label">3개월장기총</span></div>
+          <div class="info-cell"><span class="info-label">3개월초과</span></div>
+          <div class="info-cell"><span class="info-label">6개월장기총</span></div>
+          <div class="info-cell"><span class="info-label">6개월초과</span></div>
+          <div class="info-cell"><span class="info-label">9개월장기총</span></div>
+          <div class="info-cell"><span class="info-label">9개월초과</span></div>
+          <div class="info-cell"><span class="info-label">12개월장기총</span></div>
+          <div class="info-cell"><span class="info-label">12개월초과</span></div>
+        </div>
+
+        <!-- 밸류 (채권증액) -->
+        <div class="info-row-value mt-2">
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+        </div>
+      </div>
+
+      <!-- ✅ 유지율&수금율 현황 -->
+      <div class="info-section my-3">
+        <div class="info-box">수수료현황</div>
+
+        <!-- 라밸 (유지율&수금율) -->
+        <div class="info-row-label mt-3">
+          <div class="info-cell"><span class="info-label">13회손보통산</span></div>
+          <div class="info-cell"><span class="info-label">18회손보통산</span></div>
+          <div class="info-cell"><span class="info-label">13회생보통산</span></div>
+          <div class="info-cell"><span class="info-label">18회생보통산</span></div>
+          <div class="info-cell"><span class="info-label">2-6회손보응당</span></div>
+          <div class="info-cell"><span class="info-label">2-13회손보응당</span></div>
+          <div class="info-cell"><span class="info-label">2-6회생보응당</span></div>
+          <div class="info-cell"><span class="info-label">2-13회생보응당</span></div>
+        </div>
+
+        <!-- 밸류 (유지율&수금율) -->
+        <div class="info-row-value mt-2">
+          <div class="info-cell"><span class="info-value">98.76%</span></div>
+          <div class="info-cell"><span class="info-value">92.55%</span></div>
+          <div class="info-cell"><span class="info-value">93.44%</span></div>
+          <div class="info-cell"><span class="info-value">89.99%</span></div>
+          <div class="info-cell"><span class="info-value">90.26%</span></div>
+          <div class="info-cell"><span class="info-value">89.66%</span></div>
+          <div class="info-cell"><span class="info-value">89.95%</span></div>
+          <div class="info-cell"><span class="info-value">97.42%</span></div>
+        </div>
+      </div>
+
+      <!-- 채권지표 -->
+      <div class="info-section my-3">
+        <div class="info-box">채권현황</div>
+        <span class="info-value">보증보험</span>
+        <span class="info-value">기타채권</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
