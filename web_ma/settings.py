@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'board',
     'accounts',
     'widget_tweaks',
+    'commission',
 ]
 
 MIDDLEWARE = [

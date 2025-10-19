@@ -145,6 +145,91 @@
       margin-right: 6px;
     }
 
+    .info-box {
+      display: block;
+      width: 100%;
+      background-color: #f1f6fb; /* 은은한 하늘색 배경 */
+      border-radius: 12px;       /* 둥근 모서리 */
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #003f7d;            /* 브랜드 블루 */
+      text-align: center;        /* 텍스트 중앙 정렬 */
+      padding: 5px 0;           /* 위아래 여백 */
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      border: 1px solid #d2e3f5; /* 테두리 약하게 */
+    }
+
+    /* ✅ 채권관리 인적사항 정렬 전용 */
+    .info-section {
+      width: 100%;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap; /* 화면 줄어들면 자동 줄바꿈 */
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 150px;
+      white-space: nowrap;
+    }
+
+    /* ✅ 라벨-밸류 테이블형 정렬 고정 */
+    .info-row-label, .info-row-value {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .info-cell {
+      flex: 1; /* 각 칸의 고정 너비 */
+      text-align: center;
+      min-width: 100px; /* 너무 좁아지는 것 방지 */
+    }
+
+    /* 라벨 행 스타일 */
+    .info-row-label .info-label {
+      background-color: #fdfdfd;
+      border-radius: 8px;
+      padding: 0px 8px;
+      font-size: 0.80rem;
+      font-weight: 400;
+      color: #333;
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    /* 밸류 행 스타일 */
+    .info-row-value .info-value {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 0.80rem;
+      font-weight: 600;
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    /* 왼쪽 최종지급액 영역 시각적 정렬 개선 */
+    .info-section .info-cell:first-child {
+      text-align: center;
+    }
+
+    /* 전체 카드의 폭 대비 여백 조정 */
+    .info-section .flex-grow-1 {
+      width: 100%;
+    }
+
     /* ✅ 댓글 박스 구조 */
     .comment-box {
       display: flex;
@@ -243,6 +328,19 @@
       <ul class="navbar-nav mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% else %}inactive{% endif %}" href="{% url 'home' %}">메인</a></li>
         <li class="nav-item"><a class="nav-link {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'post_list' %}">업무요청</a></li>
+        {% if user.grade == 'superuser' %}
+        <!-- ✅ 수수료 메뉴 (드롭다운) -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}" href="#" id="commissionMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            수수료
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="commissionMenu">
+            <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
+            <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
+            <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
+          </ul>
+        </li>
+        {% endif %}
         <li class="nav-item"><a class="nav-link {% if '/join' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}join/">위촉서류</a></li>
         {% if user.grade == 'superuser' %}
           <li class="nav-item"><a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}admin/">관리자</a></li>
