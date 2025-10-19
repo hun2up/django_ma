@@ -23,12 +23,18 @@ from accounts.custom_admin import custom_admin_site
 from home import views as home_views  # 메인 페이지 뷰
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
+from accounts.views import SessionCloseLoginView
+
+def home_redirect(request):
+    """홈(/) 접속 시 게시판으로 리다이렉트"""
+    return redirect('post_list')
 
 urlpatterns = [
     path('admin/', custom_admin_site.urls),
-    path('', home_views.index, name='home'),  # 메인 페이지
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
+    path('', home_redirect, name='home'),
+    path('login/', SessionCloseLoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('logout/', admin.site.logout, name='logout'),
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
 ]

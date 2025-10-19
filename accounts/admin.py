@@ -1,6 +1,8 @@
 # django_ma/accounts/admin.py
 from openpyxl import Workbook, load_workbook
+import os
 from io import BytesIO
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.http import HttpResponse
@@ -11,6 +13,8 @@ from .forms import ExcelUploadForm
 from .models import CustomUser
 from .custom_admin import custom_admin_site
 from datetime import datetime
+from django.http import FileResponse, Http404
+
 
 
 # ✅ 공통 엑셀 생성 함수
@@ -195,6 +199,17 @@ def export_all_users_excel_view(request):
     users = CustomUser.objects.all()
     return export_users_as_excel(users, filename="all_custom_users.xlsx")
 
+# ✅ 엑셀 업로드용 양식 다운로드
+def upload_excel_template_view(request):
+    template_path = os.path.join(settings.BASE_DIR, "static", "excel", "업로드양식.xlsx")
+
+    if not os.path.exists(template_path):
+        raise Http404("양식 파일을 찾을 수 없습니다. 관리자에게 문의하세요.")
+
+    response = FileResponse(open(template_path, "rb"),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="업로드양식.xlsx"'
+    return response
 
 # ✅ 관리자 등록
 @admin.register(CustomUser)
@@ -226,6 +241,7 @@ class CustomUserAdmin(UserAdmin):
         custom_urls = [
             path('export-all/', self.admin_site.admin_view(export_all_users_excel_view), name='export_all_users_excel'),
             path('upload-excel/', self.admin_site.admin_view(upload_users_from_excel_view), name='upload_users_excel'),
+            path('upload-template/', self.admin_site.admin_view(upload_excel_template_view), name='upload_excel_template'),
         ]
         return custom_urls + urls
 
