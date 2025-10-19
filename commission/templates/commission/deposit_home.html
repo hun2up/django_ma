@@ -1,6 +1,7 @@
 <!-- django_ma/commission/templates/commission/deposit_home.html -->
 {% extends 'base.html' %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}채권관리{% endblock %}
 
@@ -12,6 +13,14 @@
       <!-- 제목 -->
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#searchUserModal">
+            대상자검색
+          </button>
+          <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">
+            초기화
+          </button>
+        </div>
       </div>
 
       <!-- ✅ 인적사항 -->
@@ -20,26 +29,37 @@
         <div class="info-row">
           <div class="info-item">
             <span class="info-label">사번</span>
-            <span class="info-value">1611851</span>
+            <span class="info-value">
+              {% if target %}{{ target.id }}{% else %}-{% endif %}
+            </span>
           </div>
           <div class="info-item">
             <span class="info-label">성명</span>
-            <span class="info-value">김상헌</span>
+            <span class="info-value">
+              {% if target %}{{ target.name }}{% else %}-{% endif %}
+            </span>
           </div>
           <div class="info-item">
             <span class="info-label">소속</span>
-            <span class="info-value">MA본부</span>
+            <span class="info-value">
+              {% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}
+            </span>
           </div>
           <div class="info-item">
             <span class="info-label">입사일</span>
-            <span class="info-value">2020-03-01</span>
+            <span class="info-value">
+              {% if target %}{{ target.join_date_display }}{% else %}-{% endif %}
+            </span>
           </div>
           <div class="info-item">
             <span class="info-label">퇴사일</span>
-            <span class="info-value">-</span>
+            <span class="info-value">
+              {% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}
+            </span>
           </div>
         </div>
       </div>
+
 
       <!-- 주요지표 -->
       <div class="info-section my-3">
@@ -48,45 +68,51 @@
           <div class="info-row">
             <div class="info-item">
               <span class="info-label">최종지급액</span>
-              <span class="info-value">600,000,000</span>
+              <span class="info-value">
+                {% if payment %}
+                  {{ payment|floatformat:0|intcomma }}원
+                {% else %}
+                  -
+                {% endif %}
+              </span>
             </div>
             <div class="info-item">
               <span class="info-label">환수예상</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">지급예상</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">필요채권</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">최종초과금액</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
           </div>
           <div class="info-row">
             <div class="info-item">
               <span class="info-label">총채권합계</span>
-              <span class="info-value">600,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">보증합계</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">기타합계</span>
-              <span class="info-value">300,000,000</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">25회손보통산</span>
-              <span class="info-value">94.61%</span>
+              <span class="info-value">제작중</span>
             </div>
             <div class="info-item">
               <span class="info-label">25회생보통산</span>
-              <span class="info-value">89.77%</span>
+              <span class="info-value">제작중</span>
             </div>
           </div>
       </div>
@@ -109,14 +135,14 @@
 
         <!-- 밸류 (환수예상수수료) -->
         <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
         </div>
 
         <!-- 라밸 (지급예상수수료) -->
@@ -133,14 +159,14 @@
 
         <!-- 밸류 (지급예상수수료) -->
         <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
         </div>
 
         <hr class="my-3">
@@ -159,14 +185,14 @@
 
         <!-- 밸류 (채권증액) -->
         <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
-          <div class="info-cell"><span class="info-value">1,000,000</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
         </div>
       </div>
 
@@ -188,14 +214,14 @@
 
         <!-- 밸류 (유지율&수금율) -->
         <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">98.76%</span></div>
-          <div class="info-cell"><span class="info-value">92.55%</span></div>
-          <div class="info-cell"><span class="info-value">93.44%</span></div>
-          <div class="info-cell"><span class="info-value">89.99%</span></div>
-          <div class="info-cell"><span class="info-value">90.26%</span></div>
-          <div class="info-cell"><span class="info-value">89.66%</span></div>
-          <div class="info-cell"><span class="info-value">89.95%</span></div>
-          <div class="info-cell"><span class="info-value">97.42%</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="info-cell"><span class="info-value">제작중</span></div>
         </div>
       </div>
 
@@ -207,4 +233,223 @@
     </div>
   </div>
 </div>
+
+<!-- 데이터업로드 카드 -->
+<div class="container mt-5">
+  <div class="mx-auto" style="max-width: 1100px;">
+    <div class="card shadow p-4 border-0 rounded-4">
+
+    <!-- 제목 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0" style="color:#003f7d;">데이터 업데이트</h5>
+      <div class="d-flex gap-2 align-items-center">
+        <!-- ✅ 엑셀 업로드 버튼 -->
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
+          엑셀업로드
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ 대상자 검색 모달 -->
+<div class="modal fade" id="searchUserModal" tabindex="-1" aria-labelledby="searchUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold" id="searchUserModalLabel">대상자 검색</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="searchUserForm" class="d-flex gap-2">
+          <input type="text" class="form-control" id="searchKeyword" name="q" placeholder="사번 또는 성명 입력">
+          <button type="submit" class="btn btn-primary flex-shrink-0">검색</button>
+        </form>
+
+        <!-- 검색결과 출력 영역 -->
+        <div id="searchResults" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ 엑셀 업로드 모달 -->
+<div class="modal fade" id="excelUploadModal" tabindex="-1" aria-labelledby="excelUploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header bg-light">
+        <h6 class="modal-title fw-bold" id="excelUploadModalLabel">엑셀 파일 업로드</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="excelUploadForm" method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <!-- ✅ 업로드 구분 (드롭다운으로 변경) -->
+          <div class="mb-3">
+            <label class="form-label small fw-bold">업로드 구분</label>
+            <select id="uploadTypeSelect" name="upload_type" class="form-select form-select-sm" required>
+              <option value="">-- 선택 --</option>
+              <option value="최종지급액">최종지급액</option>
+              <option value="환수지급예상">환수지급예상</option>
+              <option value="보증증액">보증증액</option>
+              <option value="보증보험">보증보험</option>
+              <option value="기타채권">기타채권</option>
+              <option value="통산생보">통산생보</option>
+              <option value="통산손보">통산손보</option>
+              <option value="응당생보">응당생보</option>
+              <option value="응당손보">응당손보</option>
+            </select>
+          </div>
+
+          <!-- ✅ 파일 선택 -->
+          <div class="mb-3">
+            <label for="excelFile" class="form-label small fw-bold">엑셀 파일 선택</label>
+            <input class="form-control form-control-sm" type="file" id="excelFile" name="excel_file" accept=".xlsx,.xls" required>
+          </div>
+
+          <div class="text-end mt-4">
+            <button type="submit" class="btn btn-primary btn-sm">업로드</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+          </div>
+        </form>
+
+        <!-- 결과 메시지 -->
+        <div id="uploadResult" class="mt-3 small text-center"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ 업로드 완료 토스트 -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+  <div id="uploadToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body fw-bold">✅ 업로드가 성공적으로 완료되었습니다!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const uploadForm = document.getElementById('excelUploadForm');
+  const resultBox = document.getElementById('uploadResult');
+  const uploadTypeSelect = document.getElementById('uploadTypeSelect');
+  const excelModal = document.getElementById('excelUploadModal');
+
+  uploadForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const file = document.getElementById('excelFile').files[0];
+    const uploadType = uploadTypeSelect.value;
+
+    if (!uploadType) return resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 업로드 구분을 선택해주세요.</span>`;
+    if (!file) return resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 파일을 선택해주세요.</span>`;
+
+    const formData = new FormData();
+    formData.append('excel_file', file);
+    formData.append('upload_type', uploadType);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    try {
+      const response = await fetch('/commission/upload-excel/', { method: 'POST', body: formData });
+      const text = await response.text();
+
+      try {
+        const data = JSON.parse(text);
+        if (response.ok) {
+          // ✅ 토스트 표시
+          const toastEl = document.getElementById('uploadToast');
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+
+          // ✅ 모달 닫기
+          const modal = bootstrap.Modal.getInstance(excelModal);
+          modal.hide();
+
+          // ✅ 폼 초기화
+          uploadForm.reset();
+          resultBox.innerHTML = '';
+
+          // ✅ 새로고침 (1.5초 후)
+          setTimeout(() => { location.reload(); }, 1500);
+        } else {
+          resultBox.innerHTML = `<span class="text-danger fw-bold">${data.message}</span>`;
+        }
+      } catch {
+        console.error("⚠️ JSON 파싱 실패:", text);
+        resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 서버 응답 오류가 발생했습니다.</span>`;
+      }
+    } catch (err) {
+      resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 업로드 중 오류가 발생했습니다.</span>`;
+      console.error(err);
+    }
+  });
+  // ✅ 모달 닫힐 때 초기화
+  excelModal.addEventListener('hidden.bs.modal', () => {
+    uploadForm.reset();
+    resultBox.innerHTML = '';
+  });
+});
+</script>
+
+<script>
+const searchInput = document.getElementById('searchKeyword');
+
+// ✅ 엔터키로도 검색 가능하게 처리
+searchInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault(); // 폼 기본 제출 방지
+    document.querySelector('#searchUserForm button[type="submit"]').click(); // 검색 버튼 클릭 실행
+  }
+});
+</script>
+
+<script>
+document.getElementById('resetUserBtn').addEventListener('click', function() {
+  // 기본 페이지(대상자 미선택 상태)로 이동
+  window.location.href = '/commission/deposit/';
+});
+</script>
+
+<style>
+  /* ✅ 대상자 검색 결과 폰트 크기 축소 */
+  #searchResults div {
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+
+  #searchResults .btn {
+    font-size: 0.85rem;
+    padding: 3px 10px;
+  }
+
+  /* ✅ 드롭다운 버튼 스타일 */
+  #uploadTypeDropdown {
+    min-width: 160px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 긴 텍스트는 … 처리 */
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const excelModal = document.getElementById('excelUploadModal');
+  const uploadForm = document.getElementById('excelUploadForm');
+  const resultBox = document.getElementById('uploadResult');
+
+  // ✅ 모달이 닫힐 때 자동 초기화
+  excelModal.addEventListener('hidden.bs.modal', () => {
+    uploadForm.reset(); // form 초기화 (드롭다운 + 파일)
+    resultBox.innerHTML = ''; // 결과 메시지 초기화
+  });
+});
+</script>
+
+
 {% endblock %}
