@@ -1,10 +1,300 @@
-<!--django_ma/dash/templates/dash/dash_sales.html-->
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
 {% block title %}업무요청서{% endblock %}
 
 {% block content %}
-<div class="container text-center mt-5">
-  <h2 class="fw-bold" style="color:#003f7d;">업무요청서</h2>
-  <p class="text-muted mt-3">🚧 제작중입니다 🚧</p>
+<div class="container mt-5">
+  <div class="mx-auto" style="max-width: 800px;">
+    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청서</h3>
+
+    <div class="card shadow p-4 border-0 rounded-4">
+      <form method="POST" novalidate>
+        {% csrf_token %}
+
+        <!-- ✅ 요청 대상 -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-bold mb-0" style="color:#003f7d;">요청대상</h6>
+          <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">
+            초기화
+          </button>
+        </div>
+
+        {% for i in "12345" %}
+        <div class="row mb-3 align-items-end">
+          <div class="col-md-1 text-center">
+            <button type="button" class="btn btn-sm btn-primary search-btn" 
+                    data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">
+              검색
+            </button>
+          </div>
+          <div class="col-md-3 mb-2">
+            <label class="form-label">성명</label>
+            <input type="text" name="target_name_{{ i }}" class="form-control">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label class="form-label">사번</label>
+            <input type="text" name="target_code_{{ i }}" class="form-control">
+          </div>
+          <div class="col-md-2 mb-2">
+            <label class="form-label">입사일</label>
+            <input type="date" name="target_join_{{ i }}" class="form-control">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label class="form-label">퇴사일</label>
+            <input type="date" name="target_leave_{{ i }}" class="form-control">
+          </div>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <!-- ✅ 계약사항 -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0" style="color:#005BAC;">계약사항</h6>
+        <button type="button" id="resetContractBtn" class="btn btn-outline-secondary btn-sm">
+            초기화
+        </button>
+        </div>
+
+        {% for i in "12345" %}
+        <div class="row mb-3">
+        <div class="col-md-3 mb-2">
+            <label class="form-label">보험사</label>
+            <input type="text" name="insurer_{{ i }}" class="form-control">
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="form-label">증권번호</label>
+            <input type="text" name="policy_no_{{ i }}" class="form-control">
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="form-label">계약자(피보험자)</label>
+            <input type="text" name="contractor_{{ i }}" class="form-control">
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="form-label">보험료</label>
+            <input type="text" name="premium_{{ i }}" class="form-control">
+        </div>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <!-- ✅ 요청 내용 -->
+        <h6 class="fw-bold mb-3" style="color:#005BAC;">요청 내용</h6>
+        <div class="mb-3">
+          <label class="form-label">제목</label>
+          <input type="text" name="title" class="form-control" placeholder="제목 입력">
+        </div>
+        <div class="mb-4">
+          <label class="form-label">내용</label>
+          <textarea name="content" class="form-control" rows="5" placeholder="요청 상세 내용을 입력해주세요"></textarea>
+        </div>
+
+        <!-- ✅ 버튼 -->
+        <div class="d-flex justify-content-between mt-4">
+          <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">뒤로가기</a>
+          <button type="button" id="generatePdfBtn" class="btn btn-primary px-5 fw-bold">제작하기</button>
+        </div>
+
+        <!-- ✅ 로딩 오버레이 -->
+        <div id="loadingOverlay" 
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+                    background:rgba(255,255,255,0.85); z-index:9999; text-align:center;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+            <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;">
+            <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 class="mt-3 fw-bold" style="color:#005BAC;">제작 중입니다... 잠시만 기다려주세요.</h5>
+        </div>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+<!-- ✅ 대상자 검색 모달 -->
+<div class="modal fade" id="searchUserModal" tabindex="-1" aria-labelledby="searchUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold" id="searchUserModalLabel">대상자 검색</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="searchUserForm" class="d-flex gap-2">
+          <input type="text" class="form-control" id="searchKeyword" name="q" placeholder="사번 또는 성명 입력">
+          <button type="submit" class="btn btn-primary flex-shrink-0">검색</button>
+        </form>
+        <div id="searchResults" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Ajax 검색 스크립트 -->
+<script>
+let currentRow = null;
+
+// 각 행별 검색 버튼 클릭 시 현재 행 번호 저장
+document.querySelectorAll('.search-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    currentRow = this.dataset.row;
+  });
+});
+
+document.getElementById('searchUserForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const query = document.getElementById('searchKeyword').value.trim();
+  const resultsBox = document.getElementById('searchResults');
+  resultsBox.innerHTML = '<p class="text-muted small text-center">검색 중...</p>';
+
+  fetch(`/board/search-user/?q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+      resultsBox.innerHTML = '';
+      if (data.results.length === 0) {
+        resultsBox.innerHTML = '<p class="text-muted small text-center">검색 결과가 없습니다.</p>';
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.classList.add('list-group');
+
+      data.results.forEach(user => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action';
+        item.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <span><strong>${user.name}</strong> (${user.id}) (${user.regist})</span>
+                <small class="text-muted">${user.branch}</small>
+            </div>
+            <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
+            `;
+
+        // ✅ 선택 시 현재 행에 채워넣기
+        item.addEventListener('click', () => {
+          if (!currentRow) return;
+          document.querySelector(`input[name="target_name_${currentRow}"]`).value = user.name;
+          document.querySelector(`input[name="target_code_${currentRow}"]`).value = user.code || user.regist || user.id;
+          document.querySelector(`input[name="target_join_${currentRow}"]`).value = user.join_date || user.enter || '';
+          document.querySelector(`input[name="target_leave_${currentRow}"]`).value = user.leave_date || user.quit || '';
+
+          bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
+        });
+
+        list.appendChild(item);
+      });
+
+      resultsBox.appendChild(list);
+    })
+    .catch(() => {
+      resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류가 발생했습니다.</p>';
+    });
+});
+</script>
+
+<style>
+  /* 검색 버튼 위치 미세 조정 */
+  .search-btn {
+    margin-top: -30px; /* 🔹 위로 살짝 올림 (필요에 따라 -4~-8px 조정) */
+  }
+</style>
+
+<script>
+  // ✅ 모달 닫았다 다시 열 때 검색어와 결과 초기화
+  const searchModal = document.getElementById('searchUserModal');
+  searchModal.addEventListener('show.bs.modal', function () {
+    document.getElementById('searchKeyword').value = ''; // 검색어 초기화
+    document.getElementById('searchResults').innerHTML = ''; // 결과 초기화
+  });
+</script>
+
+<script>
+  // ✅ 초기화 버튼 클릭 시 모든 대상자 입력 필드 비우기
+  document.getElementById('resetUserBtn').addEventListener('click', function () {
+    document.querySelectorAll('input[name^="target_name_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="target_code_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="target_join_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="target_leave_"]').forEach(el => el.value = '');
+  });
+</script>
+
+<script>
+  // ✅ 계약사항 초기화 버튼 클릭 시 모든 입력 필드 비우기
+  document.getElementById('resetContractBtn').addEventListener('click', function () {
+    document.querySelectorAll('input[name^="insurer_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="policy_no_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="contractor_"]').forEach(el => el.value = '');
+    document.querySelectorAll('input[name^="premium_"]').forEach(el => el.value = '');
+  });
+</script>
+
+<script>
+document.getElementById('generatePdfBtn').addEventListener('click', function() {
+  const form = document.querySelector('form');
+  const formData = new FormData(form);
+
+  fetch('/board/generate-pdf/', {
+    method: 'POST',
+    body: formData,
+    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("PDF 생성 실패");
+    return res.blob();
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '업무요청서.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  })
+  .catch(err => alert("PDF 제작 중 오류가 발생했습니다."));
+});
+</script>
+
+<script>
+document.querySelector('form').addEventListener('submit', async function(e) {
+  e.preventDefault(); // 기본 제출 막기
+
+  const form = this;
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.style.display = 'block'; // ✅ 로딩창 표시
+
+  try {
+    const formData = new FormData(form);
+    const response = await fetch("{% url 'generate_pdf' %}", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) throw new Error("PDF 생성 실패");
+
+    // ✅ PDF 다운로드 처리
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "업무요청서.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+  } catch (err) {
+    alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
+    console.error(err);
+  } finally {
+    overlay.style.display = 'none'; // ✅ 완료 후 로딩창 닫기
+  }
+});
+</script>
+
+
 {% endblock %}
