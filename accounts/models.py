@@ -23,10 +23,18 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     GRADE_CHOICES = [
         ('superuser', 'Superuser'),
-        ('admin', 'Admin'),
+        ('main_admin', 'Main Admin'),
+        ('sub_admin', 'Sub Admin'),
         ('basic', 'Basic'),
         ('inactive', 'Inactive'),
     ]
+
+    grade = models.CharField(
+        "권한등급",
+        max_length=20,
+        choices=GRADE_CHOICES,
+        default='Basic'
+    )
 
     id = models.CharField(max_length=30, unique=True, primary_key=True)
     name = models.CharField(max_length=100)

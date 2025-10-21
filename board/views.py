@@ -5,10 +5,21 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
-
+from django.http import JsonResponse
+from accounts.models import CustomUser
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
+from datetime import date
 from datetime import datetime
+from django.http import HttpResponse
+from docx import Document
+from io import BytesIO
+from datetime import date
+from reportlab.pdfgen import canvas
+from docx2pdf import convert
+import os
+import tempfile
+import subprocess
 
 
 # ✅ 전역에서 한 번만 로드
@@ -307,3 +318,94 @@ def support_manual(request):
 # ✅ 영업기준안 (제작중)
 def support_rules(request):
     return render(request, 'board/support_rules.html')
+
+
+# ✅ 업무요청서 페이지
+@login_required
+def support_form(request):
+    """
+    파트너 업무요청서 페이지 렌더링
+    """
+    return render(request, 'board/support_form.html')
+
+
+# ✅ 대상자 검색 (superuser는 전체, 일반 사용자는 자신의 branch만)
+@login_required
+def search_user(request):
+    keyword = request.GET.get("q", "").strip()
+    user = request.user
+
+    if not keyword:
+        return JsonResponse({"results": []})
+
+    qs = CustomUser.objects.all()
+    if user.grade != "superuser":
+        qs = qs.filter(branch=user.branch)
+
+    # ✅ 실제 존재하는 필드 사용
+    users = qs.filter(
+        Q(name__icontains=keyword) | Q(regist__icontains=keyword)
+    ).values(
+        "id", "name", "regist", "branch", "enter", "quit"
+    )[:20]
+
+    return JsonResponse({"results": list(users)})
+
+@login_required
+def generate_request_pdf(request):
+    """폼 입력 데이터를 기반으로 워드 템플릿을 채워 PDF로 변환 (Render 환경 호환)"""
+    if request.method == "POST":
+        # ✅ 1. 폼 데이터 수집
+        context = {
+            "요청일자": date.today().strftime("%Y-%m-%d"),
+            "제목": request.POST.get("title", ""),
+            "내용": request.POST.get("content", ""),
+        }
+
+        for i in range(1, 6):
+            context[f"대상{i}(성명)"] = request.POST.get(f"target_name_{i}", "")
+            context[f"대상{i}(사번)"] = request.POST.get(f"target_code_{i}", "")
+            context[f"대상{i}(입사)"] = request.POST.get(f"target_join_{i}", "")
+            context[f"대상{i}(퇴사)"] = request.POST.get(f"target_leave_{i}", "")
+            context[f"계약{i}(보험사)"] = request.POST.get(f"insurer_{i}", "")
+            context[f"계약{i}(증권번호)"] = request.POST.get(f"policy_no_{i}", "")
+            context[f"계약{i}(계약자)"] = request.POST.get(f"contractor_{i}", "")
+            context[f"계약{i}(보험료)"] = request.POST.get(f"premium_{i}", "")
+
+        # ✅ 2. Render 환경에서도 접근 가능한 절대경로 설정
+        template_path = os.path.join(settings.BASE_DIR, "media", "파트너 업무요청서.docx")
+        if not os.path.exists(template_path):
+            return JsonResponse({"error": f"템플릿 파일을 찾을 수 없습니다: {template_path}"}, status=404)
+
+        doc = Document(template_path)
+
+        # ✅ 3. 텍스트 치환
+        for p in doc.paragraphs:
+            for key, val in context.items():
+                placeholder = f"{{{{ {key} }}}}"
+                if placeholder in p.text:
+                    p.text = p.text.replace(placeholder, str(val))
+
+        # ✅ 4. 임시 저장 (Render에서 /tmp 경로만 쓰기 가능)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_doc = os.path.join(tmpdir, "temp.docx")
+            tmp_pdf = os.path.join(tmpdir, "output.pdf")
+            doc.save(tmp_doc)
+
+            # ✅ 5. docx → pdf 변환 (LibreOffice headless 모드)
+            try:
+                subprocess.run(
+                    ["libreoffice", "--headless", "--convert-to", "pdf", tmp_doc, "--outdir", tmpdir],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            except Exception as e:
+                return JsonResponse({"error": f"PDF 변환 중 오류: {str(e)}"}, status=500)
+
+            # ✅ 6. PDF 읽어서 응답 반환
+            with open(tmp_pdf, "rb") as f:
+                pdf_bytes = f.read()
+            response = HttpResponse(pdf_bytes, content_type="application/pdf")
+            response["Content-Disposition"] = 'attachment; filename="업무요청서.pdf"'
+            return response

@@ -2,22 +2,41 @@
 from openpyxl import Workbook, load_workbook
 import os
 from io import BytesIO
+from datetime import datetime
+
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
-from django.http import HttpResponse
-from django.urls import path
+from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import render, redirect
-from django.contrib import messages
+from django.urls import path
+
 from .forms import ExcelUploadForm
 from .models import CustomUser
 from .custom_admin import custom_admin_site
-from datetime import datetime
-from django.http import FileResponse, Http404
 
 
+# ✅ 공통 등급 매핑 테이블
+GRADE_MAP = {
+    'superuser': 'superuser',
+    'mainadmin': 'main_admin',
+    'main_admin': 'main_admin',
+    'subadmin': 'sub_admin',
+    'sub_admin': 'sub_admin',
+    'basic': 'basic',
+    'inactive': 'inactive',
+}
 
-# ✅ 공통 엑셀 생성 함수
+GRADE_DISPLAY = {
+    'superuser': 'Superuser',
+    'main_admin': 'Main Admin',
+    'sub_admin': 'Sub Admin',
+    'basic': 'Basic',
+    'inactive': 'Inactive',
+}
+
+
+# ✅ 엑셀 내보내기 공통 함수
 def export_users_as_excel(queryset, filename):
     wb = Workbook()
     ws = wb.active
@@ -31,7 +50,7 @@ def export_users_as_excel(queryset, filename):
             user.id,
             user.name,
             user.branch,
-            user.grade,
+            GRADE_DISPLAY.get(user.grade, user.grade),
             user.status,
             user.is_staff,
             user.is_active,
@@ -54,16 +73,14 @@ def upload_users_from_excel_view(request):
             try:
                 wb = load_workbook(excel_file, read_only=True, data_only=True)
 
-                # ✅ “업로드” 시트 존재 확인
+                # ✅ “업로드” 시트 확인
                 if "업로드" not in wb.sheetnames:
-                    messages.error(request, "'업로드' 시트를 찾을 수 없습니다. 업로드 양식을 다시 확인해주세요.")
+                    messages.error(request, "'업로드' 시트를 찾을 수 없습니다. 양식을 다시 확인하세요.")
                     return redirect("..")
 
                 ws = wb["업로드"]
-
-                # ✅ 시트 숨김 상태 확인
                 if ws.sheet_state in ["hidden", "veryHidden"]:
-                    messages.error(request, "'업로드' 시트가 숨김 상태입니다. 숨김 해제 후 다시 업로드하세요.")
+                    messages.error(request, "'업로드' 시트가 숨김 상태입니다. 숨김 해제 후 업로드하세요.")
                     return redirect("..")
 
                 total_rows = ws.max_row - 1
@@ -80,7 +97,7 @@ def upload_users_from_excel_view(request):
                     except Exception:
                         return None
 
-                # ✅ 각 행 반복 처리
+                # ✅ 각 행 반복
                 for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                     if not row or len(row) < 12:
                         error_count += 1
@@ -98,10 +115,13 @@ def upload_users_from_excel_view(request):
                         results.append([idx, user_id, name, "ID 또는 이름 누락"])
                         continue
 
-                    grade = str(grade).strip().lower() if grade else "basic"
+                    # ✅ 등급 매핑 적용
+                    grade_key = str(grade).strip().lower() if grade else "basic"
+                    grade = GRADE_MAP.get(grade_key, "basic")
+
                     is_superuser = grade == "superuser"
-                    is_staff = grade in ["superuser", "admin"]
-                    is_active = status == "재직"
+                    is_staff = grade in ["superuser", "main_admin", "sub_admin"]
+                    is_active = str(status).strip() == "재직"
 
                     try:
                         user = CustomUser.objects.filter(id=user_id).first()
@@ -110,11 +130,11 @@ def upload_users_from_excel_view(request):
                             # 신규 등록
                             CustomUser.objects.create_user(
                                 id=str(user_id).strip(),
-                                password=str(user_id).strip(),
+                                password=str(password or user_id).strip(),
                                 name=str(name).strip(),
                                 branch=str(branch).strip() if branch else "",
                                 grade=grade,
-                                status=str(status).strip() if status else "재직",
+                                status=str(status).strip() or "재직",
                                 regist=str(regist).strip() if regist else "",
                                 birth=parse_date(birth),
                                 enter=parse_date(enter),
@@ -130,7 +150,7 @@ def upload_users_from_excel_view(request):
                             user.name = str(name).strip()
                             user.branch = str(branch).strip() if branch else ""
                             user.grade = grade
-                            user.status = str(status).strip() if status else user.status
+                            user.status = str(status).strip() or user.status
                             user.regist = str(regist).strip() if regist else user.regist
                             user.birth = parse_date(birth)
                             user.enter = parse_date(enter)
@@ -191,7 +211,7 @@ def upload_users_from_excel_view(request):
 # ✅ 선택된 사용자만 엑셀로 다운로드 (Action)
 def export_selected_users_to_excel(modeladmin, request, queryset):
     return export_users_as_excel(queryset, filename="selected_custom_users.xlsx")
-export_selected_users_to_excel.short_description = "Download selected users to Excel"
+export_selected_users_to_excel.short_description = "선택된 사용자 엑셀 다운로드"
 
 
 # ✅ 전체 사용자 엑셀 다운로드
@@ -199,24 +219,23 @@ def export_all_users_excel_view(request):
     users = CustomUser.objects.all()
     return export_users_as_excel(users, filename="all_custom_users.xlsx")
 
-# ✅ 엑셀 업로드용 양식 다운로드
+
+# ✅ 엑셀 업로드 양식 다운로드
 def upload_excel_template_view(request):
     template_path = os.path.join(settings.BASE_DIR, "static", "excel", "업로드양식.xlsx")
-
     if not os.path.exists(template_path):
         raise Http404("양식 파일을 찾을 수 없습니다. 관리자에게 문의하세요.")
-
     response = FileResponse(open(template_path, "rb"),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="업로드양식.xlsx"'
     return response
+
 
 # ✅ 관리자 등록
 @admin.register(CustomUser)
 @admin.register(CustomUser, site=custom_admin_site)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
-
     actions = [export_selected_users_to_excel]
 
     list_display = ('id', 'name', 'branch', 'grade', 'status', 'is_staff', 'is_active')
