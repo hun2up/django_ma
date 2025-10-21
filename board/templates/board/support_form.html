@@ -133,7 +133,7 @@
   </div>
 </div>
 
-<!-- ✅ Ajax 검색 스크립트 -->
+<!-- ✅ 대상자 검색 / 초기화 관련 스크립트는 그대로 유지 -->
 <script>
 let currentRow = null;
 
@@ -173,21 +173,16 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
             </div>
             <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
             `;
-
-        // ✅ 선택 시 현재 행에 채워넣기
         item.addEventListener('click', () => {
           if (!currentRow) return;
           document.querySelector(`input[name="target_name_${currentRow}"]`).value = user.name;
           document.querySelector(`input[name="target_code_${currentRow}"]`).value = user.code || user.regist || user.id;
           document.querySelector(`input[name="target_join_${currentRow}"]`).value = user.join_date || user.enter || '';
           document.querySelector(`input[name="target_leave_${currentRow}"]`).value = user.leave_date || user.quit || '';
-
           bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
         });
-
         list.appendChild(item);
       });
-
       resultsBox.appendChild(list);
     })
     .catch(() => {
@@ -196,34 +191,23 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
 });
 </script>
 
-<style>
-  /* 검색 버튼 위치 미세 조정 */
-  .search-btn {
-    margin-top: -30px; /* 🔹 위로 살짝 올림 (필요에 따라 -4~-8px 조정) */
-  }
-</style>
-
 <script>
-  // ✅ 모달 닫았다 다시 열 때 검색어와 결과 초기화
+  // ✅ 모달 닫았다 다시 열 때 초기화
   const searchModal = document.getElementById('searchUserModal');
   searchModal.addEventListener('show.bs.modal', function () {
-    document.getElementById('searchKeyword').value = ''; // 검색어 초기화
-    document.getElementById('searchResults').innerHTML = ''; // 결과 초기화
+    document.getElementById('searchKeyword').value = '';
+    document.getElementById('searchResults').innerHTML = '';
   });
 </script>
 
 <script>
-  // ✅ 초기화 버튼 클릭 시 모든 대상자 입력 필드 비우기
+  // ✅ 초기화 버튼
   document.getElementById('resetUserBtn').addEventListener('click', function () {
     document.querySelectorAll('input[name^="target_name_"]').forEach(el => el.value = '');
     document.querySelectorAll('input[name^="target_code_"]').forEach(el => el.value = '');
     document.querySelectorAll('input[name^="target_join_"]').forEach(el => el.value = '');
     document.querySelectorAll('input[name^="target_leave_"]').forEach(el => el.value = '');
   });
-</script>
-
-<script>
-  // ✅ 계약사항 초기화 버튼 클릭 시 모든 입력 필드 비우기
   document.getElementById('resetContractBtn').addEventListener('click', function () {
     document.querySelectorAll('input[name^="insurer_"]').forEach(el => el.value = '');
     document.querySelectorAll('input[name^="policy_no_"]').forEach(el => el.value = '');
@@ -233,68 +217,36 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
 </script>
 
 <script>
-document.getElementById('generatePdfBtn').addEventListener('click', function() {
-  const form = document.querySelector('form');
-  const formData = new FormData(form);
+  // ✅ 제작 버튼 클릭 → DOCX 생성 요청
+  document.getElementById('generatePdfBtn').addEventListener('click', async function() {
+    const form = document.querySelector('form');
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.style.display = 'block';
 
-  fetch('/board/generate-pdf/', {
-    method: 'POST',
-    body: formData,
-    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
-  })
-  .then(res => {
-    if (!res.ok) throw new Error("PDF 생성 실패");
-    return res.blob();
-  })
-  .then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '업무요청서.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  })
-  .catch(err => alert("PDF 제작 중 오류가 발생했습니다."));
-});
+    try {
+      const formData = new FormData(form);
+      const response = await fetch("{% url 'generate_docx' %}", {
+        method: "POST",
+        body: formData,
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+      });
+
+      if (!response.ok) throw new Error("파일 생성 실패");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "업무요청서.docx"; // ✅ 확장자 확실히 DOCX
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("파일 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
+      console.error(err);
+    } finally {
+      overlay.style.display = 'none';
+    }
+  });
 </script>
-
-<script>
-document.querySelector('form').addEventListener('submit', async function(e) {
-  e.preventDefault(); // 기본 제출 막기
-
-  const form = this;
-  const overlay = document.getElementById('loadingOverlay');
-  overlay.style.display = 'block'; // ✅ 로딩창 표시
-
-  try {
-    const formData = new FormData(form);
-    const response = await fetch("{% url 'generate_pdf' %}", {
-      method: "POST",
-      body: formData
-    });
-
-    if (!response.ok) throw new Error("PDF 생성 실패");
-
-    // ✅ PDF 다운로드 처리
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = "업무요청서.pdf";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-
-  } catch (err) {
-    alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
-    console.error(err);
-  } finally {
-    overlay.style.display = 'none'; // ✅ 완료 후 로딩창 닫기
-  }
-});
-</script>
-
 
 {% endblock %}

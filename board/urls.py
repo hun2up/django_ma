@@ -10,7 +10,6 @@ urlpatterns = [
     path('support_form/', views.support_form, name='support_form'),
     path('support_manual/', views.support_manual, name='support_manual'),
     path('support_rules/', views.support_rules, name='support_rules'),
-    path('support_form/', views.support_form, name='support_form'),
     path('search-user/', views.search_user, name='search_user'),
-    path('generate-pdf/', views.generate_request_pdf, name='generate_pdf'),
+    path('generate-docx/', views.generate_request_docx, name='generate_docx'),
 ]
