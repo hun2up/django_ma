@@ -1,25 +1,41 @@
 # django_ma/board/views.py
+
+# ===============================
+# ✅ 표준 라이브러리
+# ===============================
+import os
+import tempfile
+import pypandoc
+import subprocess
+from io import BytesIO
+from datetime import date, datetime
+
+# ===============================
+# ✅ Django 기본 모듈
+# ===============================
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+
+# ===============================
+# ✅ 외부 라이브러리
+# ===============================
+from docx import Document
+from reportlab.pdfgen import canvas
+from docx2pdf import convert
+
+# ===============================
+# ✅ 로컬 앱 모듈
+# ===============================
 from accounts.models import CustomUser
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
-from datetime import date
-from datetime import datetime
-from django.http import HttpResponse
-from docx import Document
-from io import BytesIO
-from datetime import date
-from reportlab.pdfgen import canvas
-from docx2pdf import convert
-import os
-import tempfile
-import subprocess
+
 
 
 # ✅ 전역에서 한 번만 로드
@@ -352,60 +368,68 @@ def search_user(request):
     return JsonResponse({"results": list(users)})
 
 @login_required
-def generate_request_pdf(request):
-    """폼 입력 데이터를 기반으로 워드 템플릿을 채워 PDF로 변환 (Render 환경 호환)"""
-    if request.method == "POST":
-        # ✅ 1. 폼 데이터 수집
-        context = {
-            "요청일자": date.today().strftime("%Y-%m-%d"),
-            "제목": request.POST.get("title", ""),
-            "내용": request.POST.get("content", ""),
-        }
+def generate_request_docx(request):
+    """
+    Render 환경 호환 버전:
+    PDF 대신 완성된 DOCX 파일을 생성하여 바로 다운로드
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "잘못된 요청 방식입니다."}, status=400)
 
-        for i in range(1, 6):
-            context[f"대상{i}(성명)"] = request.POST.get(f"target_name_{i}", "")
-            context[f"대상{i}(사번)"] = request.POST.get(f"target_code_{i}", "")
-            context[f"대상{i}(입사)"] = request.POST.get(f"target_join_{i}", "")
-            context[f"대상{i}(퇴사)"] = request.POST.get(f"target_leave_{i}", "")
-            context[f"계약{i}(보험사)"] = request.POST.get(f"insurer_{i}", "")
-            context[f"계약{i}(증권번호)"] = request.POST.get(f"policy_no_{i}", "")
-            context[f"계약{i}(계약자)"] = request.POST.get(f"contractor_{i}", "")
-            context[f"계약{i}(보험료)"] = request.POST.get(f"premium_{i}", "")
+    user = request.user
 
-        # ✅ 2. Render 환경에서도 접근 가능한 절대경로 설정
-        template_path = os.path.join(settings.BASE_DIR, "media", "파트너 업무요청서.docx")
-        if not os.path.exists(template_path):
-            return JsonResponse({"error": f"템플릿 파일을 찾을 수 없습니다: {template_path}"}, status=404)
+    # ✅ 요청자 및 대상자 데이터 구성
+    context = {
+        "요청일자": date.today().strftime("%Y-%m-%d"),
+        "제목": request.POST.get("title", ""),
+        "내용": request.POST.get("content", ""),
+        "요청(성명)": getattr(user, "name", ""),
+        "요청(소속)": getattr(user, "branch", ""),
+        "요청(사번)": getattr(user, "regist", ""),
+        "요청(입사)": getattr(user, "enter", ""),
+    }
 
-        doc = Document(template_path)
+    # ✅ 소속 및 최상위 관리자 정보
+    branch_name = getattr(user, "branch", "")
+    context["소속"] = branch_name
+    main_admin = (
+        CustomUser.objects.filter(branch=branch_name, grade="main_admin")
+        .order_by("id").first()
+    )
+    context["최상위"] = main_admin.name if main_admin else ""
 
-        # ✅ 3. 텍스트 치환
-        for p in doc.paragraphs:
-            for key, val in context.items():
-                placeholder = f"{{{{ {key} }}}}"
-                if placeholder in p.text:
-                    p.text = p.text.replace(placeholder, str(val))
+    # ✅ 대상자 및 계약정보 반복
+    for i in range(1, 6):
+        context[f"대상{i}(성명)"] = request.POST.get(f"target_name_{i}", "")
+        context[f"대상{i}(사번)"] = request.POST.get(f"target_code_{i}", "")
+        context[f"대상{i}(입사)"] = request.POST.get(f"target_join_{i}", "")
+        context[f"대상{i}(퇴사)"] = request.POST.get(f"target_leave_{i}", "")
+        context[f"계약{i}(보험사)"] = request.POST.get(f"insurer_{i}", "")
+        context[f"계약{i}(증권번호)"] = request.POST.get(f"policy_no_{i}", "")
+        context[f"계약{i}(계약자)"] = request.POST.get(f"contractor_{i}", "")
+        context[f"계약{i}(보험료)"] = request.POST.get(f"premium_{i}", "")
 
-        # ✅ 4. 임시 저장 (Render에서 /tmp 경로만 쓰기 가능)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_doc = os.path.join(tmpdir, "temp.docx")
-            tmp_pdf = os.path.join(tmpdir, "output.pdf")
-            doc.save(tmp_doc)
+    # ✅ 템플릿 파일 불러오기
+    template_path = os.path.join(settings.BASE_DIR, "media", "파트너 업무요청서.docx")
+    if not os.path.exists(template_path):
+        return JsonResponse({"error": "템플릿 파일을 찾을 수 없습니다."}, status=404)
 
-            # ✅ 5. docx → pdf 변환 (LibreOffice headless 모드)
-            try:
-                subprocess.run(
-                    ["libreoffice", "--headless", "--convert-to", "pdf", tmp_doc, "--outdir", tmpdir],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            except Exception as e:
-                return JsonResponse({"error": f"PDF 변환 중 오류: {str(e)}"}, status=500)
+    doc = Document(template_path)
 
-            # ✅ 6. PDF 읽어서 응답 반환
-            with open(tmp_pdf, "rb") as f:
-                pdf_bytes = f.read()
-            response = HttpResponse(pdf_bytes, content_type="application/pdf")
-            response["Content-Disposition"] = 'attachment; filename="업무요청서.pdf"'
-            return response
+    # ✅ 텍스트 치환
+    for p in doc.paragraphs:
+        for key, val in context.items():
+            placeholder = f"{{{{ {key} }}}}"
+            if placeholder in p.text:
+                p.text = p.text.replace(placeholder, str(val))
+
+    # ✅ 완성된 DOCX 다운로드
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+        doc.save(tmp.name)
+        tmp.seek(0)
+        response = HttpResponse(
+            tmp.read(),
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        response["Content-Disposition"] = 'attachment; filename="업무요청서.docx"'
+        return response
