@@ -295,3 +295,15 @@ def post_edit(request, pk):
         "post": post,
         "attachments": attachments,
     })
+
+# ✅ 업무요청서 (제작중)
+def support_form(request):
+    return render(request, 'board/support_form.html')
+
+# ✅ 업무매뉴얼 (제작중)
+def support_manual(request):
+    return render(request, 'board/support_manual.html')
+
+# ✅ 영업기준안 (제작중)
+def support_rules(request):
+    return render(request, 'board/support_rules.html')

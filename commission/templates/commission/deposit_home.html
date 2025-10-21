@@ -335,63 +335,51 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const uploadForm = document.getElementById('excelUploadForm');
-  const resultBox = document.getElementById('uploadResult');
-  const uploadTypeSelect = document.getElementById('uploadTypeSelect');
-  const excelModal = document.getElementById('excelUploadModal');
+  const searchForm = document.getElementById('searchUserForm');
+  const searchInput = document.getElementById('searchKeyword');
+  const resultsBox = document.getElementById('searchResults');
 
-  uploadForm.addEventListener('submit', async function(e) {
+  // ✅ 폼 기본 제출 방지 + AJAX 검색
+  searchForm.addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const file = document.getElementById('excelFile').files[0];
-    const uploadType = uploadTypeSelect.value;
-
-    if (!uploadType) return resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 업로드 구분을 선택해주세요.</span>`;
-    if (!file) return resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 파일을 선택해주세요.</span>`;
-
-    const formData = new FormData();
-    formData.append('excel_file', file);
-    formData.append('upload_type', uploadType);
-    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    const keyword = searchInput.value.trim();
+    if (!keyword) {
+      resultsBox.innerHTML = `<div class="text-danger fw-bold mt-2">검색어를 입력해주세요.</div>`;
+      return;
+    }
 
     try {
-      const response = await fetch('/commission/upload-excel/', { method: 'POST', body: formData });
-      const text = await response.text();
+      const response = await fetch(`/commission/search-user/?q=${encodeURIComponent(keyword)}`);
+      const data = await response.json();
 
-      try {
-        const data = JSON.parse(text);
-        if (response.ok) {
-          // ✅ 토스트 표시
-          const toastEl = document.getElementById('uploadToast');
-          const toast = new bootstrap.Toast(toastEl);
-          toast.show();
-
-          // ✅ 모달 닫기
-          const modal = bootstrap.Modal.getInstance(excelModal);
-          modal.hide();
-
-          // ✅ 폼 초기화
-          uploadForm.reset();
-          resultBox.innerHTML = '';
-
-          // ✅ 새로고침 (1.5초 후)
-          setTimeout(() => { location.reload(); }, 1500);
-        } else {
-          resultBox.innerHTML = `<span class="text-danger fw-bold">${data.message}</span>`;
-        }
-      } catch {
-        console.error("⚠️ JSON 파싱 실패:", text);
-        resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 서버 응답 오류가 발생했습니다.</span>`;
+      if (data.results && data.results.length > 0) {
+        resultsBox.innerHTML = data.results.map(u => `
+          <div class="search-card shadow-sm p-3 mb-2 rounded-3 d-flex justify-content-between align-items-center">
+            <div class="card-info text-truncate">
+              <span class="fw-bold text-dark">${u.name}</span>
+              <small class="text-secondary">(${u.id})</small>
+              <span class="text-muted">| ${u.branch || '-'}</span>
+            </div>
+            <a href="/commission/deposit/?user=${u.id}" class="btn btn-sm btn-primary px-3">선택</a>
+          </div>
+        `).join('');
+      } else {
+        resultsBox.innerHTML = `<div class="text-muted mt-2 text-center">검색 결과가 없습니다.</div>`;
       }
-    } catch (err) {
-      resultBox.innerHTML = `<span class="text-danger fw-bold">⚠️ 업로드 중 오류가 발생했습니다.</span>`;
-      console.error(err);
+
+    } catch (error) {
+      console.error("검색 오류:", error);
+      resultsBox.innerHTML = `<div class="text-danger mt-2 text-center">⚠️ 검색 중 오류가 발생했습니다.</div>`;
     }
   });
-  // ✅ 모달 닫힐 때 초기화
-  excelModal.addEventListener('hidden.bs.modal', () => {
-    uploadForm.reset();
-    resultBox.innerHTML = '';
+
+  // ✅ 엔터키 입력 시에도 동일 동작
+  searchInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchForm.dispatchEvent(new Event('submit'));
+    }
   });
 });
 </script>
@@ -450,6 +438,39 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 </script>
+
+<style>
+/* 💳 검색결과 카드 스타일 */
+.search-card {
+  border: 1px solid #e0e6ed;
+  background-color: #fff;
+  transition: all 0.25s ease;
+}
+
+.search-card:hover {
+  background-color: #f8faff;
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.15);
+}
+
+.search-card .card-info {
+  flex-grow: 1;
+}
+
+.search-card .fw-bold {
+  font-size: 0.95rem;
+}
+
+.search-card small {
+  font-size: 0.8rem;
+}
+
+.search-card .text-muted {
+  font-size: 0.8rem;
+}
+</style>
+
 
 
 {% endblock %}
