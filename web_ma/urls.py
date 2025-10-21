@@ -35,12 +35,12 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
     # ✅ 커스텀 관리자
     path('admin/', custom_admin_site.urls),
-    
     path('', home_redirect, name='home'),
     path('login/', SessionCloseLoginView.as_view(template_name='registration/login.html'), name='login'),
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
     path('commission/', include('commission.urls')),
+    path('dash/', include('dash.urls')),
 ]
 
 # 개발 모드(DEBUG=True)에서만 업로드 파일 서빙

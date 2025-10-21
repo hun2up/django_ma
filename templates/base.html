@@ -313,6 +313,7 @@
   </style>
 </head>
 
+<!-- 상단메뉴 -->
 <body>
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg fixed-top">
@@ -326,8 +327,32 @@
 
     <div class="collapse navbar-collapse justify-content-center" id="navbarContent">
       <ul class="navbar-nav mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% else %}inactive{% endif %}" href="{% url 'home' %}">메인</a></li>
-        <li class="nav-item"><a class="nav-link {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'post_list' %}">업무요청</a></li>
+        
+        <!-- ✅ 대시보드 메뉴 (드롭다운) -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}" href="#" id="dashMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            대시보드
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="dashMenu">
+            <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
+            <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
+            <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
+          </ul>
+        </li>
+
+        <!-- ✅ 대시보드 메뉴 (드롭다운) -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            업무요청
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="boardMenu">
+            <li><a class="dropdown-item" href="{% url 'post_list' %}">요청게시판</a></li>
+            <li><a class="dropdown-item" href="{% url 'support_from' %}">업무요청서</a></li>
+            <li><a class="dropdown-item" href="{% url 'support_manual' %}">업무매뉴얼</a></li>
+            <li><a class="dropdown-item" href="{% url 'support_rules' %}">영업기준안</a></li>
+          </ul>
+        </li>
+        
         {% if user.grade == 'superuser' %}
         <!-- ✅ 수수료 메뉴 (드롭다운) -->
         <li class="nav-item dropdown">
