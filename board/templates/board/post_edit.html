@@ -1,3 +1,4 @@
+<!-- django_ma/board/templates/board/post_edit.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -7,13 +8,16 @@
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
+    <!-- ✅ 제목 -->
     <h2 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 수정</h2>
 
+    <!-- ✅ 본문 카드 -->
     <div class="card shadow p-4 border-0 rounded-4">
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
+      <!-- ✅ 게시글 수정 폼 -->
       <form method="post" enctype="multipart/form-data" id="postForm" novalidate>
         {% csrf_token %}
 
@@ -50,18 +54,21 @@
           <label class="form-label fw-semibold">현재 첨부파일</label>
         </div>
 
-        <div id="existingFileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height: 80px;">
+        <div id="existingFileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
           {% if attachments %}
             <ul id="existingFiles" class="list-unstyled m-0">
               {% for att in attachments %}
                 <li class="d-flex justify-content-between align-items-center py-1 border-bottom small">
                   <span class="text-truncate" style="max-width:80%;">
                     <i class="bi bi-paperclip"></i>
-                    <a href="{{ att.file.url }}" download>{{ att.original_name|default:att.file.name }}</a>
+                    <a href="{{ att.file.url }}" download>
+                      {{ att.original_name|default:att.file.name }}
+                    </a>
                     <span class="text-muted">({{ att.size|filesizeformat }})</span>
                   </span>
-                  <button type="button" class="btn btn-sm btn-outline-danger remove-existing"
-                          data-id="{{ att.id }}">✖</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-existing" data-id="{{ att.id }}">
+                    ✖
+                  </button>
                 </li>
               {% endfor %}
             </ul>
@@ -74,11 +81,11 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">새 첨부파일 추가</label>
           <input type="file" id="fileInput" name="attachments" class="form-control" multiple>
-          <div class="form-text">파일은 개당 최대 10MB까지 업로드할 수 있습니다.</div>
+          <div class="form-text">파일은 개당 최대 <strong>10MB</strong>까지 업로드할 수 있습니다.</div>
         </div>
 
-        <!-- ✅ 새 파일 목록 (post_create.html 스타일 그대로) -->
-        <div id="fileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height: 80px;">
+        <!-- ✅ 새 파일 목록 -->
+        <div id="fileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
           <p class="text-muted m-0 small" id="noFilesText">첨부된 새 파일이 없습니다.</p>
           <ul id="fileNames" class="list-unstyled m-0"></ul>
         </div>
@@ -94,124 +101,27 @@
       </form>
     </div>
 
+    <!-- ✅ 메인으로 돌아가기 -->
     <div class="text-center mt-4">
-      <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">
-        메인으로 돌아가기
-      </a>
+      <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">메인으로 돌아가기</a>
     </div>
   </div>
 </div>
+{% endblock %}
 
-<!-- ✅ JavaScript : 기존파일 삭제 + 새파일 추가 -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const MAX_SIZE = 10 * 1024 * 1024;
-  const fileInput = document.getElementById("fileInput");
-  const fileNames = document.getElementById("fileNames");
-  const noFilesText = document.getElementById("noFilesText");
-  const deleteContainer = document.getElementById("deleteContainer");
-  const form = document.getElementById("postForm");
+{% block extra_js %}
+  <!-- ✅ 공용 업로드 유틸 로드 -->
+  <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
 
-  let filesArray = [];
-
-  // ✅ 기존 첨부파일 삭제 (X 버튼 클릭 시 즉시 제거)
-  document.querySelectorAll(".remove-existing").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const li = btn.closest("li");
-      const fileId = btn.dataset.id;
-
-      // hidden input으로 삭제 ID 추가
-      const hidden = document.createElement("input");
-      hidden.type = "hidden";
-      hidden.name = "delete_files";
-      hidden.value = fileId;
-      deleteContainer.appendChild(hidden);
-
-      li.remove();
-
-      // 기존 파일이 다 삭제된 경우 안내 문구 표시
-      if (document.querySelectorAll("#existingFiles li").length === 0) {
-        document.getElementById("existingFileList").innerHTML =
-          '<p class="text-muted small m-0">첨부된 파일이 없습니다.</p>';
-      }
-    });
-  });
-
-  // ✅ 새 파일 추가 이벤트
-  fileInput.addEventListener("change", (event) => {
-    const newFiles = Array.from(event.target.files);
-    newFiles.forEach(file => {
-      if (file.size > MAX_SIZE) {
-        alert(`⚠️ ${file.name}은(는) 10MB를 초과합니다.`);
-      } else {
-        filesArray.push(file);
-      }
-    });
-    updateFileList();
-    fileInput.value = "";
-  });
-
-  // ✅ 새 파일 목록 업데이트
-  function updateFileList() {
-    fileNames.innerHTML = "";
-
-    if (filesArray.length === 0) {
-      noFilesText.style.display = "block";
-      return;
-    }
-    noFilesText.style.display = "none";
-
-    filesArray.forEach((file, index) => {
-      const li = document.createElement("li");
-      li.classList.add("d-flex", "justify-content-between", "align-items-center", "py-1", "border-bottom");
-
-      const nameSpan = document.createElement("span");
-      nameSpan.textContent = `${file.name} (${formatFileSize(file.size)})`;
-      nameSpan.classList.add("small", "text-dark", "text-truncate");
-      nameSpan.style.maxWidth = "80%";
-
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.classList.add("btn", "btn-sm", "btn-outline-danger");
-      removeBtn.textContent = "✖";
-      removeBtn.addEventListener("click", () => {
-        filesArray.splice(index, 1);
-        updateFileList();
+  <!-- ✅ 초기화 스크립트 -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      initFileUpload({
+        formSelector: "#postForm",
+        existingFileSelector: ".remove-existing",
+        deleteContainerSelector: "#deleteContainer",
+        maxFileSize: 10 * 1024 * 1024, // 10MB
       });
-
-      li.appendChild(nameSpan);
-      li.appendChild(removeBtn);
-      fileNames.appendChild(li);
     });
-  }
-
-  // ✅ 파일 크기 포맷 함수
-  function formatFileSize(bytes) {
-    if (bytes === 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(1) + " " + units[i];
-  }
-
-  // ✅ 폼 제출 시 FormData 전송 (새 파일 + 삭제파일)
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const formData = new FormData(form);
-    filesArray.forEach(file => formData.append("attachments", file));
-
-    fetch(form.action || window.location.href, {
-      method: "POST",
-      body: formData,
-    })
-      .then(response => {
-        if (response.redirected) window.location.href = response.url;
-        else response.text().then(html => document.body.innerHTML = html);
-      })
-      .catch(err => {
-        alert("파일 업로드 중 오류가 발생했습니다.");
-        console.error(err);
-      });
-  });
-});
-</script>
+  </script>
 {% endblock %}
