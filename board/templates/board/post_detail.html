@@ -1,4 +1,4 @@
-<!--django_ma/board/templates/board/post_detail.html-->
+<!-- django_ma/board/templates/board/post_detail.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -7,31 +7,29 @@
 
 {% block content %}
 <div class="container mt-5">
-
+  <!-- ✅ 메시지 알림 -->
   {% if messages %}
-    <div class="container mt-3">
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    </div>
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
   {% endif %}
 
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <link rel="stylesheet" href="{% static 'css/label-style.css' %}">
-
-      <!-- 제목 + 작성일자 -->
+      <!-- ✅ 제목 + 작성일 -->
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0" style="color:#003f7d;">{{ post.title }}</h5>
+        <h5 class="fw-bold mb-0 text-primary">{{ post.title }}</h5>
         <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
       </div>
 
-      <!-- 요청 내용 -->
-      <div class="my-3 mt-3 p-3 rounded-3 bg-light">
+      <!-- ✅ 본문 내용 -->
+      <div class="my-3 p-3 bg-light rounded-3">
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
           {{ post.content }}
         </p>
@@ -39,66 +37,55 @@
 
       <hr class="my-3">
 
-      <!-- 댓글 라벨 -->
+      <!-- ✅ 댓글 영역 -->
       <div class="my-3">
         <span class="info-value">댓글</span>
 
-        <!-- 댓글 리스트 -->
+        <!-- 댓글 목록 -->
         <div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
-
           {% for comment in comments %}
           <div class="mb-3 position-relative">
-
-            <!-- 작성일시 -->
             <small class="text-muted d-block mb-1" style="font-size:12px;">
               {{ comment.created_at|date:"Y-m-d H:i" }}
             </small>
 
-            <!-- 댓글 본문 (공통 CSS 구조) -->
+            <!-- 댓글 본문 -->
             <div class="comment-box">
-
-              <!-- 좌측 내용 -->
+              <!-- 본문 -->
               <div class="comment-content position-relative">
                 <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.content }}</p>
 
                 {% if user == comment.author %}
                 <div class="position-absolute top-0 end-0 mt-1 me-2 edit-delete-btns">
-                  <button type="button"
-                          class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
-                          data-id="{{ comment.id }}"
-                          style="font-size:12px;">수정</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
+                          data-id="{{ comment.id }}" style="font-size:12px;">수정</button>
 
                   <form method="post" style="display:inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action_type" value="delete_comment">
                     <input type="hidden" name="comment_id" value="{{ comment.id }}">
-                    <button type="submit"
-                            class="btn btn-sm btn-outline-danger px-2 py-0"
-                            style="font-size:12px;">삭제</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-0" style="font-size:12px;">삭제</button>
                   </form>
                 </div>
                 {% endif %}
               </div>
 
-              <!-- 우측 작성자 -->
+              <!-- 작성자 -->
               <span class="info-label">{{ comment.author.name }}</span>
             </div>
-
           </div>
           {% empty %}
           <p class="comment-empty mb-0">아직 댓글이 없습니다.</p>
           {% endfor %}
         </div>
 
-        <!-- 댓글 입력 폼 -->
+        <!-- ✅ 댓글 입력 -->
         {% if user.is_authenticated %}
-        <form method="post" class="mt-3">
+        <form method="post" class="mt-3 d-flex align-items-center gap-1">
           {% csrf_token %}
           <input type="hidden" name="action_type" value="comment">
-          <div class="d-flex align-items-center gap-1">
-            {{ form.content|add_class:"form-control form-control-sm flex-grow-1" }}
-            <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px; line-height:1;">등록</button>
-          </div>
+          {{ form.content|add_class:"form-control form-control-sm flex-grow-1" }}
+          <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px;">등록</button>
         </form>
         {% else %}
         <p class="comment-login mt-3">
@@ -109,57 +96,32 @@
 
       <hr class="my-3">
 
-      <!-- 필드 요약 정보 -->
+      <!-- ✅ 게시글 기본정보 -->
       <div class="my-3">
         <div class="row gy-2 gx-3">
-
+          {% for label, value in post_info.items %}
           <div class="col-md-4">
-            <span class="info-label">구분</span>
-            <span class="info-value">{{ post.category|default:"-" }}</span>
+            <span class="info-label">{{ label }}</span>
+            <span class="info-value">{{ value|default:"-" }}</span>
           </div>
-
-          <div class="col-md-4">
-            <span class="info-label">성명(대상자)</span>
-            <span class="info-value">{{ post.fa|default:"-" }}</span>
-          </div>
-
-          <div class="col-md-4">
-            <span class="info-label">사번(대상자)</span>
-            <span class="info-value">{{ post.code|default:"-" }}</span>
-          </div>
-
-          <div class="col-md-4">
-            <span class="info-label">소속(요청자)</span>
-            <span class="info-value">{{ post.user_branch }}</span>
-          </div>
-
-          <div class="col-md-4">
-            <span class="info-label">성명(요청자)</span>
-            <span class="info-value">{{ post.user_name }}</span>
-          </div>
-
-          <div class="col-md-4">
-            <span class="info-label">사번(요청자)</span>
-            <span class="info-value">{{ post.user_id }}</span>
-          </div>
+          {% endfor %}
         </div>
       </div>
-      
+
       <hr class="my-3">
-      
-      <!-- 담당자, 상태, 상태변경일 -->
+
+      <!-- ✅ 담당자 / 상태 -->
       <div class="my-3">
         <div class="row align-items-center">
-
           <!-- 담당자 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
             {% if is_superuser %}
-              <form method="post" style="display:inline;">
+              <form method="post" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="handler">
-                <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
-                  <option value="선택" {% if not post.handler %}selected{% endif %}>선택</option>
+                <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
+                  <option value="">선택</option>
                   {% for h in handlers %}
                     <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
                   {% endfor %}
@@ -175,14 +137,13 @@
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
             {% if is_superuser %}
-              <form method="post" style="display:inline;">
+              <form method="post" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="status">
-                <select name="status" class="form-select form-select-sm status-select d-inline-block" style="width:auto;">
+                <select name="status" class="form-select form-select-sm status-select d-inline-block w-auto">
                   {% for s in status_choices %}
-                    <option value="{{ s }}"
-                      {% if post.status == s %}selected{% endif %}
-                      data-color="{% if s == '확인중' %}orange{% elif s == '진행중' %}green{% elif s == '보완요청' %}red{% elif s == '완료' %}black{% elif s == '반려' %}gray{% endif %}">
+                    <option value="{{ s }}" {% if post.status == s %}selected{% endif %}
+                            data-color="{% if s == '확인중' %}orange{% elif s == '진행중' %}green{% elif s == '보완요청' %}red{% elif s == '완료' %}black{% elif s == '반려' %}gray{% endif %}">
                       {{ s }}
                     </option>
                   {% endfor %}
@@ -190,15 +151,14 @@
                 <button type="submit" class="btn btn-sm btn-primary">변경</button>
               </form>
             {% else %}
-              <span
-                style="
-                  {% if post.status == '확인중' %}color:orange;
-                  {% elif post.status == '진행중' %}color:green;
-                  {% elif post.status == '보완요청' %}color:red;
-                  {% elif post.status == '완료' %}color:black;
-                  {% elif post.status == '반려' %}color:gray;
-                  {% endif %}
-                  font-weight:600;">
+              <span class="fw-semibold" style="color:
+                {% if post.status == '확인중' %}orange
+                {% elif post.status == '진행중' %}green
+                {% elif post.status == '보완요청' %}red
+                {% elif post.status == '완료' %}black
+                {% elif post.status == '반려' %}gray
+                {% endif %};
+              ">
                 {{ post.status }}
               </span>
             {% endif %}
@@ -206,78 +166,51 @@
 
           <!-- 상태변경일 -->
           <div class="col-md-4 mb-2">
-            <span class="info-label">상태변경</span> <span class="small-text">{{ post.status_updated_at|date:"Y-m-d H:i" }}</span>
+            <span class="info-label">상태변경</span>
+            <span class="small-text">{{ post.status_updated_at|date:"Y-m-d H:i" }}</span>
           </div>
         </div>
+      </div>
 
       <hr class="my-3">
 
+      <!-- ✅ 첨부파일 -->
       {% if post.attachments.exists %}
-        <div class="my-3">
-          <span class="info-value">첨부파일</span>
-          <ul class="list-group">
-            {% for att in post.attachments.all %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div class="text-truncate" style="max-width: 80%;">
-                  <i class="bi bi-paperclip"></i>
-                  <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
-                    {{ att.original_name|default:att.file.name }}
-                  </a>
-                </div>
-                <span class="badge bg-light text-dark border">
-                  {{ att.size|filesizeformat }}
-                </span>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
+      <div class="my-3">
+        <span class="info-value">첨부파일</span>
+        <ul class="list-group mt-2">
+          {% for att in post.attachments.all %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="text-truncate" style="max-width: 80%;">
+              <i class="bi bi-paperclip"></i>
+              <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
+                {{ att.original_name|default:att.file.name }}
+              </a>
+            </div>
+            <span class="badge bg-light text-dark border">{{ att.size|filesizeformat }}</span>
+          </li>
+          {% endfor %}
+        </ul>
       </div>
+      {% endif %}
 
+      <!-- ✅ 하단 버튼 -->
       <div class="d-flex justify-content-between mt-4">
         <div class="d-flex gap-2">
           <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">목록으로</a>
-
-          {% if user.is_authenticated and user == post.author or user.is_superuser %}
-            <!-- 수정 버튼 -->
-            <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
+          {% if user.is_authenticated and (user == post.author or user.is_superuser) %}
+          <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
           {% endif %}
         </div>
-
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
       </div>
 
-    </div>  
+    </div>
   </div>
 </div>
+{% endblock %}
 
-<!-- 댓글 수정 JS -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.edit-comment-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const commentId = btn.dataset.id;
-      const container = btn.closest('.comment-content');
-      const textP = container.querySelector('p');
-      const oldText = textP.innerText.trim();
-      const actionBtns = container.querySelector('.edit-delete-btns');
-      if (actionBtns) actionBtns.style.display = 'none';
-
-      textP.outerHTML = `
-        <form method="post" class="d-flex align-items-center gap-1 w-100">
-          {% csrf_token %}
-          <input type="hidden" name="action_type" value="edit_comment">
-          <input type="hidden" name="comment_id" value="${commentId}">
-          <textarea name="content" class="form-control form-control-sm flex-grow-1" rows="1">${oldText}</textarea>
-          <button type="submit" class="btn btn-sm btn-primary px-2 py-1" style="font-size:12px;">저장</button>
-          <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1 cancel-edit" style="font-size:12px;">취소</button>
-        </form>
-      `;
-      const cancelBtn = container.querySelector('.cancel-edit');
-      cancelBtn.addEventListener('click', () => window.location.reload());
-    });
-  });
-});
-</script>
-
+{% block extra_js %}
+  <!-- ✅ 댓글 수정 기능 분리 -->
+  <script src="{% static 'js/post_detail.js' %}"></script>
 {% endblock %}

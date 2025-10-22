@@ -16,6 +16,13 @@ from join.tasks import generate_pdf_task
 def db_test_view(request):
     return HttpResponse("DB 테스트 뷰입니다.")
 
+# ✅ 기본 수수료 페이지 접속 시 → 채권관리 페이지로 자동 이동
+@login_required
+def redirect_to_manual(request):
+    return redirect('support_manual')
+
+def support_manual(request): return render(request, "join/support_manual.html")
+def support_rules(request): return render(request, "join/support_rules.html")
 
 @login_required
 def join_form(request):
