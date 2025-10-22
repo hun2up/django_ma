@@ -22,28 +22,32 @@
         </div>
 
         {% for i in "12345" %}
-        <div class="row mb-3 align-items-end">
+        <div class="row mb-3 align-items-center">
+          <!-- 검색 버튼 -->
           <div class="col-md-1 text-center">
-            <button type="button" class="btn btn-sm btn-primary search-btn" 
+            <button type="button" class="btn btn-sm btn-primary search-btn"
+                    style="margin-top:-4px;"
                     data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">
               검색
             </button>
           </div>
-          <div class="col-md-3 mb-2">
+
+          <!-- 회색 비활성 필드 -->
+          <div class="col equal-field mb-2">
             <label class="form-label">성명</label>
-            <input type="text" name="target_name_{{ i }}" class="form-control">
+            <input type="text" name="target_name_{{ i }}" class="form-control readonly-field" readonly>
           </div>
-          <div class="col-md-3 mb-2">
+          <div class="col equal-field mb-2">
             <label class="form-label">사번</label>
-            <input type="text" name="target_code_{{ i }}" class="form-control">
+            <input type="text" name="target_code_{{ i }}" class="form-control readonly-field" readonly>
           </div>
-          <div class="col-md-2 mb-2">
+          <div class="col equal-field mb-2">
             <label class="form-label">입사일</label>
-            <input type="date" name="target_join_{{ i }}" class="form-control">
+            <input type="date" name="target_join_{{ i }}" class="form-control readonly-field" readonly>
           </div>
-          <div class="col-md-3 mb-2">
+          <div class="col equal-field mb-2">
             <label class="form-label">퇴사일</label>
-            <input type="date" name="target_leave_{{ i }}" class="form-control">
+            <input type="text" name="target_leave_{{ i }}" class="form-control readonly-field" readonly>
           </div>
         </div>
         {% endfor %}
@@ -175,10 +179,20 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
             `;
         item.addEventListener('click', () => {
           if (!currentRow) return;
-          document.querySelector(`input[name="target_name_${currentRow}"]`).value = user.name;
-          document.querySelector(`input[name="target_code_${currentRow}"]`).value = user.code || user.regist || user.id;
-          document.querySelector(`input[name="target_join_${currentRow}"]`).value = user.join_date || user.enter || '';
-          document.querySelector(`input[name="target_leave_${currentRow}"]`).value = user.leave_date || user.quit || '';
+
+          const nameInput = document.querySelector(`input[name="target_name_${currentRow}"]`);
+          const codeInput = document.querySelector(`input[name="target_code_${currentRow}"]`);
+          const joinInput = document.querySelector(`input[name="target_join_${currentRow}"]`);
+          const leaveInput = document.querySelector(`input[name="target_leave_${currentRow}"]`);
+
+          nameInput.value = user.name || '';
+          codeInput.value = user.code || user.regist || user.id || '';
+          joinInput.value = user.join_date || user.enter || '';
+
+          // ✅ 퇴사일이 없으면 “재직중”으로 표시
+          const leaveDate = user.leave_date || user.quit;
+          leaveInput.value = leaveDate ? leaveDate : '재직중';
+
           bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
         });
         list.appendChild(item);
@@ -217,7 +231,7 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
 </script>
 
 <script>
-  // ✅ 제작 버튼 클릭 → DOCX 생성 요청
+  // ✅ 제작 버튼 클릭 → PDF 생성 요청
   document.getElementById('generatePdfBtn').addEventListener('click', async function() {
     const form = document.querySelector('form');
     const overlay = document.getElementById('loadingOverlay');
@@ -225,28 +239,55 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
 
     try {
       const formData = new FormData(form);
-      const response = await fetch("{% url 'generate_docx' %}", {
+      const response = await fetch("{% url 'generate_request_pdf' %}", {
         method: "POST",
         body: formData,
         headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
       });
 
-      if (!response.ok) throw new Error("파일 생성 실패");
+      if (!response.ok) throw new Error("PDF 생성 실패");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "업무요청서.docx"; // ✅ 확장자 확실히 DOCX
+      a.download = "업무요청서.pdf";
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert("파일 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
+      alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
       console.error(err);
     } finally {
       overlay.style.display = 'none';
     }
   });
 </script>
+
+<style>
+  .readonly-field {
+    background-color: #f0f0f0 !important; /* 회색 배경 */
+    pointer-events: none; /* 클릭 차단 */
+    color: #6c757d; /* 글씨 회색 */
+  }
+
+  .readonly-field:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .equal-field {
+    flex: 1;
+    min-width: 0;
+  }
+</style>
+
+<style>
+  .readonly-field {
+    background-color: #f0f0f0 !important;
+    pointer-events: none;
+    color: #333; /* 조금 더 진하게 */
+    font-weight: 500;
+  }
+</style>
 
 {% endblock %}

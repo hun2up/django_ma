@@ -11,5 +11,5 @@ urlpatterns = [
     path('support_manual/', views.support_manual, name='support_manual'),
     path('support_rules/', views.support_rules, name='support_rules'),
     path('search-user/', views.search_user, name='search_user'),
-    path('generate-docx/', views.generate_request_docx, name='generate_docx'),
+    path('generate-pdf/', views.generate_request_pdf, name='generate_request_pdf'),
 ]
