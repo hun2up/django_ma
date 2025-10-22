@@ -58,7 +58,7 @@ def export_users_as_excel(queryset, filename):
     wb = Workbook()
     ws = wb.active
     ws.title = "Users"
-    ws.append(['ID', 'Name', 'Branch', 'Grade', 'Status', 'Is Staff', 'Is Active'])
+    ws.append(['ID', 'Name', 'Branch', 'Grade', 'Status', '입사일', '퇴사일', 'Is Staff', 'Is Active'])
 
     for user in queryset:
         ws.append([
@@ -67,6 +67,8 @@ def export_users_as_excel(queryset, filename):
             user.branch,
             GRADE_DISPLAY.get(user.grade, user.grade),
             user.status,
+            user.enter.strftime("%Y-%m-%d") if user.enter else "",
+            user.quit.strftime("%Y-%m-%d") if user.quit else "",
             user.is_staff,
             user.is_active,
         ])
@@ -106,15 +108,12 @@ def upload_users_from_excel_view(request):
             messages.error(request, "'업로드' 시트가 숨김 상태입니다. 숨김 해제 후 업로드하세요.")
             return redirect("..")
 
-        # --- 행 데이터 미리 로드 ---
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         total_rows = len(rows)
         success_new, success_update, error_count = 0, 0, 0
         results = []
 
-        # ============================================================
-        # ✅ 사전 검증 1: 동일 소속 내 main_admin 중복 방지
-        # ============================================================
+        # --- 중복 Main Admin 검사 ---
         branch_admin_count = {}
         for row in rows:
             if not row or len(row) < 12:
@@ -128,16 +127,10 @@ def upload_users_from_excel_view(request):
 
         duplicate_branches = [b for b, count in branch_admin_count.items() if count > 1]
         if duplicate_branches:
-            msg = (
-                "동일 영업가족 내에 둘 이상의 최상위관리자를 지정할 수 없습니다.\n\n"
-                f"중복 소속: {', '.join(duplicate_branches)}"
-            )
-            messages.error(request, msg)
+            messages.error(request, f"동일 영업가족 내에 둘 이상의 최상위관리자를 지정할 수 없습니다: {', '.join(duplicate_branches)}")
             return redirect("..")
 
-        # ============================================================
-        # ✅ 행 반복 처리 (등록/갱신)
-        # ============================================================
+        # --- 사용자 등록/갱신 ---
         for idx, row in enumerate(rows, start=2):
             if not row or len(row) < 12:
                 results.append([idx, None, None, "데이터 부족"])
@@ -155,7 +148,6 @@ def upload_users_from_excel_view(request):
                 error_count += 1
                 continue
 
-            # 등급 매핑 및 권한 처리
             grade_val = GRADE_MAP.get(str(grade).strip().lower(), "basic")
             is_superuser = grade_val == "superuser"
             is_staff = grade_val in ["superuser", "main_admin", "sub_admin"]
@@ -196,9 +188,7 @@ def upload_users_from_excel_view(request):
                 error_count += 1
                 results.append([idx, user_id, name, f"오류: {e}"])
 
-        # ============================================================
-        # ✅ 결과 요약 엑셀 생성
-        # ============================================================
+        # --- 결과 요약 엑셀 생성 ---
         result_wb = Workbook()
         ws = result_wb.active
         ws.title = "UploadResult"
@@ -255,7 +245,7 @@ def upload_excel_template_view(request):
 
 
 # ============================================================
-# ✅ 관리자 등록
+# ✅ 관리자 등록 (입사일/퇴사일 + 자동 상태 업데이트 포함)
 # ============================================================
 @admin.register(CustomUser)
 @admin.register(CustomUser, site=custom_admin_site)
@@ -263,23 +253,51 @@ class CustomUserAdmin(UserAdmin):
     model = CustomUser
     actions = [export_selected_users_to_excel]
 
-    list_display = ("id", "name", "branch", "grade", "status", "is_staff", "is_active")
+    # ✅ 목록에 입사일/퇴사일 표시
+    list_display = (
+        "id", "name", "branch", "grade", "status",
+        "enter", "quit",  # ✅ 추가됨
+        "is_staff", "is_active",
+    )
     search_fields = ("id", "name", "branch")
     ordering = ("id",)
 
+    # ✅ 상세페이지에서 입사일/퇴사일 수정 가능
     fieldsets = (
         (None, {"fields": ("id", "password")}),
-        ("Personal Info", {"fields": ("name", "branch", "grade", "status")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Personal Info", {
+            "fields": (
+                "name", "branch", "grade", "status",
+                "enter", "quit",  # ✅ 추가됨
+            )
+        }),
+        ("Permissions", {
+            "fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")
+        }),
     )
 
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
-            "fields": ("id", "password1", "password2", "name", "branch", "grade", "status"),
+            "fields": (
+                "id", "password1", "password2",
+                "name", "branch", "grade", "status",
+                "enter", "quit",
+            ),
         }),
     )
 
+    # ✅ 퇴사일 입력 시 자동으로 status='퇴사' 처리
+    def save_model(self, request, obj, form, change):
+        """퇴사일 입력 시 자동으로 상태(status)를 '퇴사'로 변경"""
+        if obj.quit:
+            obj.status = "퇴사"
+            # 비활성화까지 함께 처리하고 싶다면 아래 두 줄도 추가 가능
+            # obj.is_active = False
+            # obj.is_staff = False
+        super().save_model(request, obj, form, change)
+
+    # ✅ 커스텀 URL (엑셀 다운로드/업로드)
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
