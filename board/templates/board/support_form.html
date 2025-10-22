@@ -1,3 +1,4 @@
+<!-- django_ma/board/templates/board/support_form.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -35,19 +36,19 @@
           <!-- 회색 비활성 필드 -->
           <div class="col equal-field mb-2">
             <label class="form-label">성명</label>
-            <input type="text" name="target_name_{{ i }}" class="form-control readonly-field" readonly>
+            <input type="text" name="target_name_{{ i }}" class="form-control readonly-field">
           </div>
           <div class="col equal-field mb-2">
             <label class="form-label">사번</label>
-            <input type="text" name="target_code_{{ i }}" class="form-control readonly-field" readonly>
+            <input type="text" name="target_code_{{ i }}" class="form-control readonly-field">
           </div>
           <div class="col equal-field mb-2">
             <label class="form-label">입사일</label>
-            <input type="date" name="target_join_{{ i }}" class="form-control readonly-field" readonly>
+            <input type="date" name="target_join_{{ i }}" class="form-control readonly-field">
           </div>
           <div class="col equal-field mb-2">
             <label class="form-label">퇴사일</label>
-            <input type="text" name="target_leave_{{ i }}" class="form-control readonly-field" readonly>
+            <input type="text" name="target_leave_{{ i }}" class="form-control readonly-field">
           </div>
         </div>
         {% endfor %}
@@ -137,132 +138,6 @@
   </div>
 </div>
 
-<!-- ✅ 대상자 검색 / 초기화 관련 스크립트는 그대로 유지 -->
-<script>
-let currentRow = null;
-
-// 각 행별 검색 버튼 클릭 시 현재 행 번호 저장
-document.querySelectorAll('.search-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    currentRow = this.dataset.row;
-  });
-});
-
-document.getElementById('searchUserForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const query = document.getElementById('searchKeyword').value.trim();
-  const resultsBox = document.getElementById('searchResults');
-  resultsBox.innerHTML = '<p class="text-muted small text-center">검색 중...</p>';
-
-  fetch(`/board/search-user/?q=${encodeURIComponent(query)}`)
-    .then(res => res.json())
-    .then(data => {
-      resultsBox.innerHTML = '';
-      if (data.results.length === 0) {
-        resultsBox.innerHTML = '<p class="text-muted small text-center">검색 결과가 없습니다.</p>';
-        return;
-      }
-
-      const list = document.createElement('div');
-      list.classList.add('list-group');
-
-      data.results.forEach(user => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'list-group-item list-group-item-action';
-        item.innerHTML = `
-            <div class="d-flex justify-content-between">
-                <span><strong>${user.name}</strong> (${user.id}) (${user.regist})</span>
-                <small class="text-muted">${user.branch}</small>
-            </div>
-            <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
-            `;
-        item.addEventListener('click', () => {
-          if (!currentRow) return;
-
-          const nameInput = document.querySelector(`input[name="target_name_${currentRow}"]`);
-          const codeInput = document.querySelector(`input[name="target_code_${currentRow}"]`);
-          const joinInput = document.querySelector(`input[name="target_join_${currentRow}"]`);
-          const leaveInput = document.querySelector(`input[name="target_leave_${currentRow}"]`);
-
-          nameInput.value = user.name || '';
-          codeInput.value = user.code || user.regist || user.id || '';
-          joinInput.value = user.join_date || user.enter || '';
-
-          // ✅ 퇴사일이 없으면 “재직중”으로 표시
-          const leaveDate = user.leave_date || user.quit;
-          leaveInput.value = leaveDate ? leaveDate : '재직중';
-
-          bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
-        });
-        list.appendChild(item);
-      });
-      resultsBox.appendChild(list);
-    })
-    .catch(() => {
-      resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류가 발생했습니다.</p>';
-    });
-});
-</script>
-
-<script>
-  // ✅ 모달 닫았다 다시 열 때 초기화
-  const searchModal = document.getElementById('searchUserModal');
-  searchModal.addEventListener('show.bs.modal', function () {
-    document.getElementById('searchKeyword').value = '';
-    document.getElementById('searchResults').innerHTML = '';
-  });
-</script>
-
-<script>
-  // ✅ 초기화 버튼
-  document.getElementById('resetUserBtn').addEventListener('click', function () {
-    document.querySelectorAll('input[name^="target_name_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="target_code_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="target_join_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="target_leave_"]').forEach(el => el.value = '');
-  });
-  document.getElementById('resetContractBtn').addEventListener('click', function () {
-    document.querySelectorAll('input[name^="insurer_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="policy_no_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="contractor_"]').forEach(el => el.value = '');
-    document.querySelectorAll('input[name^="premium_"]').forEach(el => el.value = '');
-  });
-</script>
-
-<script>
-  // ✅ 제작 버튼 클릭 → PDF 생성 요청
-  document.getElementById('generatePdfBtn').addEventListener('click', async function() {
-    const form = document.querySelector('form');
-    const overlay = document.getElementById('loadingOverlay');
-    overlay.style.display = 'block';
-
-    try {
-      const formData = new FormData(form);
-      const response = await fetch("{% url 'generate_request_pdf' %}", {
-        method: "POST",
-        body: formData,
-        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
-      });
-
-      if (!response.ok) throw new Error("PDF 생성 실패");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = "업무요청서.pdf";
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
-      console.error(err);
-    } finally {
-      overlay.style.display = 'none';
-    }
-  });
-</script>
-
 <style>
   .readonly-field {
     background-color: #f0f0f0 !important; /* 회색 배경 */
@@ -284,10 +159,205 @@ document.getElementById('searchUserForm').addEventListener('submit', function(e)
 <style>
   .readonly-field {
     background-color: #f0f0f0 !important;
-    pointer-events: none;
-    color: #333; /* 조금 더 진하게 */
+    pointer-events: none; /* 클릭만 막음, 값은 전송됨 */
+    color: #333;
     font-weight: 500;
   }
 </style>
+
+
+<!-- ✅ [1] 대상자 검색 및 자동입력 관련 스크립트 -->
+<script>
+/**
+ * 🎯 기능 요약:
+ * - 대상자 검색 모달에서 검색어 입력 후 결과 표시
+ * - 검색 결과 클릭 시 해당 행의 input 필드 자동 채움
+ * - currentRow 변수로 현재 선택된 행(row) 추적
+ */
+let currentRow = null;
+
+// 🧩 각 행별 "검색" 버튼 클릭 시, 몇 번째 행(row)인지 저장
+document.querySelectorAll('.search-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    // 예: 1, 2, 3 ... 번째 행
+    currentRow = this.dataset.row;
+  });
+});
+
+// 🧩 모달 내 검색폼 (대상자 검색 실행)
+document.getElementById('searchUserForm').addEventListener('submit', function(e) {
+  e.preventDefault(); // 기본 form 제출 막기
+
+  const query = document.getElementById('searchKeyword').value.trim(); // 입력된 검색어
+  const resultsBox = document.getElementById('searchResults'); // 검색 결과 표시 영역
+  resultsBox.innerHTML = '<p class="text-muted small text-center">검색 중...</p>';
+
+  // ✅ Django /board/search-user/ API 호출
+  fetch(`/board/search-user/?q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+      resultsBox.innerHTML = ''; // 기존 결과 초기화
+
+      // 검색 결과가 없을 때
+      if (data.results.length === 0) {
+        resultsBox.innerHTML = '<p class="text-muted small text-center">검색 결과가 없습니다.</p>';
+        return;
+      }
+
+      // 검색 결과를 list-group 형태로 표시
+      const list = document.createElement('div');
+      list.classList.add('list-group');
+
+      data.results.forEach(user => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action';
+
+        // 검색 결과 UI 생성
+        item.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <span><strong>${user.name}</strong> (${user.id}) (${user.regist})</span>
+                <small class="text-muted">${user.branch}</small>
+            </div>
+            <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
+        `;
+
+        // ✅ 검색 결과 클릭 시 → 해당 행 input 채우기
+        item.addEventListener('click', () => {
+          if (!currentRow) return;
+
+          // 현재 선택된 행(row)에 해당하는 input 요소들 찾기
+          const nameInput = document.querySelector(`input[name="target_name_${currentRow}"]`);
+          const codeInput = document.querySelector(`input[name="target_code_${currentRow}"]`);
+          const joinInput = document.querySelector(`input[name="target_join_${currentRow}"]`);
+          const leaveInput = document.querySelector(`input[name="target_leave_${currentRow}"]`);
+
+          // DB에서 받아온 값으로 입력 필드 채우기
+          nameInput.value = user.name || '';
+          codeInput.value = user.code || user.id || '';
+          joinInput.value = user.join_date || user.enter || '';
+
+          // ✅ 퇴사일이 없으면 "재직중" 자동 표시
+          const leaveDate = user.leave_date || user.quit;
+          leaveInput.value = leaveDate ? leaveDate : '재직중';
+
+          // ✅ 모달 닫기
+          bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
+        });
+
+        list.appendChild(item);
+      });
+
+      resultsBox.appendChild(list);
+    })
+    .catch(() => {
+      resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류가 발생했습니다.</p>';
+    });
+});
+</script>
+
+<!-- ✅ [2] 모달 초기화 스크립트 -->
+<script>
+/**
+ * 🎯 기능 요약:
+ * - 모달을 닫았다 다시 열 때, 이전 검색 결과 및 검색어를 초기화
+ */
+const searchModal = document.getElementById('searchUserModal');
+searchModal.addEventListener('show.bs.modal', function () {
+  // 검색창과 결과 리스트 초기화
+  document.getElementById('searchKeyword').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+});
+</script>
+
+<!-- ✅ [3] 초기화 버튼 관련 스크립트 -->
+<script>
+/**
+ * 🎯 기능 요약:
+ * - "요청대상 초기화" 버튼 클릭 시 → 대상자 입력 필드 전체 리셋
+ * - "계약사항 초기화" 버튼 클릭 시 → 보험사/증권번호/계약자/보험료 필드 전체 리셋
+ */
+
+// ✅ 대상자 정보 초기화
+document.getElementById('resetUserBtn').addEventListener('click', function () {
+  document.querySelectorAll('input[name^="target_name_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="target_code_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="target_join_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="target_leave_"]').forEach(el => el.value = '');
+});
+
+// ✅ 계약사항 초기화
+document.getElementById('resetContractBtn').addEventListener('click', function () {
+  document.querySelectorAll('input[name^="insurer_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="policy_no_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="contractor_"]').forEach(el => el.value = '');
+  document.querySelectorAll('input[name^="premium_"]').forEach(el => el.value = '');
+});
+</script>
+
+<!-- ✅ [4] PDF 생성 및 전송 스크립트 (완전 수정 버전) -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.querySelector("form");
+  const overlay = document.getElementById("loadingOverlay");
+  const generateBtn = document.getElementById("generatePdfBtn");
+
+  generateBtn.addEventListener("click", async function () {
+    overlay.style.display = "block";
+
+    try {
+      // ✅ 기본 FormData 생성
+      const formData = new FormData();
+
+      // ✅ 모든 input, textarea, select 강제 수집 (readonly 포함)
+      document.querySelectorAll("input, textarea, select").forEach((el) => {
+        if (el.name) {
+          const val = el.value || "";
+          formData.append(el.name, val);
+          console.log(`📩 추가됨 → ${el.name}: ${val}`);
+        }
+      });
+
+      // ✅ 요청자 정보 추가
+      formData.append("request_user_name", "{{ user.name }}");
+      formData.append("request_user_branch", "{{ user.branch }}");
+      formData.append("request_user_id", "{{ user.id }}");
+      formData.append("request_user_enter", "{{ user.enter|date:'Y-m-d'|default:'' }}");
+
+      // ✅ FormData 내용 디버그 출력
+      console.log("🧾 최종 전송 FormData:");
+      console.table([...formData.entries()]);
+
+      // ✅ Django로 전송
+      const response = await fetch("{% url 'generate_request_pdf' %}", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+      });
+
+      if (!response.ok) throw new Error("PDF 생성 실패");
+
+      // ✅ PDF 자동 다운로드
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "업무요청서.pdf";
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      console.log("✅ PDF 다운로드 완료");
+    } catch (err) {
+      alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
+      console.error("❌ 오류:", err);
+    } finally {
+      overlay.style.display = "none";
+    }
+  });
+});
+</script>
+
 
 {% endblock %}

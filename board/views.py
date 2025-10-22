@@ -4,8 +4,7 @@
 # ✅ 표준 라이브러리
 # ===============================
 import os
-import io
-import tempfile
+import logging
 from datetime import date, datetime
 
 # ===============================
@@ -19,12 +18,16 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.template.loader import get_template
 
 # ===============================
-# ✅ 외부 라이브러리
+# ✅ ReportLab (PDF 생성용)
 # ===============================
-from xhtml2pdf import pisa
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
 
 # ===============================
 # ✅ 로컬 앱 모듈
@@ -34,7 +37,13 @@ from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
 
 # ✅ 전역에서 한 번만 로드
+logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# -------------------------------------------------------------------
+# 📋 공용 상수
+# -------------------------------------------------------------------
+STATUS_CHOICES = ['확인중', '진행중', '보완요청', '완료', '반려']
 
 # -------------------------------------------------------------------
 # 📋 게시글 목록 (검색 + 필터 + 초기화)
@@ -317,10 +326,6 @@ def post_edit(request, pk):
         "attachments": attachments,
     })
 
-# ✅ 업무요청서 (제작중)
-def support_form(request):
-    return render(request, 'board/support_form.html')
-
 # ✅ 업무매뉴얼 (제작중)
 def support_manual(request):
     return render(request, 'board/support_manual.html')
@@ -329,14 +334,42 @@ def support_manual(request):
 def support_rules(request):
     return render(request, 'board/support_rules.html')
 
-
 # ✅ 업무요청서 페이지
 @login_required
 def support_form(request):
-    """
-    파트너 업무요청서 페이지 렌더링
-    """
+    """파트너 업무요청서 페이지"""
     return render(request, 'board/support_form.html')
+
+
+# -------------------------------------------------------------------
+# 🧾 PDF 유틸리티
+# -------------------------------------------------------------------
+def register_korean_font():
+    """NotoSansKR 폰트를 안전하게 등록"""
+    font_path = os.path.join(settings.BASE_DIR, "static", "fonts", "NotoSansKR-Regular.ttf")
+    if not pdfmetrics.getRegisteredFontNames() or "NotoSansKR" not in pdfmetrics.getRegisteredFontNames():
+        try:
+            pdfmetrics.registerFont(TTFont("NotoSansKR", font_path))
+        except Exception as e:
+            logger.warning(f"[PDF] 폰트 등록 실패: {e}")
+
+
+def build_pdf_response(filename="output.pdf"):
+    """PDF 응답 객체 생성"""
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def create_pdf_document(response, elements):
+    """ReportLab PDF 문서 생성"""
+    doc = SimpleDocTemplate(response, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    try:
+        doc.build(elements)
+    except Exception as e:
+        logger.error(f"[PDF 생성 오류] {e}")
+        raise
+
 
 # -------------------------------------------------------------------
 # 🔍 대상자 검색 (superuser는 전체, 일반 사용자는 자신의 branch만)
@@ -345,7 +378,6 @@ def support_form(request):
 def search_user(request):
     keyword = request.GET.get("q", "").strip()
     user = request.user
-
     if not keyword:
         return JsonResponse({"results": []})
 
@@ -353,55 +385,189 @@ def search_user(request):
     if user.grade != "superuser":
         qs = qs.filter(branch=user.branch)
 
-    # ✅ 실제 존재하는 필드 사용
     users = qs.filter(
         Q(name__icontains=keyword) | Q(regist__icontains=keyword)
-    ).values(
-        "id", "name", "regist", "branch", "enter", "quit"
-    )[:20]
+    ).values("id", "name", "regist", "branch", "enter", "quit")[:20]
 
     return JsonResponse({"results": list(users)})
+
 
 # -------------------------------------------------------------------
 # 🧾 업무요청서 PDF 생성 (xhtml2pdf)
 # -------------------------------------------------------------------
 @login_required
 def generate_request_pdf(request):
-    """폼 입력 데이터를 기반으로 HTML 템플릿을 PDF로 변환"""
-    if request.method == "POST":
-        context = {
-            "요청일자": date.today().strftime("%Y-%m-%d"),
-            "요청(성명)": request.user.name,
-            "요청(소속)": request.user.branch,
-            "요청(사번)": request.user.id,
-            "요청(입사)": getattr(request.user, "join_date", ""),
-            "제목": request.POST.get("title", ""),
-            "내용": request.POST.get("content", ""),
-            "대상자": [
-                {
-                    "성명": request.POST.get(f"target_name_{i}", ""),
-                    "사번": request.POST.get(f"target_code_{i}", ""),
-                    "입사": request.POST.get(f"target_join_{i}", ""),
-                    "퇴사": request.POST.get(f"target_leave_{i}", ""),
-                } for i in range(1, 6)
-            ],
-            "계약": [
-                {
-                    "보험사": request.POST.get(f"insurer_{i}", ""),
-                    "증권번호": request.POST.get(f"policy_no_{i}", ""),
-                    "계약자": request.POST.get(f"contractor_{i}", ""),
-                    "보험료": request.POST.get(f"premium_{i}", ""),
-                } for i in range(1, 6)
-            ],
-            "logo_url": os.path.join(settings.STATIC_URL, "images/logo.png"),
-        }
+    """폼 입력값을 기반으로 업무요청서 PDF 생성"""
+    if request.method != "POST":
+        return redirect("support_form")
 
-        template = get_template("board/request_pdf_template.html")
-        html = template.render(context)
-        pdf_output = io.BytesIO()
-        pisa.CreatePDF(html, dest=pdf_output)
-        pdf_value = pdf_output.getvalue()
+    # ==========================================
+    # ✅ 폰트 및 기본 설정
+    # ==========================================
+    font_path = os.path.join(settings.BASE_DIR, "static", "fonts", "NotoSansKR-Regular.ttf")
+    pdfmetrics.registerFont(TTFont("NotoSansKR", font_path))
 
-        response = HttpResponse(pdf_value, content_type="application/pdf")
-        response["Content-Disposition"] = 'attachment; filename="업무요청서.pdf"'
-        return response
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="업무요청서.pdf"'
+
+    doc = SimpleDocTemplate(
+        response,
+        pagesize=A4,
+        rightMargin=40, leftMargin=40,
+        topMargin=40, bottomMargin=40
+    )
+
+    # ==========================================
+    # ✅ 스타일 정의
+    # ==========================================
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="Korean", fontName="NotoSansKR", fontSize=11, leading=16))
+    styles.add(ParagraphStyle(name="TitleBold", fontName="NotoSansKR", fontSize=18, leading=22,
+                              alignment=1, spaceAfter=10))
+    styles.add(ParagraphStyle(name="RightAlign", fontName="NotoSansKR", fontSize=11, alignment=2))
+    styles.add(ParagraphStyle(name="RightAdmin", fontName="NotoSansKR", fontSize=11, alignment=2))
+
+    elements = []
+
+    # ==========================================
+    # ✅ 제목 / 요청일자
+    # ==========================================
+    elements.append(Paragraph("<b>파트너 업무요청서</b>", styles["TitleBold"]))
+    elements.append(Spacer(1, 4))
+
+    elements.append(Paragraph(f"요청일자 : {date.today().strftime('%Y-%m-%d')}", styles["RightAlign"]))
+    elements.append(Spacer(1, 15))
+
+    # ==========================================
+    # ✅ 요청자 정보
+    # ==========================================
+    enter_value = getattr(request.user, "enter", None)
+    if enter_value:
+        try:
+            enter_value = enter_value.strftime("%Y-%m-%d")
+        except Exception:
+            enter_value = str(enter_value)
+    else:
+        enter_value = "-"
+
+    requester_table = [
+        ["성명", "사번", "소속", "입사일"],
+        [
+            request.user.name,
+            str(request.user.id),
+            request.user.branch,
+            enter_value,
+        ],
+    ]
+
+    elements.append(Paragraph("요청자", styles["Korean"]))
+    table1 = Table(requester_table, colWidths=[100, 100, 150, 150])
+    table1.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+    ]))
+    elements.append(table1)
+    elements.append(Spacer(1, 20))
+
+    # ==========================================
+    # ✅ 대상자 정보
+    # ==========================================
+    target_rows = [["성명", "사번", "입사일", "퇴사일"]]
+    for i in range(1, 6):
+        name = request.POST.get(f"target_name_{i}", "").strip()
+        code = request.POST.get(f"target_code_{i}", "").strip()
+        join = request.POST.get(f"target_join_{i}", "").strip()
+        leave = request.POST.get(f"target_leave_{i}", "").strip()
+        if any([name, code, join, leave]):
+            target_rows.append([name or "-", code or "-", join or "-", leave or "-"])
+
+    if len(target_rows) == 1:
+        target_rows.append(["-", "-", "-", "-"])
+
+    elements.append(Paragraph("대상자", styles["Korean"]))
+    table2 = Table(target_rows, colWidths=[100, 100, 150, 150])
+    table2.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+    ]))
+    elements.append(table2)
+    elements.append(Spacer(1, 20))
+
+    # ==========================================
+    # ✅ 계약 정보
+    # ==========================================
+    elements.append(Paragraph("계약사항", styles["Korean"]))
+    contract_rows = [["보험사", "증권번호", "계약자(피보험자)", "보험료"]]
+
+    for i in range(1, 6):
+        insurer = request.POST.get(f"insurer_{i}", "").strip()
+        policy_no = request.POST.get(f"policy_no_{i}", "").strip()
+        contractor = request.POST.get(f"contractor_{i}", "").strip()
+        premium = request.POST.get(f"premium_{i}", "").strip()
+
+        if any([insurer, policy_no, contractor, premium]):
+            contract_rows.append([insurer or "-", policy_no or "-", contractor or "-", premium or "-"])
+
+    if len(contract_rows) == 1:
+        contract_rows.append(["-", "-", "-", "-"])
+
+    table3 = Table(contract_rows, colWidths=[100, 150, 150, 100])
+    table3.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+    ]))
+    elements.append(table3)
+    elements.append(Spacer(1, 20))
+
+    # ==========================================
+    # ✅ 요청 내용
+    # ==========================================
+    title = request.POST.get("title", "").strip()
+    content = request.POST.get("content", "").strip()
+
+    title_paragraph = Paragraph(title or "-", styles["Korean"])
+    content_paragraph = Paragraph(content or "-", styles["Korean"])
+
+    elements.append(Paragraph("요청내용", styles["Korean"]))
+
+    content_table = [
+        ["제목", title_paragraph],
+        ["내용", content_paragraph],
+    ]
+
+    table4 = Table(content_table, colWidths=[80, 420], minRowHeights=[20, 200])
+    table4.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 14),
+        ("ROWHEIGHTS", (1, 1), (1, 1)),
+    ]))
+    elements.append(table4)
+    elements.append(Spacer(1, 25))
+
+    # ==========================================
+    # ✅ 본부장(사업단장) 표시
+    # ==========================================
+    main_admin = CustomUser.objects.filter(branch=request.user.branch, grade="main_admin").first()
+    admin_name = main_admin.name if main_admin else ""
+
+    confirm_text = (
+        f'최상위관리자 확인 : {request.user.branch} 본부장(사업단장)'
+        f'<b>&nbsp;&nbsp;{admin_name}&nbsp;&nbsp;</b>(서명)'
+    )
+    elements.append(Paragraph(confirm_text, styles["RightAdmin"]))
+
+    # ==========================================
+    # ✅ PDF 빌드
+    # ==========================================
+    doc.build(elements)
+    return response
+
