@@ -1,58 +1,40 @@
 <!-- django_ma/board/templates/board/support_form.html -->
 {% extends "base.html" %}
 {% load static %}
-{% load widget_tweaks %}
-
 {% block title %}업무요청서{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-  <div class="mx-auto" style="max-width: 700px;">
+  <div class="mx-auto" style="max-width: 800px;">
     <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청서</h3>
 
     <div class="card shadow p-4 border-0 rounded-4">
-      <form method="POST" novalidate>
+      <form id="requestForm" method="POST" novalidate>
         {% csrf_token %}
 
-        <!-- ✅ 요청 대상 (타이틀) -->
+        <!-- ✅ 요청대상 -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0" style="color:#005BAC;">요청대상</h5>
+          <h5 class="fw-bold mb-0 text-primary">요청대상</h5>
           <div>
             <button type="button" id="addUserBtn" class="btn btn-outline-primary btn-sm me-2">추가</button>
             <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
           </div>
         </div>
 
-        <!-- ✅ 요청 대상 (본문) -->
         <div id="userContainer">
           {% for i in "12345" %}
           <div class="row mb-2 align-items-center user-row" data-index="{{ i }}" {% if i != "1" %}style="display:none;"{% endif %}>
             <div class="col-md-1 text-center">
-              <button type="button" class="btn btn-sm btn-primary search-btn"
-                      data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">
-                검색
-              </button>
+              <button type="button" class="btn btn-sm btn-primary search-btn" data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
             </div>
 
-            <div class="col equal-field mb-2">
-              <label class="form-label">성명</label>
-              <input type="text" name="target_name_{{ i }}" class="form-control readonly-field">
-            </div>
-            <div class="col equal-field mb-2">
-              <label class="form-label">사번</label>
-              <input type="text" name="target_code_{{ i }}" class="form-control readonly-field">
-            </div>
-            <div class="col equal-field mb-2">
-              <label class="form-label">입사일</label>
-              <input type="text" name="target_join_{{ i }}" class="form-control readonly-field"
-                    onfocus="this.type='date'" onblur="if(!this.value)this.type='text'">
-            </div>
-            <div class="col equal-field mb-2">
-              <label class="form-label">퇴사일</label>
-              <input type="text" name="target_leave_{{ i }}" class="form-control readonly-field">
-            </div>
+            {% for label, field in fields %}
+              <div class="col equal-field mb-2">
+                <label class="form-label">{{ label }}</label>
+                <input type="text" name="{{ field }}{{ i }}" class="form-control readonly-field">
+              </div>
+            {% endfor %}
 
-            <!-- ✅ 삭제 버튼 (1행은 비활성화) -->
             <div class="col-md-1 text-center">
               {% if i != "1" %}
                 <button type="button" class="btn btn-sm btn-outline-danger remove-user-btn" data-index="{{ i }}">제거</button>
@@ -66,37 +48,24 @@
 
         <hr>
 
-        <!-- ✅ 계약사항(타이틀) -->
+        <!-- ✅ 계약사항 -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0" style="color:#005BAC;">계약사항</h5>
+          <h5 class="fw-bold mb-0 text-primary">계약사항</h5>
           <div>
             <button type="button" id="addContractBtn" class="btn btn-outline-primary btn-sm me-2">추가</button>
             <button type="button" id="resetContractBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
           </div>
         </div>
 
-        <!-- ✅ 계약사항(본문) -->
         <div id="contractContainer">
           {% for i in "12345" %}
           <div class="row mb-2 contract-row" data-index="{{ i }}" {% if i != "1" %}style="display:none;"{% endif %}>
-            <div class="col-md-2 mb-2">
-              <label class="form-label">보험사</label>
-              <input type="text" name="insurer_{{ i }}" class="form-control">
-            </div>
-            <div class="col-md-3 mb-2">
-              <label class="form-label">증권번호</label>
-              <input type="text" name="policy_no_{{ i }}" class="form-control">
-            </div>
-            <div class="col-md-3 mb-2">
-              <label class="form-label">계약자(피보험자)</label>
-              <input type="text" name="contractor_{{ i }}" class="form-control">
-            </div>
-            <div class="col-md-3 mb-2">
-              <label class="form-label">보험료</label>
-              <input type="text" name="premium_{{ i }}" class="form-control">
-            </div>
-
-            <!-- ✅ 삭제 버튼 (1행은 비활성화) -->
+            {% for label, name, col in contracts %}
+              <div class="col-md-{{ col }} mb-2">
+                <label class="form-label">{{ label }}</label>
+                <input type="text" name="{{ name }}{{ i }}" class="form-control">
+              </div>
+            {% endfor %}
             <div class="col-md-1 text-center">
               {% if i != "1" %}
                 <button type="button" class="btn btn-sm btn-outline-danger remove-contract-btn" data-index="{{ i }}">제거</button>
@@ -110,8 +79,8 @@
 
         <hr>
 
-        <!-- ✅ 요청 내용 -->
-        <h5 class="fw-bold mb-3" style="color:#005BAC;">요청내용</h5>
+        <!-- ✅ 요청내용 -->
+        <h5 class="fw-bold mb-3 text-primary">요청내용</h5>
         <div class="mb-3">
           <label class="form-label">제목</label>
           <input type="text" name="title" class="form-control" placeholder="제목 입력">
@@ -121,22 +90,23 @@
           <textarea name="content" class="form-control" rows="5" placeholder="요청 상세 내용을 입력해주세요"></textarea>
         </div>
 
-        <!-- ✅ 버튼 -->
+        <!-- ✅ 버튼 & 로딩 -->
         <div class="d-flex justify-content-between mt-4">
           <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">뒤로가기</a>
-          <button type="button" id="generatePdfBtn" class="btn btn-primary px-5 fw-bold">제작하기</button>
+          <button type="button"
+                  id="generatePdfBtn"
+                  class="btn btn-primary px-5 fw-bold"
+                  data-pdf-url="{% url 'generate_request_pdf' %}">
+            제작하기
+          </button>
         </div>
 
-        <!-- ✅ 로딩 오버레이 -->
-        <div id="loadingOverlay" 
-            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-                    background:rgba(255,255,255,0.85); z-index:9999; text-align:center;">
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
-            <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;">
-            <span class="visually-hidden">Loading...</span>
-            </div>
-            <h5 class="mt-3 fw-bold" style="color:#005BAC;">제작 중입니다... 잠시만 기다려주세요.</h5>
-        </div>
+        <!-- 로딩 오버레이 -->
+        <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+          <div class="loading-box">
+            <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;"></div>
+            <h5 class="mt-3 fw-bold text-primary">제작 중입니다... 잠시만 기다려주세요.</h5>
+          </div>
         </div>
       </form>
     </div>
@@ -144,16 +114,16 @@
 </div>
 
 <!-- ✅ 대상자 검색 모달 -->
-<div class="modal fade" id="searchUserModal" tabindex="-1" aria-labelledby="searchUserModalLabel" aria-hidden="true">
+<div class="modal fade" id="searchUserModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4">
       <div class="modal-header">
-        <h6 class="modal-title fw-bold" id="searchUserModalLabel">대상자 검색</h6>
+        <h6 class="modal-title fw-bold">대상자 검색</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <form id="searchUserForm" class="d-flex gap-2">
-          <input type="text" class="form-control" id="searchKeyword" name="q" placeholder="사번 또는 성명 입력">
+          <input type="text" id="searchKeyword" name="q" class="form-control" placeholder="사번 또는 성명 입력">
           <button type="submit" class="btn btn-primary flex-shrink-0">검색</button>
         </form>
         <div id="searchResults" class="mt-3"></div>
@@ -162,364 +132,7 @@
   </div>
 </div>
 
-<style>
-  /* ✅ 라벨 크기 조금 더 줄이기 */
-  .form-label {
-    font-size: 0.85rem;
-  }
-
-  /* ✅ 인풋 필드 글씨 크기 살짝 줄이기 */
-  .form-control {
-    font-size: 0.9rem;
-  }
-  
-  .readonly-field {
-    background-color: #f0f0f0 !important;
-    pointer-events: none; /* 클릭만 막음, 값은 전송됨 */
-    color: #333;
-    font-weight: 500;
-  }
-
-  .readonly-field:focus {
-    outline: none;
-    box-shadow: none;
-  }
-
-  .equal-field {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* ✅ 모든 date 입력 필드 공통 적용 */
-  input[type="date"] {
-    color: transparent;                /* 기본 텍스트 숨김 */
-    text-shadow: 0 0 0 #333;           /* 입력 시엔 정상 표시 */
-    position: relative;
-  }
-
-  /* ✅ placeholder처럼 보이는 기본 연도-월-일 문구 제거 */
-  input[type="date"]::before {
-    content: "";
-    color: transparent;
-  }
-
-  /* ✅ Chrome / Edge - 달력 아이콘 제거 */
-  input[type="date"]::-webkit-calendar-picker-indicator {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  /* ✅ 숫자 스핀 버튼, 초기화 버튼 제거 */
-  input[type="date"]::-webkit-inner-spin-button,
-  input[type="date"]::-webkit-clear-button {
-    display: none;
-  }
-
-  /* ✅ Firefox / Edge 대응 */
-  input[type="date"]::-ms-clear,
-  input[type="date"]::-ms-expand {
-    display: none;
-  }
-
-  /* ✅ 요청대상 / 계약사항의 각 행 간격을 조금 좁히기 */
-  .row.mb-3 {
-    margin-bottom: 0.6rem !important; /* 기본 1rem → 약 10px로 축소 */
-  }
-
-  /* ✅ 요청내용과 구분되는 구획선도 약간 조정 */
-  hr {
-    margin: 0.8rem 0 !important; /* 위아래 간격 축소 */
-  }
-
-  /* ✅ 계약내용의 제거 버튼 수직 정렬 조정 */
-  .remove-contract-btn {
-    margin-top: 24px; /* 버튼을 아래로 살짝 내림 (적절한 높이값 조정 가능) */
-  }
-</style>
-
-<script>
-/* ✅ 요청대상 / 계약사항 추가 기능 */
-document.addEventListener('DOMContentLoaded', () => {
-  const userRows = document.querySelectorAll('.user-row');
-  const contractRows = document.querySelectorAll('.contract-row');
-
-  const addUserBtn = document.getElementById('addUserBtn');
-  const addContractBtn = document.getElementById('addContractBtn');
-
-  addUserBtn.addEventListener('click', () => {
-    const hidden = Array.from(userRows).filter(r => r.style.display === 'none');
-    if (hidden.length === 0) {
-      alert('요청대상은 최대 5개까지만 입력할 수 있습니다.\n추가 입력이 필요한 경우 아래 내용 칸에 기재해주세요.');
-      return;
-    }
-    hidden[0].style.display = '';
-  });
-
-  addContractBtn.addEventListener('click', () => {
-    const hidden = Array.from(contractRows).filter(r => r.style.display === 'none');
-    if (hidden.length === 0) {
-      alert('계약사항은 최대 5개까지만 입력할 수 있습니다.\n추가 입력이 필요한 경우 아래 내용 칸에 기재해주세요.');
-      return;
-    }
-    hidden[0].style.display = '';
-  });
-
-    /* ✅ 삭제 버튼 로직 */
-  document.querySelectorAll('.remove-user-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = btn.dataset.index;
-      const row = document.querySelector(`.user-row[data-index="${index}"]`);
-      if (!row) return;
-      // 값 초기화
-      row.querySelectorAll('input').forEach(el => el.value = '');
-      // 숨김 처리
-      row.style.display = 'none';
-    });
-  });
-
-  document.querySelectorAll('.remove-contract-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = btn.dataset.index;
-      const row = document.querySelector(`.contract-row[data-index="${index}"]`);
-      if (!row) return;
-      row.querySelectorAll('input').forEach(el => el.value = '');
-      row.style.display = 'none';
-    });
-  });
-});
-</script>
-
-
-<!-- ✅ [1] 대상자 검색 및 자동입력 관련 스크립트 -->
-<script>
-/**
- * 🎯 기능 요약:
- * - 대상자 검색 모달에서 검색어 입력 후 결과 표시
- * - 검색 결과 클릭 시 해당 행의 input 필드 자동 채움
- * - currentRow 변수로 현재 선택된 행(row) 추적
- */
-let currentRow = null;
-
-// 🧩 각 행별 "검색" 버튼 클릭 시, 몇 번째 행(row)인지 저장
-document.querySelectorAll('.search-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    // 예: 1, 2, 3 ... 번째 행
-    currentRow = this.dataset.row;
-  });
-});
-
-// 🧩 모달 내 검색폼 (대상자 검색 실행)
-document.getElementById('searchUserForm').addEventListener('submit', function(e) {
-  e.preventDefault(); // 기본 form 제출 막기
-
-  const query = document.getElementById('searchKeyword').value.trim(); // 입력된 검색어
-  const resultsBox = document.getElementById('searchResults'); // 검색 결과 표시 영역
-  resultsBox.innerHTML = '<p class="text-muted small text-center">검색 중...</p>';
-
-  // ✅ Django /board/search-user/ API 호출
-  fetch(`/board/search-user/?q=${encodeURIComponent(query)}`)
-    .then(res => res.json())
-    .then(data => {
-      resultsBox.innerHTML = ''; // 기존 결과 초기화
-
-      // 검색 결과가 없을 때
-      if (data.results.length === 0) {
-        resultsBox.innerHTML = '<p class="text-muted small text-center">검색 결과가 없습니다.</p>';
-        return;
-      }
-
-      // 검색 결과를 list-group 형태로 표시
-      const list = document.createElement('div');
-      list.classList.add('list-group');
-
-      data.results.forEach(user => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'list-group-item list-group-item-action';
-
-        // 검색 결과 UI 생성
-        item.innerHTML = `
-            <div class="d-flex justify-content-between">
-                <span><strong>${user.name}</strong> (${user.id}) (${user.regist})</span>
-                <small class="text-muted">${user.branch}</small>
-            </div>
-            <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
-        `;
-
-        // ✅ 검색 결과 클릭 시 → 해당 행 input 채우기
-        item.addEventListener('click', () => {
-          if (!currentRow) return;
-
-          const selectedCode = user.code || user.id || '';
-
-          // ✅ 중복 검사: 이미 등록된 사번이 있는지 확인
-          const existingCodes = Array.from(document.querySelectorAll('input[name^="target_code_"]'))
-            .map(input => input.value.trim())
-            .filter(v => v !== '');
-
-          if (existingCodes.includes(String(selectedCode))) {
-            alert('⚠️ 이미 추가된 대상자입니다.');
-            return; // 중복일 경우 아무 동작도 하지 않음
-          }
-
-          // 현재 선택된 행(row)에 해당하는 input 요소들 찾기
-          const nameInput = document.querySelector(`input[name="target_name_${currentRow}"]`);
-          const codeInput = document.querySelector(`input[name="target_code_${currentRow}"]`);
-          const joinInput = document.querySelector(`input[name="target_join_${currentRow}"]`);
-          const leaveInput = document.querySelector(`input[name="target_leave_${currentRow}"]`);
-
-          // DB에서 받아온 값으로 입력 필드 채우기
-          nameInput.value = user.name || '';
-          codeInput.value = selectedCode;
-          joinInput.value = user.join_date || user.enter || '';
-
-          // ✅ 퇴사일이 없으면 "재직중" 자동 표시
-          const leaveDate = user.leave_date || user.quit;
-          leaveInput.value = leaveDate ? leaveDate : '재직중';
-
-          // ✅ 모달 닫기
-          bootstrap.Modal.getInstance(document.getElementById('searchUserModal')).hide();
-        });
-
-        list.appendChild(item);
-      });
-
-      resultsBox.appendChild(list);
-    })
-    .catch(() => {
-      resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류가 발생했습니다.</p>';
-    });
-});
-</script>
-
-<!-- ✅ [2] 모달 초기화 스크립트 -->
-<script>
-/**
- * 🎯 기능 요약:
- * - 모달을 닫았다 다시 열 때, 이전 검색 결과 및 검색어를 초기화
- */
-const searchModal = document.getElementById('searchUserModal');
-searchModal.addEventListener('show.bs.modal', function () {
-  // 검색창과 결과 리스트 초기화
-  document.getElementById('searchKeyword').value = '';
-  document.getElementById('searchResults').innerHTML = '';
-});
-</script>
-
-<!-- ✅ [3] 초기화 버튼 관련 스크립트 -->
-<script>
-/**
- * 🎯 기능 요약:
- * - "요청대상 초기화" 버튼 클릭 시 → 대상자 입력 필드 전체 리셋
- * - "계약사항 초기화" 버튼 클릭 시 → 보험사/증권번호/계약자/보험료 필드 전체 리셋
- */
-
-// ✅ 대상자 정보 초기화
-document.getElementById('resetUserBtn').addEventListener('click', function () {
-  document.querySelectorAll('input[name^="target_name_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="target_code_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="target_join_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="target_leave_"]').forEach(el => el.value = '');
-});
-
-// ✅ 계약사항 초기화
-document.getElementById('resetContractBtn').addEventListener('click', function () {
-  document.querySelectorAll('input[name^="insurer_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="policy_no_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="contractor_"]').forEach(el => el.value = '');
-  document.querySelectorAll('input[name^="premium_"]').forEach(el => el.value = '');
-});
-</script>
-
-<!-- ✅ [4] PDF 생성 및 전송 스크립트 (완전 수정 버전) -->
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.querySelector("form");
-  const overlay = document.getElementById("loadingOverlay");
-  const generateBtn = document.getElementById("generatePdfBtn");
-
-  generateBtn.addEventListener("click", async function () {
-    overlay.style.display = "block";
-
-    try {
-      // ✅ 기본 FormData 생성
-      const formData = new FormData();
-
-      // ✅ 모든 input, textarea, select 강제 수집 (readonly 포함)
-      document.querySelectorAll("input, textarea, select").forEach((el) => {
-        if (el.name) {
-          const val = el.value || "";
-          formData.append(el.name, val);
-          console.log(`📩 추가됨 → ${el.name}: ${val}`);
-        }
-      });
-
-      // ✅ 요청자 정보 추가
-      formData.append("request_user_name", "{{ user.name }}");
-      formData.append("request_user_branch", "{{ user.branch }}");
-      formData.append("request_user_id", "{{ user.id }}");
-      formData.append("request_user_enter", "{{ user.enter|date:'Y-m-d'|default:'' }}");
-
-      // ✅ FormData 내용 디버그 출력
-      console.log("🧾 최종 전송 FormData:");
-      console.table([...formData.entries()]);
-
-      // ✅ Django로 전송
-      const response = await fetch("{% url 'generate_request_pdf' %}", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
-        },
-      });
-
-      if (!response.ok) throw new Error("PDF 생성 실패");
-
-      // ✅ PDF 자동 다운로드
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "업무요청서.pdf";
-      a.click();
-      window.URL.revokeObjectURL(url);
-
-      console.log("✅ PDF 다운로드 완료");
-    } catch (err) {
-      alert("PDF 제작 중 오류가 발생했습니다. 관리자에게 문의하세요.");
-      console.error("❌ 오류:", err);
-    } finally {
-      overlay.style.display = "none";
-    }
-  });
-});
-</script>
-
-<script>
-/* ✅ 보험료 입력 시 숫자만 + 천단위 콤마 자동 적용 */
-document.addEventListener('DOMContentLoaded', function() {
-  const premiumInputs = document.querySelectorAll('input[name^="premium_"]');
-
-  premiumInputs.forEach(input => {
-    input.addEventListener('input', function(e) {
-      // 1. 숫자 이외 제거
-      let value = this.value.replace(/[^0-9]/g, '');
-      // 2. 천단위 콤마 추가
-      if (value) {
-        value = parseInt(value, 10).toLocaleString('ko-KR');
-      }
-      this.value = value;
-    });
-
-    // 3. 복사/붙여넣기 시 숫자만 유지
-    input.addEventListener('paste', function(e) {
-      e.preventDefault();
-      const text = (e.clipboardData || window.clipboardData).getData('text');
-      const numeric = text.replace(/[^0-9]/g, '');
-      this.value = parseInt(numeric || 0, 10).toLocaleString('ko-KR');
-    });
-  });
-});
-</script>
+<!-- ✅ 외부 JS 파일 연결 -->
+<script src="{% static 'js/support_form.js' %}"></script>
 
 {% endblock %}

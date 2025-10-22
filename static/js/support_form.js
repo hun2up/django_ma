@@ -1,6 +1,5 @@
 /**
  * django_ma/static/js/support_form.js
- * support_form.js
  * 업무요청서 페이지 전용 스크립트
  * 기능: 행 추가/삭제, 사용자 검색, PDF 생성
  */
@@ -8,6 +7,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("requestForm");
   const overlay = document.getElementById("loadingOverlay");
+  const generateBtn = document.getElementById("generatePdfBtn");
 
   /** -------------------------------
    * ✅ 공통 행 제어 유틸 함수
@@ -26,15 +26,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ♻️ 초기화
     resetBtn.addEventListener("click", () => {
-      document.querySelectorAll(`${rowSelector} input`).forEach(el => el.value = "");
-      rows.forEach((r, i) => { if (i > 0) r.style.display = "none"; });
+      document.querySelectorAll(`${rowSelector} input`).forEach(el => (el.value = ""));
+      rows.forEach((r, i) => {
+        if (i > 0) r.style.display = "none";
+      });
     });
 
     // ❌ 행 제거
     document.querySelectorAll(`.${removeBtnClass}`).forEach(btn => {
       btn.addEventListener("click", () => {
         const row = document.querySelector(`${rowSelector}[data-index="${btn.dataset.index}"]`);
-        if (row) { row.querySelectorAll("input").forEach(el => el.value = ""); row.style.display = "none"; }
+        if (row) {
+          row.querySelectorAll("input").forEach(el => (el.value = ""));
+          row.style.display = "none";
+        }
       });
     });
   };
@@ -50,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 검색버튼 클릭 시 현재 행 기억
   document.querySelectorAll(".search-btn").forEach(btn => {
-    btn.addEventListener("click", () => currentRow = btn.dataset.row);
+    btn.addEventListener("click", () => (currentRow = btn.dataset.row));
   });
 
   // 검색 실행
@@ -68,7 +73,9 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        resultsBox.innerHTML = data.results.map(user => `
+        resultsBox.innerHTML = data.results
+          .map(
+            user => `
           <button type="button" class="list-group-item list-group-item-action search-result"
             data-id="${user.id}" data-name="${user.name}" data-branch="${user.branch}"
             data-enter="${user.enter || ''}" data-quit="${user.quit || '재직중'}">
@@ -77,7 +84,9 @@ document.addEventListener("DOMContentLoaded", () => {
               <small class="text-muted">${user.branch}</small>
             </div>
             <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
-          </button>`).join("");
+          </button>`
+          )
+          .join("");
 
         // 검색 결과 클릭 시 → input 채우기
         document.querySelectorAll(".search-result").forEach(item => {
@@ -91,23 +100,22 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         });
       })
-      .catch(() => resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류 발생</p>');
+      .catch(() => (resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류 발생</p>'));
   });
 
   /** -------------------------------
    * 🧾 PDF 생성 요청
    * ------------------------------- */
-  document.getElementById("generatePdfBtn").addEventListener("click", async () => {
+  generateBtn.addEventListener("click", async () => {
     overlay.style.display = "block";
 
     try {
       const formData = new FormData(form);
-      formData.append("request_user_name", "{{ user.name }}");
-      formData.append("request_user_branch", "{{ user.branch }}");
-      formData.append("request_user_id", "{{ user.id }}");
-      formData.append("request_user_enter", "{{ user.enter|date:'Y-m-d'|default:'' }}");
 
-      const response = await fetch("{% url 'generate_request_pdf' %}", {
+      // ✅ URL은 HTML에서 data 속성으로 가져옴
+      const pdfUrl = generateBtn.dataset.pdfUrl;
+
+      const response = await fetch(pdfUrl, {
         method: "POST",
         body: formData,
         headers: { "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value },
