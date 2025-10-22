@@ -461,12 +461,13 @@ def generate_request_pdf(request):
     ]
 
     elements.append(Paragraph("요청자", styles["Korean"]))
-    table1 = Table(requester_table, colWidths=[100, 100, 150, 150])
+    table1 = Table(requester_table, colWidths=[120, 100, 140, 140])
     table1.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
         ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     elements.append(table1)
     elements.append(Spacer(1, 20))
@@ -487,18 +488,19 @@ def generate_request_pdf(request):
         target_rows.append(["-", "-", "-", "-"])
 
     elements.append(Paragraph("대상자", styles["Korean"]))
-    table2 = Table(target_rows, colWidths=[100, 100, 150, 150])
+    table2 = Table(target_rows, colWidths=[120, 100, 140, 140])
     table2.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
         ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     elements.append(table2)
     elements.append(Spacer(1, 20))
 
     # ==========================================
-    # ✅ 계약 정보
+    # ✅ 계약 내용
     # ==========================================
     elements.append(Paragraph("계약사항", styles["Korean"]))
     contract_rows = [["보험사", "증권번호", "계약자(피보험자)", "보험료"]]
@@ -507,7 +509,14 @@ def generate_request_pdf(request):
         insurer = request.POST.get(f"insurer_{i}", "").strip()
         policy_no = request.POST.get(f"policy_no_{i}", "").strip()
         contractor = request.POST.get(f"contractor_{i}", "").strip()
-        premium = request.POST.get(f"premium_{i}", "").strip()
+        premium_raw = request.POST.get(f"premium_{i}", "").replace(",", "").strip()
+
+        # ✅ 숫자만 추출 후 천단위 구분 적용
+        premium = ""
+        if premium_raw.isdigit():
+            premium = f"{int(premium_raw):,}"
+        elif premium_raw:
+            premium = premium_raw  # 혹시 문자 포함 시 그대로 표시
 
         if any([insurer, policy_no, contractor, premium]):
             contract_rows.append([insurer or "-", policy_no or "-", contractor or "-", premium or "-"])
@@ -515,12 +524,15 @@ def generate_request_pdf(request):
     if len(contract_rows) == 1:
         contract_rows.append(["-", "-", "-", "-"])
 
-    table3 = Table(contract_rows, colWidths=[100, 150, 150, 100])
+    table3 = Table(contract_rows, colWidths=[120, 140, 140, 100])
     table3.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
         ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),   # 머릿말 행(첫 번째 행)은 전체 가운데 정렬
+        ("ALIGN", (0, 1), (2, -1), "CENTER"),   # 보험료 제외한 나머지 데이터 열은 가운데 정렬
+        ("ALIGN", (3, 1), (3, -1), "RIGHT"),    # 보험료 열만 오른쪽 정렬
     ]))
     elements.append(table3)
     elements.append(Spacer(1, 20))
@@ -541,7 +553,7 @@ def generate_request_pdf(request):
         ["내용", content_paragraph],
     ]
 
-    table4 = Table(content_table, colWidths=[80, 420], minRowHeights=[20, 200])
+    table4 = Table(content_table, colWidths=[60, 440], minRowHeights=[20, 200])
     table4.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), "NotoSansKR"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
