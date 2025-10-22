@@ -242,7 +242,22 @@ def post_edit(request, pk):
 @login_required
 def support_form(request):
     """업무요청서 작성 페이지"""
-    return render(request, "board/support_form.html")
+    fields = [
+        ("성명", "target_name_"),
+        ("사번", "target_code_"),
+        ("입사일", "target_join_"),
+        ("퇴사일", "target_leave_"),
+    ]
+    contracts = [
+        ("보험사", "insurer_", 2),
+        ("증권번호", "policy_no_", 3),
+        ("계약자(피보험자)", "contractor_", 3),
+        ("보험료", "premium_", 3),
+    ]
+    return render(request, "board/support_form.html", {
+        "fields": fields,
+        "contracts": contracts,
+    })
 
 
 # ===========================================
