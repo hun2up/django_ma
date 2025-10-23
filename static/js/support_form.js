@@ -45,20 +45,28 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // 요청대상 / 계약사항 공통 적용
-  handleRowControl(".user-row", "addUserBtn", "resetUserBtn", "remove-user-btn", 5, "요청대상은 최대 5개까지만 입력 가능합니다.");
-  handleRowControl(".contract-row", "addContractBtn", "resetContractBtn", "remove-contract-btn", 5, "계약사항은 최대 5개까지만 입력 가능합니다.");
+  handleRowControl(".user-row", "addUserBtn", "resetUserBtn", "btn-remove", 5, "요청대상은 최대 5개까지만 입력 가능합니다. \n추가 입력이 필요한 경우 상세내용 칸에 기재해주세요.");
+  handleRowControl(".contract-row", "addContractBtn", "resetContractBtn", "btn-remove", 5, "계약사항은 최대 5개까지만 입력 가능합니다. \n추가 입력이 필요한 경우 상세내용 칸에 기재해주세요.");
+
 
   /** -------------------------------
    * 🔍 대상자 검색
    * ------------------------------- */
   let currentRow = null;
 
-  // 검색버튼 클릭 시 현재 행 기억
-  document.querySelectorAll(".search-btn").forEach(btn => {
-    btn.addEventListener("click", () => (currentRow = btn.dataset.row));
+  document.querySelectorAll('.readonly-field').forEach(input => {
+    input.addEventListener('focus', e => {
+      e.target.blur(); // 포커스 즉시 해제 (커서 깜박임 방지)
+      alert("검색 버튼을 통해서만 입력할 수 있습니다.");
+    });
   });
 
-  // 검색 실행
+  // ① 검색버튼 클릭 시 현재 행 기억
+  document.querySelectorAll('.btn-open-search').forEach(btn => {
+    btn.addEventListener('click', () => (currentRow = btn.dataset.row));
+  });
+
+  // ② 검색 실행
   document.getElementById("searchUserForm").addEventListener("submit", e => {
     e.preventDefault();
     const query = document.getElementById("searchKeyword").value.trim();
@@ -73,9 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        resultsBox.innerHTML = data.results
-          .map(
-            user => `
+        resultsBox.innerHTML = data.results.map(user => `
           <button type="button" class="list-group-item list-group-item-action search-result"
             data-id="${user.id}" data-name="${user.name}" data-branch="${user.branch}"
             data-enter="${user.enter || ''}" data-quit="${user.quit || '재직중'}">
@@ -84,23 +90,64 @@ document.addEventListener("DOMContentLoaded", () => {
               <small class="text-muted">${user.branch}</small>
             </div>
             <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
-          </button>`
-          )
-          .join("");
-
-        // 검색 결과 클릭 시 → input 채우기
-        document.querySelectorAll(".search-result").forEach(item => {
-          item.addEventListener("click", () => {
-            if (!currentRow) return;
-            document.querySelector(`input[name="target_name_${currentRow}"]`).value = item.dataset.name;
-            document.querySelector(`input[name="target_code_${currentRow}"]`).value = item.dataset.id;
-            document.querySelector(`input[name="target_join_${currentRow}"]`).value = item.dataset.enter;
-            document.querySelector(`input[name="target_leave_${currentRow}"]`).value = item.dataset.quit;
-            bootstrap.Modal.getInstance(document.getElementById("searchUserModal")).hide();
-          });
-        });
+          </button>
+        `).join("");
       })
       .catch(() => (resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류 발생</p>'));
+  });
+
+  // ③ 검색 결과 클릭 시 input 자동 채우기 (이벤트 위임)
+  document.addEventListener("click", e => {
+    const item = e.target.closest(".search-result");
+    if (!item) return;
+    if (!currentRow) return;
+
+    document.querySelector(`input[name="target_name_${currentRow}"]`).value = item.dataset.name;
+    document.querySelector(`input[name="target_code_${currentRow}"]`).value = item.dataset.id;
+    document.querySelector(`input[name="target_join_${currentRow}"]`).value = item.dataset.enter;
+    document.querySelector(`input[name="target_leave_${currentRow}"]`).value = item.dataset.quit;
+
+    bootstrap.Modal.getInstance(document.getElementById("searchUserModal")).hide();
+  });
+
+   // 🔁 모달 닫힐 때 검색 내용 초기화
+  const searchModal = document.getElementById("searchUserModal");
+  if (searchModal) {
+    searchModal.addEventListener("hidden.bs.modal", () => {
+      document.getElementById("searchKeyword").value = "";
+      document.getElementById("searchResults").innerHTML = "";
+    });
+  }
+
+  /** -------------------------------
+   * 💰 보험료 입력칸 숫자만 허용 + 1,000단위 콤마
+   * ------------------------------- */
+  const premiumInputs = document.querySelectorAll('input[name^="premium_"]');
+  premiumInputs.forEach(input => {
+    input.addEventListener("input", e => {
+      // 🔹 숫자 이외 문자 제거
+      let value = e.target.value.replace(/[^0-9]/g, "");
+      if (value) {
+        // 🔹 1,000단위 콤마 추가
+        value = Number(value).toLocaleString("ko-KR");
+      }
+      e.target.value = value;
+    });
+
+    // 🔹 복사/붙여넣기 시에도 숫자만 남게
+    input.addEventListener("paste", e => {
+      e.preventDefault();
+      const paste = (e.clipboardData || window.clipboardData).getData("text");
+      const clean = paste.replace(/[^0-9]/g, "");
+      if (clean) e.target.value = Number(clean).toLocaleString("ko-KR");
+    });
+  });
+
+  // 🔹 폼 전송 시 보험료 콤마 제거 (숫자만 서버로 전달)
+  form.addEventListener("submit", () => {
+    premiumInputs.forEach(input => {
+      input.value = input.value.replace(/,/g, "");
+    });
   });
 
   /** -------------------------------

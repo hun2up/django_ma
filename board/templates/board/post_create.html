@@ -1,7 +1,7 @@
-<!-- django_ma/board/templates/board/post_create.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
+
 {% block title %}업무요청 글 작성{% endblock %}
 
 {% block content %}
@@ -64,7 +64,7 @@
         <!-- 버튼 -->
         <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
           <a href="{% url 'post_list' %}" class="btn btn-outline-secondary w-100 w-md-auto">목록으로</a>
-          <button type="submit" class="btn btn-primary w-100 w-md-auto fw-bold">글 등록하기</button>
+          <button type="submit" id="submitBtn" class="btn btn-primary w-100 w-md-auto">등록하기</button>
         </div>
       </form>
     </div>
@@ -75,19 +75,11 @@
     </div>
   </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-  <!-- ✅ 업로드 유틸 포함 -->
-  <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
+<!-- ✅ 업로드 유틸 -->
+<script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
 
-  <!-- ✅ 초기화 -->
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      initFileUpload({
-        formSelector: "#postForm",
-        maxFileSize: 10 * 1024 * 1024, // 10MB
-      });
-    });
-  </script>
+<!-- ✅ 중복 클릭 방지 및 초기화 -->
+<script src="{% static 'js/post_create.js' %}"></script>
+
 {% endblock %}

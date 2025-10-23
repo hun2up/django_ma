@@ -163,11 +163,18 @@ def generate_request_pdf(request):
     elements += [Paragraph("요청내용", styles["Korean"]), table4, Spacer(1, 25)]
 
     # -------------------------------------------
+    # ✍️ 요청자 서명란 추가
+    # -------------------------------------------
+    requester_sign = f"요청자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
+    elements.append(Paragraph(requester_sign, styles["RightAlign"]))
+    elements.append(Spacer(1, 10))
+
+    # -------------------------------------------
     # ✅ 본부장 확인
     # -------------------------------------------
     admin = CustomUser.objects.filter(branch=request.user.branch, grade="main_admin").first()
     admin_name = admin.name if admin else "(미등록)"
-    confirm_text = f"최상위관리자 확인 : {request.user.branch} 본부장(사업단장) <b>{admin_name}</b> (서명)"
+    confirm_text = f"최상위관리자 확인 : {request.user.branch} 본부장(사업단장)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{admin_name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
     elements.append(Paragraph(confirm_text, styles["RightAlign"]))
     elements.append(Spacer(1, 20))
 

@@ -1,15 +1,13 @@
 <!-- django_ma/board/templates/post_list.html -->
 {% extends 'base.html' %}
 {% load static %}
+
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
 <div class="container mt-4 board-font">
-
-  <!-- ✅ 페이지 제목 -->
   <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">업무요청 게시판</h3>
 
-  <!-- ✅ 시스템 메시지 -->
   {% if messages %}
     <div class="container mt-3">
       {% for message in messages %}
@@ -21,25 +19,23 @@
     </div>
   {% endif %}
 
-  <!-- ✅ 새 글 작성 버튼 -->
   <div class="d-flex justify-content-end mb-3">
     <a href="{% url 'post_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
   </div>
 
-  <!-- ✅ 게시판 테이블 -->
   <div class="card p-4 shadow-sm rounded-4">
     <div class="table-responsive">
       <table class="table table-hover align-middle text-center">
         <thead class="table-light">
           <tr>
-            <th>접수번호</th>
-            <th>접수일자</th>
-            <th>구분</th>
-            <th class="text-start">제목</th>
-            <th>요청자</th>
-            <th>담당자</th>
-            <th>상태</th>
-            <th>상태변경일</th>
+            <th scope="col">접수번호</th>
+            <th scope="col">접수일자</th>
+            <th scope="col">구분</th>
+            <th scope="col" class="text-start">제목</th>
+            <th scope="col">요청자</th>
+            <th scope="col">담당자</th>
+            <th scope="col">상태</th>
+            <th scope="col">상태변경일</th>
           </tr>
         </thead>
 
@@ -50,19 +46,21 @@
             <td>{{ post.created_at|date:"Y-m-d" }}</td>
             <td>{{ post.category|default:"-" }}</td>
             <td class="text-start">
-              <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">{{ post.title }}</a>
+              <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
+                {{ post.title }}
+              </a>
             </td>
             <td>{{ post.user_name|default:"-" }}</td>
 
-            <!-- ✅ 담당자 -->
+            <!-- 담당자 -->
             <td>
               {% if is_superuser %}
-                <form method="post" class="d-inline-block">
+                <form method="post" class="d-inline-block inline-update-form">
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="handler">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
                   <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
-                    <option value="선택" {% if not post.handler %}selected{% endif %}>선택</option>
+                    <option value="">선택</option>
                     {% for h in handlers %}
                       <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
                     {% endfor %}
@@ -74,10 +72,10 @@
               {% endif %}
             </td>
 
-            <!-- ✅ 상태 -->
+            <!-- 상태 -->
             <td>
               {% if is_superuser %}
-                <form method="post" class="d-inline-block">
+                <form method="post" class="d-inline-block inline-update-form">
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="status">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
@@ -92,9 +90,7 @@
                   <button type="submit" class="btn btn-sm btn-outline-primary">변경</button>
                 </form>
               {% else %}
-                <span class="fw-semibold status-text" data-status="{{ post.status }}">
-                  {{ post.status }}
-                </span>
+                <span class="fw-semibold status-text" data-status="{{ post.status }}">{{ post.status }}</span>
               {% endif %}
             </td>
 
@@ -109,7 +105,7 @@
       </table>
     </div>
 
-    <!-- ✅ 페이지네이션 -->
+    <!-- 페이지네이션 -->
     <div class="text-center mt-3">
       {% if posts.has_previous %}
         <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
@@ -180,8 +176,8 @@
 
     </div>
   </form>
-</div>
+{% endblock %}
 
-<!-- ✅ 외부 JS 연결 -->
+{% block extra_js %}
 <script src="{% static 'js/post_list.js' %}"></script>
 {% endblock %}

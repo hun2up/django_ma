@@ -198,8 +198,17 @@
       <div class="d-flex justify-content-between mt-4">
         <div class="d-flex gap-2">
           <a href="{% url 'post_list' %}" class="btn btn-outline-secondary">목록으로</a>
-          {% if user.is_authenticated and (user == post.author or user.is_superuser) %}
-          <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
+
+          {% if user.id == post.user_id or is_superuser %}
+            <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
+
+            <!-- 🔥 삭제하기 버튼 추가 -->
+            <form method="post" style="display:inline;" 
+                  onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
+              {% csrf_token %}
+              <input type="hidden" name="action_type" value="delete_post">
+              <button type="submit" class="btn btn-outline-danger">삭제하기</button>
+            </form>
           {% endif %}
         </div>
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
@@ -208,9 +217,9 @@
     </div>
   </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-  <!-- ✅ 댓글 수정 기능 분리 -->
-  <script src="{% static 'js/post_detail.js' %}"></script>
+
+<!-- ✅ 댓글 수정 기능 분리 -->
+<script src="{% static 'js/post_detail.js' %}"></script>
+  
 {% endblock %}
