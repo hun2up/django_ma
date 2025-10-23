@@ -9,7 +9,7 @@
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
     <!-- ✅ 제목 -->
-    <h2 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 수정</h2>
+    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 수정</h3>
 
     <!-- ✅ 본문 카드 -->
     <div class="card shadow p-4 border-0 rounded-4">
@@ -93,10 +93,10 @@
         <!-- 삭제할 파일 ID 전달용 -->
         <div id="deleteContainer"></div>
 
-        <!-- 버튼 -->
-        <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-          <a href="{% url 'post_detail' post.id %}" class="btn btn-outline-secondary w-100 w-md-auto">취소</a>
-          <button type="submit" class="btn btn-primary w-100 w-md-auto fw-bold">수정 완료</button>
+        <!-- ✅ 버튼 -->
+        <div class="d-flex justify-content-between align-items-center mt-4">
+          <a href="{% url 'post_detail' post.id %}" class="btn btn-outline-secondary px-4">취소</a>
+          <button type="submit" id="submitBtn" class="btn btn-primary px-4">수정 완료</button>
         </div>
       </form>
     </div>
@@ -107,8 +107,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-
+{% block extra_js %}
 <!-- ✅ 공용 업로드 유틸 로드 -->
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
 
@@ -124,4 +125,6 @@
   });
 </script>
 
+<!-- ✅ 게시글 작성/수정 공용 JS -->
+<script src="{% static 'js/post_create.js' %}"></script>
 {% endblock %}
