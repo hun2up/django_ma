@@ -210,3 +210,42 @@ html, body, button, input, textarea, select {
   transform: translate(-50%, -50%); /* 정확한 화면 중앙 배치 */
   text-align: center;
 }
+
+/* =======================================================
+   🔍 대상자 검색 결과 스타일
+   ======================================================= */
+#searchResults .list-group-item.search-result {
+  margin-bottom: 10px;      /* 항목 간 간격 */
+  padding-top: 11px;        /* 내부 위 여백 */
+  padding-bottom: 11px;     /* 내부 아래 여백 */
+  border-radius: 8px;       /* 둥근 모서리 */
+  transition: all 0.2s ease;
+}
+
+#searchResults .list-group-item.search-result:hover {
+  background-color: #f0f8ff; /* 연한 파란색 배경 */
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 91, 172, 0.15);
+}
+
+/* =======================================================
+   🔒 요청대상 입력칸 (검색 전용, 직접 입력 불가)
+   ======================================================= */
+.readonly-field[readonly] {
+  background-color: #f1f1f1;   /* 회색 음영 */
+  color: #666;
+  cursor: not-allowed;
+  opacity: 1;                  /* Bootstrap이 투명하게 만드는 것 방지 */
+}
+
+.readonly-field[readonly]:focus {
+  box-shadow: none;
+  border-color: #ccc;
+}
+
+/* =======================================================
+   💰 보험료 입력칸 (검색 전용, 직접 입력 불가)
+   ======================================================= */
+input[name^="premium_"] {
+  text-align: right;
+}

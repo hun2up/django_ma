@@ -139,6 +139,13 @@ def post_detail(request, pk):
             case "delete_comment":
                 Comment.objects.filter(id=request.POST["comment_id"], author=request.user).delete()
                 messages.info(request, "댓글 삭제 완료")
+            case "delete_post":
+                if not (is_superuser or str(request.user.id) == str(post.user_id)):
+                    messages.error(request, "삭제 권한이 없습니다.")
+                    return redirect("post_detail", pk=pk)
+                post.delete()
+                messages.success(request, "게시글이 삭제되었습니다.")
+                return redirect("post_list")
         return redirect("post_detail", pk=pk)
 
     # 🔸 템플릿 전달용 정보
@@ -249,10 +256,10 @@ def support_form(request):
         ("퇴사일", "target_leave_"),
     ]
     contracts = [
-        ("보험사", "insurer_", 2),
+        ("보험사", "insurer_", 3),
         ("증권번호", "policy_no_", 3),
         ("계약자(피보험자)", "contractor_", 3),
-        ("보험료", "premium_", 3),
+        ("보험료", "premium_", 2),
     ]
     return render(request, "board/support_form.html", {
         "fields": fields,

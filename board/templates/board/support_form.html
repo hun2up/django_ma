@@ -24,14 +24,14 @@
         <div id="userContainer">
           {% for i in "12345" %}
           <div class="row mb-2 align-items-center user-row" data-index="{{ i }}" {% if i != "1" %}style="display:none;"{% endif %}>
-            <div class="col-md-1 text-center">
-              <button type="button" class="btn btn-primary btn-search" data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+            <div class="col-auto text-center">
+              <button type="button" class="btn btn-primary btn-open-search" data-row="{{ i }}" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
             </div>
 
             {% for label, field in fields %}
               <div class="col equal-field mb-2">
                 <label class="form-label">{{ label }}</label>
-                <input type="text" name="{{ field }}{{ i }}" class="form-control readonly-field">
+                <input type="text" name="{{ field }}{{ i }}" class="form-control readonly-field" readonly>
               </div>
             {% endfor %}
 
