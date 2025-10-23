@@ -1,37 +1,75 @@
-/* base.css */
+/* =======================================================
+   🎨 base.css — 공통 스타일 시트
+   전역 폰트, 버튼, 입력폼, 카드, 레이아웃, 유틸리티 포함
+   ======================================================= */
 
 /* ✅ 기본 폰트 및 배경 */
+html {
+  font-size: 14px; /* 전체 폰트 한 단계 축소 (기본 16px → 14px) */
+}
+
 html, body, button, input, textarea, select {
   font-family: 'Noto Sans KR', sans-serif;
   background-color: #f9fbfd;
 }
 
-/* ✅ Navbar */
-.navbar {
+/* =======================================================
+   🔷 Navbar
+   ======================================================= */
+
+/* ✅ 상단 메뉴 폰트 강조 */
+.nav-link {
+  font-size: 1.1rem;     /* 기본 대비 약 15.4px → 살짝 큼 */
+  font-weight: 600;
+}
+
+.nav-link.active {
+  font-size: 1.1rem;     /* active 상태에서도 동일 크기 유지 */
+  font-weight: 700;
+}
+
+   .navbar {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
+
 .nav-link {
   font-weight: 600;
   color: #333 !important;
 }
-.nav-link.active { color: #005BAC !important; font-weight: 700; }
-.nav-link.inactive { color: #aaa !important; }
-.nav-link.inactive:hover { color: #005BAC !important; }
 
-/* ✅ 버튼 */
+.nav-link.active {
+  color: #005BAC !important;
+  font-weight: 700;
+}
+
+.nav-link.inactive {
+  color: #aaa !important;
+}
+
+.nav-link.inactive:hover {
+  color: #005BAC !important;
+}
+
+/* =======================================================
+   🔹 버튼 스타일
+   ======================================================= */
+
+/* 기본 파란 버튼 */
 .btn-primary {
   background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
   border: none;
   border-radius: 10px;
   font-weight: 600;
+  transition: all 0.3s ease;
 }
+
 .btn-primary:hover {
   background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
 }
 
-/* ✅ 로그아웃 버튼 */
+/* 로그아웃 버튼 */
 .btn-logout {
   background-color: #dc3545;
   color: white;
@@ -39,45 +77,79 @@ html, body, button, input, textarea, select {
   padding: 6px 14px;
   border: none;
 }
-.btn-logout:hover { background-color: #b02a37; }
 
-/* ✅ 카드 */
+.btn-logout:hover {
+  background-color: #b02a37;
+}
+
+/* 검색 / 제거 버튼 */
+.btn-search,
+.btn-remove {
+  white-space: nowrap;
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border-radius: 8px;
+}
+
+/* =======================================================
+   🧾 카드 / 폼 / 인풋
+   ======================================================= */
 .card {
   border: none;
   border-radius: 15px;
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* ✅ 인풋 */
 .form-control {
   border-radius: 10px;
   border: 1px solid #d2ddec;
   transition: all 0.25s ease;
 }
+
 .form-control:focus {
   border-color: #005BAC;
   box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
 }
 
-/* ✅ 상태 셀렉트 */
+/* 셀렉트 */
 .status-select {
   font-weight: 600;
   border-radius: 6px;
   padding: 4px 8px;
 }
 
-/* ✅ 댓글 */
-.comment-empty, .comment-login {
+/* =======================================================
+   💬 댓글 / 코멘트
+   ======================================================= */
+.comment-empty,
+.comment-login {
   font-size: 13px;
   color: #999;
 }
 
-/* ======================================
-   📘 Info Label / Value (게시판 공용 스타일)
-   ====================================== */
+.comment-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
 
+.comment-content {
+  flex: 1 1 auto;
+  background-color: #f8f9fa;
+  border: 1px solid #d2ddec;
+  border-radius: 12px;
+  padding: 10px 12px;
+  position: relative;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* =======================================================
+   📋 Info Label / Value (게시판 공용)
+   ======================================================= */
 .info-label {
-  font-size: 0.80rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: #333;
   background-color: #fdfdfd;
@@ -92,7 +164,7 @@ html, body, button, input, textarea, select {
   background-color: #f8f9fa;
   border-radius: 10px;
   padding: 5px 10px;
-  font-size: 0.80rem;
+  font-size: 0.8rem;
   font-weight: 600;
   display: inline-block;
   min-width: 90px;
@@ -101,7 +173,6 @@ html, body, button, input, textarea, select {
   color: #222;
 }
 
-/* ✅ Label 박스형 그룹 */
 .info-row {
   display: flex;
   flex-wrap: wrap;
@@ -116,18 +187,26 @@ html, body, button, input, textarea, select {
   min-width: 150px;
 }
 
-/* ✅ Comment Style */
-.comment-box {
+/* =======================================================
+   ⏳ 로딩 오버레이
+   ======================================================= */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.8);
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
 }
-.comment-content {
-  flex: 1 1 auto;
-  background-color: #f8f9fa;
-  border: 1px solid #d2ddec;
-  border-radius: 12px;
-  padding: 10px 12px;
-  position: relative;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+
+.loading-box {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* 정확한 화면 중앙 배치 */
+  text-align: center;
 }
