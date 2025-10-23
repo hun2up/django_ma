@@ -5,7 +5,7 @@
 
 /* ✅ 기본 폰트 및 배경 */
 html {
-  font-size: 14px; /* 전체 폰트 한 단계 축소 (기본 16px → 14px) */
+  font-size: 16px; /* 전체 폰트 한 단계 축소 (기본 16px → 14px) */
 }
 
 html, body, button, input, textarea, select {
@@ -248,4 +248,10 @@ html, body, button, input, textarea, select {
    ======================================================= */
 input[name^="premium_"] {
   text-align: right;
+}
+
+/* 로그인 / 등록 등 버튼 로딩 상태 */
+.btn[disabled] {
+  opacity: 0.85;
+  cursor: not-allowed;
 }

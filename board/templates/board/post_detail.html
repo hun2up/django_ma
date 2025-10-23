@@ -7,7 +7,6 @@
 
 {% block content %}
 <div class="container mt-5">
-  <!-- ✅ 메시지 알림 -->
   {% if messages %}
   <div class="container mt-3">
     {% for message in messages %}
@@ -21,14 +20,11 @@
 
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
-
-      <!-- ✅ 제목 + 작성일 -->
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0 text-primary">{{ post.title }}</h5>
         <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
       </div>
 
-      <!-- ✅ 본문 내용 -->
       <div class="my-3 p-3 bg-light rounded-3">
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
           {{ post.content }}
@@ -37,21 +33,16 @@
 
       <hr class="my-3">
 
-      <!-- ✅ 댓글 영역 -->
+      <!-- ✅ 댓글 -->
       <div class="my-3">
         <span class="info-value">댓글</span>
-
-        <!-- 댓글 목록 -->
         <div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
           {% for comment in comments %}
           <div class="mb-3 position-relative">
             <small class="text-muted d-block mb-1" style="font-size:12px;">
               {{ comment.created_at|date:"Y-m-d H:i" }}
             </small>
-
-            <!-- 댓글 본문 -->
             <div class="comment-box">
-              <!-- 본문 -->
               <div class="comment-content position-relative">
                 <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.content }}</p>
 
@@ -69,8 +60,6 @@
                 </div>
                 {% endif %}
               </div>
-
-              <!-- 작성자 -->
               <span class="info-label">{{ comment.author.name }}</span>
             </div>
           </div>
@@ -79,13 +68,12 @@
           {% endfor %}
         </div>
 
-        <!-- ✅ 댓글 입력 -->
         {% if user.is_authenticated %}
-        <form method="post" class="mt-3 d-flex align-items-center gap-1">
+        <form method="post" class="mt-3 d-flex align-items-center flex-nowrap gap-2">
           {% csrf_token %}
           <input type="hidden" name="action_type" value="comment">
           {{ form.content|add_class:"form-control form-control-sm flex-grow-1" }}
-          <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px;">등록</button>
+          <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px; white-space: nowrap;">등록</button>
         </form>
         {% else %}
         <p class="comment-login mt-3">
@@ -203,11 +191,11 @@
             <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
 
             <!-- 🔥 삭제하기 버튼 추가 -->
-            <form method="post" style="display:inline;" 
+            <form method="post" style="display:inline;"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
               <input type="hidden" name="action_type" value="delete_post">
-              <button type="submit" class="btn btn-outline-danger">삭제하기</button>
+              <button type="submit" name="delete_button" class="btn btn-outline-danger">삭제하기</button>
             </form>
           {% endif %}
         </div>
@@ -217,9 +205,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-
+{% block extra_js %}
 <!-- ✅ 댓글 수정 기능 분리 -->
 <script src="{% static 'js/post_detail.js' %}"></script>
-  
 {% endblock %}
