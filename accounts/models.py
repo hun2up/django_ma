@@ -29,24 +29,20 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         ('inactive', 'Inactive'),
     ]
 
-    grade = models.CharField(
-        "권한등급",
-        max_length=20,
-        choices=GRADE_CHOICES,
-        default='Basic'
-    )
-
     id = models.CharField(max_length=30, unique=True, primary_key=True)
     name = models.CharField(max_length=100)
     branch = models.CharField(max_length=100, blank=True, null=True)
     grade = models.CharField(max_length=20, choices=GRADE_CHOICES, default='basic')
     status = models.CharField(max_length=20, default='재직')
 
-    # ✅ 새로 추가되는 4개 필드
     regist = models.CharField(max_length=50, blank=True, null=True)
     birth = models.DateField("생년월일", blank=True, null=True)
     enter = models.DateField("입사일자", blank=True, null=True)
     quit = models.DateField("퇴사일자", blank=True, null=True)
+
+    # ✅ 새로 추가되는 컬럼
+    channel = models.CharField(max_length=10, blank=True, verbose_name='부문', default='MA부문')
+    part = models.CharField(max_length=10, blank=True, verbose_name='부서', default='MA사업4부')
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -63,4 +59,3 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "users"
         verbose_name_plural = "users"
-

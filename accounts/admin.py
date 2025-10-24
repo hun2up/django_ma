@@ -58,13 +58,15 @@ def export_users_as_excel(queryset, filename):
     wb = Workbook()
     ws = wb.active
     ws.title = "Users"
-    ws.append(['ID', 'Name', 'Branch', 'Grade', 'Status', '입사일', '퇴사일', 'Is Staff', 'Is Active'])
+    ws.append(['ID', 'Name', 'Branch', 'Channel', 'Part', 'Grade', 'Status', '입사일', '퇴사일', 'Is Staff', 'Is Active'])
 
     for user in queryset:
         ws.append([
             user.id,
             user.name,
             user.branch,
+            user.channel,
+            user.part,
             GRADE_DISPLAY.get(user.grade, user.grade),
             user.status,
             user.enter.strftime("%Y-%m-%d") if user.enter else "",
@@ -138,7 +140,7 @@ def upload_users_from_excel_view(request):
                 continue
 
             (
-                user_id, password, name, branch, grade,
+                user_id, password, name, channel, part, branch, grade,
                 status, *_,
                 regist, birth, enter, quit_date
             ) = row[:12]
@@ -157,6 +159,8 @@ def upload_users_from_excel_view(request):
                 user = CustomUser.objects.filter(id=user_id).first()
                 defaults = dict(
                     name=str(name).strip(),
+                    channel=str(channel).strip() if channel else "",
+                    part=str(part).strip() if part else "",  
                     branch=str(branch).strip() if branch else "",
                     grade=grade_val,
                     status=str(status).strip() or "재직",
@@ -255,8 +259,8 @@ class CustomUserAdmin(UserAdmin):
 
     # ✅ 목록에 입사일/퇴사일 표시
     list_display = (
-        "id", "name", "branch", "grade", "status",
-        "enter", "quit",  # ✅ 추가됨
+        "id", "name", "channel", "part", "branch", 
+        "grade", "status", "enter", "quit",
         "is_staff", "is_active",
     )
     search_fields = ("id", "name", "branch")
@@ -267,8 +271,8 @@ class CustomUserAdmin(UserAdmin):
         (None, {"fields": ("id", "password")}),
         ("Personal Info", {
             "fields": (
-                "name", "branch", "grade", "status",
-                "enter", "quit",  # ✅ 추가됨
+                "name", "channel", "part", "branch", 
+                "grade", "status", "enter", "quit",
             )
         }),
         ("Permissions", {
@@ -281,8 +285,8 @@ class CustomUserAdmin(UserAdmin):
             "classes": ("wide",),
             "fields": (
                 "id", "password1", "password2",
-                "name", "branch", "grade", "status",
-                "enter", "quit",
+                "name", "channel", "part", "branch",  
+                "grade", "status", "enter", "quit",
             ),
         }),
     )
