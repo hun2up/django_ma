@@ -1,5 +1,6 @@
 <!--django_ma/partner/templates/partner/manage_charts.html-->
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}편제변경{% endblock %}
 
 {#
@@ -28,10 +29,10 @@
 {% block content %}
 <div class="container mt-4" id="manage-structure" 
      data-user-grade="{{ user.grade }}"
-     data-current-year="{{ current_year|default:now|date:'Y' }}"
-     data-current-month="{{ current_month|default:now|date:'n' }}"
-     data-selected-year="{{ selected_year|default:now|date:'Y' }}"
-     data-selected-month="{{ selected_month|default:now|date:'n' }}"
+     data-current-year="{% now 'Y' %}"
+     data-current-month="{% now 'n' %}"
+     data-selected-year="{% now 'Y' %}"
+     data-selected-month="{% now 'n' %}"
      data-future-until="{{ future_select_until|default:'' }}"
      data-data-fetch-url="{{ data_fetch_url }}"
      data-data-save-url="{{ data_save_url }}"
@@ -87,8 +88,7 @@
       <div class="col-6 col-md-1 ms-auto">
         <label class="form-label mb-1">기한</label>
         <select id="deadlineSelect" name="deadline" class="form-select">
-          <option value="">선택</option>
-          {% for d in 1|to_list:31 %}{% endfor %}
+          <option value="">선택</option>          
           {# 위 헬퍼가 없다면 아래 루프 사용:
              {% for d in "0123456789012345678901234567890" %} ... {% endfor %}
              실제 구현은 JS에서 1~31 생성 처리 #}
