@@ -255,3 +255,43 @@ input[name^="premium_"] {
   opacity: 0.85;
   cursor: not-allowed;
 }
+
+#controlsForm .form-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+#controlsForm .form-select-sm, 
+#controlsForm .btn-sm {
+  height: 34px;
+  font-size: 0.9rem;
+}
+
+#controlsForm {
+  align-items: flex-end;
+}
+
+/* =============================
+   📘 편제변경 - 비활성화 상태 스타일
+   ============================= */
+.disabled-mode {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.disabled-mode::before {
+  content: "⚠️ 현재 월도는 입력이 불가합니다.";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f8d7da;
+  color: #842029;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+}

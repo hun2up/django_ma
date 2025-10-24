@@ -35,3 +35,16 @@ class PartnerChangeLog(models.Model):
 
     def __str__(self):
         return f"[{self.timestamp:%Y-%m-%d %H:%M}] {self.user} - {self.action}"
+
+
+class StructureDeadline(models.Model):
+    branch = models.CharField(max_length=50)
+    month = models.CharField(max_length=7)  # YYYY-MM
+    deadline_day = models.PositiveSmallIntegerField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("branch", "month")
+
+    def __str__(self):
+        return f"{self.branch} {self.month} ({self.deadline_day}일)"

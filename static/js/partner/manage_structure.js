@@ -8,6 +8,7 @@
  * 3. 삭제/기한설정 Ajax
  * 4. DataTables 초기화
  * 5. 로딩/검증/중복사번 방지
+ * 6. 기한 기본값(10일) + 입력제한/비활성화 표시
  * -----------------------------------------------------
  */
 
@@ -109,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="16" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="13" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
       return;
     }
 
@@ -125,10 +126,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${r.chg_branch || "-"}</td>
         <td>${r.rank || "-"}</td>
         <td>${r.chg_rank || "-"}</td>
-        <td>${r.table_name || "-"}</td>
-        <td>${r.rate || "-"}</td>
-        <td>${r.chg_table || "-"}</td>
-        <td>${r.chg_rate || "-"}</td>
         <td>${r.memo || "-"}</td>
         <td>${r.request_date || "-"}</td>
         <td>${r.process_date || "-"}</td>
@@ -162,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(dataSaveUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
         body: JSON.stringify({ rows, month }),
       });
       const data = await res.json();
@@ -196,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
           const res = await fetch(dataDeleteUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
             body: JSON.stringify({ id }),
           });
           const data = await res.json();
@@ -233,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(setDeadlineUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
         body: JSON.stringify({ branch, deadline_day: day, month }),
       });
       const data = await res.json();
@@ -251,9 +248,10 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================= */
   function getCSRFToken() {
     const name = "csrftoken";
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(";").shift();
+    const cookieValue = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(name + "="));
+    return cookieValue ? cookieValue.split("=")[1] : "";
   }
 
   /* =======================================================
@@ -266,5 +264,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  console.log("✅ Manage Structure JS Loaded");
+  /* =======================================================
+     📌 8. 입력 가능 여부 제어 + 기본 기한(10일) 적용
+  ======================================================= */
+  const today = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const selectedYear = parseInt(yearSelect.value);
+  const selectedMonth = parseInt(monthSelect.value);
+  const deadlineDay = window.ManageStructureBoot.deadlineDay;
+
+  // ✅ 기한 없으면 기본 10일 적용
+  const effectiveDeadline = deadlineDay || 10;
+
+  // ✅ 안내문 표시
+  if (!deadlineDay) {
+    console.warn("⚠️ 기한이 설정되지 않아 기본 10일로 적용됩니다.");
+    const hintBox = document.getElementById("periodHints");
+    if (hintBox) {
+      const note = document.createElement("div");
+      note.className = "text-warning small mt-1";
+      note.textContent = "⚠️ 기한이 설정되지 않아 기본 10일로 적용됩니다.";
+      hintBox.appendChild(note);
+    }
+  }
+
+  // ✅ 입력 가능 여부 판단
+  function checkInputAvailability() {
+    inputSection.classList.remove("disabled-mode");
+    inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = false);
+
+    const isPastMonth =
+      selectedYear < currentYear ||
+      (selectedYear === currentYear && selectedMonth < currentMonth);
+
+    const isDeadlineOver =
+      selectedYear === currentYear &&
+      selectedMonth === currentMonth &&
+      today.getDate() > effectiveDeadline;
+
+    if (isPastMonth || isDeadlineOver) {
+      inputSection.classList.add("disabled-mode");
+      inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = true);
+    }
+  }
+
+  // 초기 및 변경 시 체크
+  checkInputAvailability();
+  yearSelect.addEventListener("change", checkInputAvailability);
+  monthSelect.addEventListener("change", checkInputAvailability);
+
+  console.log("✅ Manage Structure JS Loaded with deadline rules");
 });
