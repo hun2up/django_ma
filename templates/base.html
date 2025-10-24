@@ -66,9 +66,9 @@
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">조직관리</a>
             <ul class="dropdown-menu" aria-labelledby="boardMenu">
-              <li><a class="dropdown-item" href="{% url 'manage_calculate' %}">지점효율</a></li>
-              <li><a class="dropdown-item" href="{% url 'manage_charts' %}">편제변경</a></li>
-              <li><a class="dropdown-item" href="{% url 'manage_grades' %}">권한관리</a></li>
+              <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
+              <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
+              <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
             </ul>
           </li>
         {% endif %}

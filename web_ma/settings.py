@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'commission',
     'dash',
     'partner',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
