@@ -2,9 +2,277 @@
 {% extends 'base.html' %}
 {% block title %}편제변경{% endblock %}
 
+{#
+  django_ma/partner/templates/partner/manage_charts.html
+  -----------------------------------------------------
+  ▶ 편제변경(Manage Structure) — 권한별 접근 + 월도/부서/기한 선택 + 대상자 입력 + 메인시트 표시
+  ▷ 모든 동작(데이터 조회/저장/삭제/기한설정/로그 저장)은 백엔드 뷰에서 처리, 본 템플릿은 UI와 훅만 제공
+  ▷ 필수 컨텍스트(예시):
+     - current_year, current_month (int)
+     - user_grade (str: superuser|main_admin|sub_admin|basic|inactive) — 없으면 user.grade 사용
+     - available_periods (list[str 'YYYY-MM']): 과거 데이터가 존재하는 월도
+     - future_select_until (str 'YYYY-MM'): 현재월 기준 +1개월 (선택 허용 상한)
+     - selected_year, selected_month, selected_branch (초기 선택값)
+     - deadline_day (int|None): 설정된 기한(1~31)
+     - branches: ["MA사업1부","MA사업2부","MA사업3부","MA사업4부"]
+  ▷ 엔드포인트(예시):
+     - data_fetch_url: 월도/부서 기준 메인시트 데이터 GET
+     - data_save_url: 대상자 입력행 저장 POST
+     - data_delete_url: 메인시트 행 삭제 POST
+     - set_deadline_url: 기한 설정 POST
+     - search_user_url: 대상자 검색(모달) — 기존 /board/search-user/ 재사용 권장
+  ▷ 접근제어는 서버의 @grade_required(['superuser','main_admin','sub_admin'])에서 1차 보장
+     - 템플릿에서는 보조 메시지 및 일부 UI show/hide 처리만 수행
+#}
+
 {% block content %}
-<div class="container text-center mt-5">
-  <h2 class="fw-bold" style="color:#003f7d;">편제변경 요청 페이지</h2>
-  <p class="text-muted mt-3">🚧 제작중입니다 🚧</p>
+<div class="container mt-4" id="manage-structure" 
+     data-user-grade="{{ user.grade }}"
+     data-current-year="{{ current_year|default:now|date:'Y' }}"
+     data-current-month="{{ current_month|default:now|date:'n' }}"
+     data-selected-year="{{ selected_year|default:now|date:'Y' }}"
+     data-selected-month="{{ selected_month|default:now|date:'n' }}"
+     data-future-until="{{ future_select_until|default:'' }}"
+     data-data-fetch-url="{{ data_fetch_url }}"
+     data-data-save-url="{{ data_save_url }}"
+     data-data-delete-url="{{ data_delete_url }}"
+     data-set-deadline-url="{{ set_deadline_url }}"
+     data-search-user-url="{{ search_user_url|default:'/board/search-user/' }}">
+
+  {# ─────────────────────────────────────────────────────
+     권한 안내 (뷰 데코레이터에서 차단되더라도 UX 차원 메시지)
+  ───────────────────────────────────────────────────── #}
+  {% if user.grade not in 'superuser main_admin sub_admin' %}
+    <div class="alert alert-danger">접근 권한이 없습니다.</div>
+  {% endif %}
+
+  <h3 class="mb-3 fw-bold" style="color:#003f7d;">편제변경 관리</h3>
+
+  {# ─────────────────────────────────────────────────────
+     월도 / 부서 / 기한 컨트롤 바
+  ───────────────────────────────────────────────────── #}
+  <div class="card shadow p-3 border-0 rounded-4 mb-3">
+    <form id="controlsForm" class="row g-2 align-items-end">
+      {% csrf_token %}
+
+      {# ▷ 연도/월도 — 좌측 배치 #}
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-1">연도</label>
+        <select id="yearSelect" name="year" class="form-select"></select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-1">월도</label>
+        <select id="monthSelect" name="month" class="form-select"></select>
+      </div>
+      <div class="col-12 col-md-2 d-grid">
+        <button type="button" id="btnSearchPeriod" class="btn btn-primary btn-search">검색</button>
+      </div>
+
+      {# ▷ 부서선택 — superuser만 표시 #}
+      {% if user.grade == 'superuser' %}
+      <div class="col-12 col-md-2">
+        <label class="form-label mb-1">부서</label>
+        <select id="branchSelect" name="branch" class="form-select">
+          <option value="">선택</option>
+          {% for b in branches %}
+            <option value="{{ b }}" {% if selected_branch == b %}selected{% endif %}>{{ b }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      {# ▷ 기한선택 — superuser만 표시 (우측)
+         같은 줄 우측 정렬을 위해 order 조정 #}
+      {% if user.grade == 'superuser' %}
+      <div class="col-6 col-md-1 ms-auto">
+        <label class="form-label mb-1">기한</label>
+        <select id="deadlineSelect" name="deadline" class="form-select">
+          <option value="">선택</option>
+          {% for d in 1|to_list:31 %}{% endfor %}
+          {# 위 헬퍼가 없다면 아래 루프 사용:
+             {% for d in "0123456789012345678901234567890" %} ... {% endfor %}
+             실제 구현은 JS에서 1~31 생성 처리 #}
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid">
+        <button type="button" id="btnSetDeadline" class="btn btn-outline-primary">설정</button>
+      </div>
+      {% endif %}
+    </form>
+
+    <div id="periodHints" class="mt-2 small text-muted">
+      <span class="me-2">※ 과거는 데이터가 존재하는 월도만 선택 가능</span>
+      <span>※ 미래 선택은 현재월 기준 +1개월까지만 허용</span>
+    </div>
+  </div>
+
+  {# ─────────────────────────────────────────────────────
+     대상자 입력 섹션 — 조건부 표시 (과거월 or 기한초과 시 숨김)
+  ───────────────────────────────────────────────────── #}
+  <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="fw-bold mb-0" style="color:#005BAC;">대상자 입력</h5>
+      <div class="d-flex gap-2">
+        <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
+        <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
+        <button type="button" id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle" id="inputTable">
+        <thead class="table-light">
+          <tr>
+            <th>성명(요청자)</th>
+            <th>사번(요청자)</th>
+            <th>소속(요청자)</th>
+            <th>성명(대상자)</th>
+            <th>사번(대상자)</th>
+            <th>소속(대상자)</th>
+            <th>소속변경<span class="text-danger">*</span></th>
+            <th>OR<span class="text-danger">*</span></th>
+            <th>직급</th>
+            <th>직급변경<span class="text-danger">*</span></th>
+            <th>수수료테이블</th>
+            <th>수수료율</th>
+            <th>테이블변경<span class="text-danger">*</span></th>
+            <th>변경요율</th>
+            <th>비고<span class="text-danger">*</span></th>
+            <th>검색</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# 최초 1행 템플릿 — JS로 복제/최대 10개까지 #}
+          <tr class="input-row">
+            <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="rq_branch" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_name" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_id" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_branch" readonly></td>
+            <td><input type="text" class="form-control" name="chg_branch" maxlength="50" placeholder="예) MA사업2부"></td>
+            <td class="text-center"><input type="checkbox" class="form-check-input" name="or_flag"></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_rank" readonly></td>
+            <td><input type="text" class="form-control" name="chg_rank" maxlength="20" placeholder="예) 수석"></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_table" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_rate" readonly></td>
+            <td>
+              <select class="form-select" name="chg_table">
+                <option value="">선택</option>
+                <option>Table-A</option>
+                <option>Table-B</option>
+                <option>Table-C</option>
+              </select>
+            </td>
+            <td><input type="text" class="form-control" name="chg_rate" placeholder="예) 35"></td>
+            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="사유 등"></td>
+            <td>
+              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="small text-muted">※ 대상자는 한 번에 최대 10명까지 추가할 수 있습니다.</div>
+  </div>
+
+  {# ─────────────────────────────────────────────────────
+     메인시트 (조회/삭제/처리일자 입력)
+  ───────────────────────────────────────────────────── #}
+  <div class="card shadow p-3 border-0 rounded-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
+      <div class="small text-muted" id="sheetNotice">
+        {# 예: MA사업3부 2025년 10월 입력기한 : 2025년 10월 25일 18시 #}
+      </div>
+    </div>
+
+    <div class="alert alert-info py-2 mb-3">
+      입력 후 수정이 불가합니다. 수정이 필요한 경우 수정 후 다시 입력 바랍니다.
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-striped align-middle" id="mainTable">
+        <thead class="table-light">
+          <tr>
+            <th>성명(요청자)</th>
+            <th>사번(요청자)</th>
+            <th>소속(요청자)</th>
+            <th>성명(대상자)</th>
+            <th>사번(대상자)</th>
+            <th>소속(대상자)</th>
+            <th>소속변경</th>
+            <th>직급</th>
+            <th>직급변경</th>
+            <th>수수료테이블</th>
+            <th>수수료율</th>
+            <th>테이블변경</th>
+            <th>변경요율</th>
+            <th>비고</th>
+            <th>요청일자</th>
+            <th>처리일자</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# 서버에서 selected period + 권한 필터링된 rows 렌더링 또는 JS로 주입 #}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ─────────────────────────────────────────────────────
+     대상자 검색 모달 — support_form 의 검색 컴포넌트 재사용 가정
+  ───────────────────────────────────────────────────── #}
+  <div class="modal fade" id="searchUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">대상자 검색</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="input-group mb-2">
+            <input type="text" class="form-control" id="searchKeyword" placeholder="이름/사번/부서 등">
+            <button class="btn btn-primary" id="btnDoSearch">검색</button>
+          </div>
+          <div id="searchResults" class="list-group"></div>
+          <div class="small text-muted mt-2">※ superuser: 전체 검색 / mainAdmin: 동일 branch 제한</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 로딩 오버레이 #}
+  <div class="loading-overlay" id="loadingOverlay" hidden>
+    <div class="loading-box">
+      <div class="spinner-border" role="status"></div>
+      <div class="mt-2">처리 중…</div>
+    </div>
+  </div>
 </div>
+
+{# ─────────────────────────────────────────────────────
+   스크립트: 모든 로직은 분리된 JS에서 처리 (초기 데이터만 전달)
+   /static/js/partner/manage_structure.js 에서 구현
+  ───────────────────────────────────────────────────── #}
+<script>
+  window.ManageStructureBoot = {
+    userGrade: "{{ user.grade }}",
+    currentYear: Number(document.getElementById('manage-structure').dataset.currentYear || new Date().getFullYear()),
+    currentMonth: Number(document.getElementById('manage-structure').dataset.currentMonth || (new Date().getMonth()+1)),
+    selectedYear: Number(document.getElementById('manage-structure').dataset.selectedYear || new Date().getFullYear()),
+    selectedMonth: Number(document.getElementById('manage-structure').dataset.selectedMonth || (new Date().getMonth()+1)),
+    availablePeriods: [{% for ym in available_periods %}'{{ ym }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+    futureUntil: '{{ future_select_until|default:"" }}',
+    branches: [{% for b in branches %}'{{ b }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+    deadlineDay: {{ deadline_day|default:'null' }},
+  };
+</script>
+<script src="{% static 'js/partner/manage_structure.js' %}"></script>
 {% endblock %}
+
