@@ -34,50 +34,78 @@
     <!-- 🔹 중앙 메뉴 -->
     <div class="collapse navbar-collapse justify-content-center position-absolute start-50 translate-middle-x" id="navbarContent" style="width: fit-content;">
       <ul class="navbar-nav mb-2 mb-lg-0"> 
-        <!-- ✅ 대시보드 -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}" href="#" id="dashMenu" data-bs-toggle="dropdown">대시보드</a>
-          <ul class="dropdown-menu" aria-labelledby="dashMenu">
-            <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
-            <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
-            <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
-          </ul>
-        </li>
+
+        {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
+          <!-- ✅ 대시보드 -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}" href="#" id="dashMenu" data-bs-toggle="dropdown">대시보드</a>
+            <ul class="dropdown-menu" aria-labelledby="dashMenu">
+              <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
+              <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
+              <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
+            </ul>
+          </li>
+        {% endif %}
 
         <!-- ✅ 업무요청 -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
           <ul class="dropdown-menu" aria-labelledby="boardMenu">
             <li><a class="dropdown-item" href="{% url 'post_list' %}">요청게시판</a></li>
-            <li><a class="dropdown-item" href="{% url 'support_form' %}">업무요청서</a></li>
+            {% if user.grade != 'inactive' %}
+              <li><a class="dropdown-item" href="{% url 'support_form' %}">업무요청서</a></li>
+            {% endif %}
+            {% if user.grade != 'inactive' %}
+              <li><a class="dropdown-item" href="{% url 'states_form' %}">FA소명서</a></li>
+            {% endif %}
           </ul>
         </li>
 
-        {% if user.grade == 'superuser' %}
-        <!-- ✅ 관리자 메뉴 -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}" href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
-          <ul class="dropdown-menu" aria-labelledby="commissionMenu">
-            <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
-            <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
-            <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
-          </ul>
-        </li>
+        {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
+          <!-- ✅ 조직관리 -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">조직관리</a>
+            <ul class="dropdown-menu" aria-labelledby="boardMenu">
+              <li><a class="dropdown-item" href="{% url 'manage_calculate' %}">지점효율</a></li>
+              <li><a class="dropdown-item" href="{% url 'manage_charts' %}">편제변경</a></li>
+              <li><a class="dropdown-item" href="{% url 'manage_grades' %}">권한관리</a></li>
+            </ul>
+          </li>
         {% endif %}
 
-        <!-- ✅ 기타 -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}" href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
-          <ul class="dropdown-menu" aria-labelledby="joinMenu">
-            <li><a class="dropdown-item" href="{% url 'join:support_manual' %}">업무매뉴얼</a></li>
-            <li><a class="dropdown-item" href="{% url 'join:support_rules' %}">영업기준안</a></li>
-          </ul>
-        </li>
+        {% if user.grade == 'superuser' %}
+          <!-- ✅ 관리자 메뉴 -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}" href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
+            <ul class="dropdown-menu" aria-labelledby="commissionMenu">
+              <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
+              <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
+              <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
+            </ul>
+          </li>
+        {% endif %}
+
+        {% if user.grade != 'inactive' %}
+          <!-- ✅ 매뉴얼 -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}" href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
+            <ul class="dropdown-menu" aria-labelledby="joinMenu">
+              <li><a class="dropdown-item" href="{% url 'join:manual_basic' %}">업무매뉴얼</a></li>
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+                <li><a class="dropdown-item" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a></li>
+              {% endif %}
+              <li><a class="dropdown-item" href="{% url 'join:rules_basic' %}">영업기준안</a></li>
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+                <li><a class="dropdown-item" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a></li>
+              {% endif %}
+            </ul>
+          </li>
+        {% endif %}
 
         {% if user.grade == 'superuser' %}
-        <li class="nav-item">
-          <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}admin/">관리자</a>
-        </li>
+          <li class="nav-item">
+            <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}admin/">관리자</a>
+          </li>
         {% endif %}
       </ul>
     </div>
