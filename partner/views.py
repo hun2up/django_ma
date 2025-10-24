@@ -9,7 +9,7 @@ from django.db.models import Q
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .models import StructureChange, PartnerChangeLog
+from .models import StructureChange, PartnerChangeLog, StructureDeadline
 
 
 
@@ -133,21 +133,37 @@ def ajax_delete(request):
 @grade_required(['superuser'])
 @transaction.atomic
 def ajax_set_deadline(request):
-    """입력기한 설정"""
+    """입력기한 설정 및 DB 저장"""
     try:
         payload = json.loads(request.body.decode("utf-8"))
         branch = payload.get("branch")
         deadline_day = payload.get("deadline_day")
         month = payload.get("month")
 
-        # 여기서는 단순 로그만 남기지만, 필요 시 별도 Deadline 모델 저장 가능
+        if not all([branch, deadline_day, month]):
+            return JsonResponse({"status": "error", "message": "필수값 누락"}, status=400)
+
+        # ✅ StructureDeadline 테이블에 저장 (없으면 생성)
+        obj, created = StructureDeadline.objects.update_or_create(
+            branch=branch,
+            month=month,
+            defaults={"deadline_day": int(deadline_day)},
+        )
+
+        # ✅ 로그 기록
         PartnerChangeLog.objects.create(
             user=request.user,
             action="set_deadline",
-            detail=f"[{branch}] {month}월 기한 {deadline_day}일 설정"
+            detail=f"[{branch}] {month}월 기한 {deadline_day}일 {'등록' if created else '갱신'}"
         )
-        return JsonResponse({"status": "success", "message": f"{branch} {month}월 기한 {deadline_day}일 설정 완료"})
+
+        return JsonResponse({
+            "status": "success",
+            "message": f"{branch} {month}월 기한 {deadline_day}일 {'등록' if created else '갱신'} 완료"
+        })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
@@ -160,7 +176,7 @@ def ajax_fetch(request):
     """월도 기준으로 편제변경 데이터 조회"""
     month = request.GET.get("month")
     if not month:
-        return JsonResponse({"rows": []})
+        return JsonResponse({"status": "success", "rows": []})
 
     # 기본 쿼리
     qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
@@ -191,8 +207,8 @@ def ajax_fetch(request):
             "rate": obj.rate,
             "chg_rate": obj.chg_rate,
             "memo": obj.memo,
-            "request_date": obj.request_date.strftime("%Y-%m-%d"),
+            "request_date": obj.request_date.strftime("%Y-%m-%d") if obj.request_date else "",
             "process_date": obj.process_date.strftime("%Y-%m-%d") if obj.process_date else "",
         })
 
-    return JsonResponse({"rows": rows})
+    return JsonResponse({"status": "success", "rows": rows})
