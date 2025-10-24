@@ -15,7 +15,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from accounts.models import CustomUser
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
-from board.utils.pdf_utils import generate_request_pdf as build_pdf
+from board.utils.pdf_support_utils import generate_request_support as build_support
+from board.utils.pdf_states_utils import generate_request_states as build_states
 
 # ===========================================
 # 🔧 기본 설정 / 상수
@@ -244,7 +245,7 @@ def post_edit(request, pk):
 
 
 # ===========================================
-# 📘 참고 문서 페이지
+# 📘 업무요청서 작성 페이지
 # ===========================================
 @login_required
 def support_form(request):
@@ -266,6 +267,28 @@ def support_form(request):
         "contracts": contracts,
     })
 
+# ===========================================
+# 📘 소명서 작성 페이지
+# ===========================================
+@login_required
+def states_form(request):
+    """업무요청서 작성 페이지"""
+    fields = [
+        ("성명", "target_name_"),
+        ("사번", "target_code_"),
+        ("입사일", "target_join_"),
+        ("퇴사일", "target_leave_"),
+    ]
+    contracts = [
+        ("보험사", "insurer_", 3),
+        ("증권번호", "policy_no_", 3),
+        ("계약자(피보험자)", "contractor_", 3),
+        ("보험료", "premium_", 2),
+    ]
+    return render(request, "board/states_form.html", {
+        "fields": fields,
+        "contracts": contracts,
+    })
 
 # ===========================================
 # 🔍 대상자 검색
@@ -292,10 +315,22 @@ def search_user(request):
 # 🧾 업무요청서 PDF 생성
 # ===========================================
 @login_required
-def generate_request_pdf(request):
+def generate_request_support(request):
     """PDF 생성 요청 → board.utils.pdf_utils 호출"""
-    pdf_response = build_pdf(request)
+    pdf_response = build_support(request)
     if pdf_response is None:
         messages.error(request, "PDF 생성 중 오류가 발생했습니다.")
         return redirect("support_form")
+    return pdf_response
+
+# ===========================================
+# 🧾 소명서 PDF 생성
+# ===========================================
+@login_required
+def generate_request_states(request):
+    """PDF 생성 요청 → board.utils.pdf_utils 호출"""
+    pdf_response = build_states(request)
+    if pdf_response is None:
+        messages.error(request, "PDF 생성 중 오류가 발생했습니다.")
+        return redirect("states_form")
     return pdf_response

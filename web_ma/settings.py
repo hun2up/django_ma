@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'commission',
     'dash',
+    'partner',
 ]
 
 MIDDLEWARE = [

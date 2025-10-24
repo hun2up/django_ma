@@ -41,6 +41,7 @@ urlpatterns = [
     path('board/', include('board.urls')),
     path('commission/', include('commission.urls')),
     path('dash/', include('dash.urls')),
+    path('partner/', include('partner.urls')),
 ]
 
 # 개발 모드(DEBUG=True)에서만 업로드 파일 서빙

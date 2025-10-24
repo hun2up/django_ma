@@ -1,7 +1,7 @@
 # ===========================================
-# 📂 board/utils/pdf_utils.py
+# 📂 board/utils/pdf_states_utils.py
 # ===========================================
-# 업무요청서 PDF 생성 유틸 — ReportLab 기반
+# FA 소명서 PDF 생성 (대상자 없음)
 # ===========================================
 
 import os
@@ -17,9 +17,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from accounts.models import CustomUser
 
-
 # -------------------------------------------
-# ✅ 상수 정의 (PDF 설정)
+# ✅ 공통 설정
 # -------------------------------------------
 PDF_CONFIG = {
     "FONT_NAME": "NotoSansKR",
@@ -30,12 +29,10 @@ PDF_CONFIG = {
 
 logger = logging.getLogger("board.access")
 
-
 # -------------------------------------------
-# ✅ Table 공통 스타일
+# ✅ 공통 테이블 스타일
 # -------------------------------------------
 def base_table_style(font_name=PDF_CONFIG["FONT_NAME"]):
-    """기본 테이블 스타일 생성"""
     return TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
@@ -44,18 +41,12 @@ def base_table_style(font_name=PDF_CONFIG["FONT_NAME"]):
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ])
 
-
 # -------------------------------------------
-# ✅ PDF 생성 메인 함수
+# ✅ 소명서 PDF 생성
 # -------------------------------------------
-def generate_request_pdf(request):
-    """
-    [유틸함수] 업무요청서 PDF 생성
-    - 요청자, 대상자, 계약사항, 요청내용 포함
-    - logo + 한글폰트 + 자동 서명 표시
-    """
+def generate_request_states(request):
     if request.method != "POST":
-        return None  # 뷰 단에서 redirect 처리
+        return None
 
     # 🔸 폰트 등록
     if PDF_CONFIG["FONT_NAME"] not in pdfmetrics.getRegisteredFontNames():
@@ -63,7 +54,7 @@ def generate_request_pdf(request):
 
     # 🔸 기본 설정
     response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="업무요청서.pdf"'
+    response["Content-Disposition"] = 'attachment; filename="소명서.pdf"'
     doc = SimpleDocTemplate(response, pagesize=A4, **PDF_CONFIG["MARGINS"])
 
     styles = getSampleStyleSheet()
@@ -80,7 +71,7 @@ def generate_request_pdf(request):
     if os.path.exists(logo_path):
         elements += [Image(logo_path, width=140, height=20, hAlign="LEFT")]
     elements += [
-        Paragraph("<b>파트너 업무요청서</b>", styles["TitleBold"]),
+        Paragraph("<b>FA 소명서</b>", styles["TitleBold"]),
         Paragraph(f"요청일자 : {date.today():%Y-%m-%d}", styles["RightAlign"]),
         Spacer(1, 15),
     ]
@@ -99,26 +90,6 @@ def generate_request_pdf(request):
     table1 = Table(requester_data, colWidths=[120, 100, 140, 140])
     table1.setStyle(base_table_style())
     elements += [Paragraph("요청자", styles["Korean"]), table1, Spacer(1, 20)]
-
-    # -------------------------------------------
-    # 🎯 대상자 정보
-    # -------------------------------------------
-    target_rows = [["성명", "사번", "입사일", "퇴사일"]]
-    for i in range(1, 6):
-        row = [
-            request.POST.get(f"target_name_{i}", "-"),
-            request.POST.get(f"target_code_{i}", "-"),
-            request.POST.get(f"target_join_{i}", "-"),
-            request.POST.get(f"target_leave_{i}", "-"),
-        ]
-        if any(v.strip("-") for v in row):
-            target_rows.append(row)
-    if len(target_rows) == 1:
-        target_rows.append(["-", "-", "-", "-"])
-
-    table2 = Table(target_rows, colWidths=[120, 100, 140, 140])
-    table2.setStyle(base_table_style())
-    elements += [Paragraph("대상자", styles["Korean"]), table2, Spacer(1, 20)]
 
     # -------------------------------------------
     # 💼 계약사항
@@ -146,24 +117,26 @@ def generate_request_pdf(request):
     # 📝 요청 내용
     # -------------------------------------------
     title = request.POST.get("title", "-")
-    content = request.POST.get("content", "-")
+    reason = request.POST.get("reason", "-")
+    solution = request.POST.get("solution", "-")
 
     content_table = [
         ["제목", Paragraph(title, styles["Korean"])],
-        ["내용", Paragraph(content, styles["Korean"])],
+        ["발생경위", Paragraph(reason, styles["Korean"])],
+        ["개선방안", Paragraph(solution, styles["Korean"])],
     ]
-    table4 = Table(content_table, colWidths=[60, 440], minRowHeights=[20, 200])
+    table4 = Table(content_table, colWidths=[60, 440], minRowHeights=[20, 150, 150])
     table4.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), PDF_CONFIG["FONT_NAME"]),
         ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-        ("BACKGROUND", (0, 0), (0, 1), colors.whitesmoke),
+        ("BACKGROUND", (0, 0), (0, 2), colors.whitesmoke),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (0, 1), "CENTER"),   
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
     ]))
     elements += [Paragraph("요청내용", styles["Korean"]), table4, Spacer(1, 25)]
 
     # -------------------------------------------
-    # ✍️ 요청자 서명란 추가
+    # ✍️ 요청자 서명란
     # -------------------------------------------
     requester_sign = f"요청자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
     elements.append(Paragraph(requester_sign, styles["RightAlign"]))
@@ -183,7 +156,7 @@ def generate_request_pdf(request):
     # -------------------------------------------
     try:
         doc.build(elements)
-        logger.info(f"[PDF] 업무요청서 생성 완료 — {request.user.name} ({request.user.branch})")
+        logger.info(f"[PDF] FA 소명서 생성 완료 — {request.user.name} ({request.user.branch})")
     except Exception as e:
         logger.error(f"[PDF 생성 오류] {e}")
         return None
