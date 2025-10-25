@@ -295,3 +295,10 @@ input[name^="premium_"] {
   font-weight: 600;
   box-shadow: 0 0 4px rgba(0,0,0,0.1);
 }
+
+/* 비활성화된 입력 섹션 */
+.disabled-mode {
+  opacity: 0.6;
+  pointer-events: none;
+  filter: grayscale(0.8);
+}

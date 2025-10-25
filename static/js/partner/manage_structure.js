@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadingOverlay.querySelector(".mt-2").textContent = msg;
     loadingOverlay.hidden = false;
   };
+
   const hideLoading = () => (loadingOverlay.hidden = true);
   const alertBox = (msg) => alert(msg);
 
@@ -95,7 +96,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${dataFetchUrl}?month=${ym}`);
       if (!res.ok) throw new Error("데이터 조회 실패");
       const data = await res.json();
-
       renderMainTable(data.rows || []);
     } catch (err) {
       console.error(err);
@@ -162,6 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
         body: JSON.stringify({ rows, month }),
       });
+
       const data = await res.json();
       if (data.status === "success") {
         alertBox(data.message);
@@ -196,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
             headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
             body: JSON.stringify({ id }),
           });
+
           const data = await res.json();
           if (data.status === "success") {
             alertBox("삭제 완료");
@@ -233,8 +235,17 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
         body: JSON.stringify({ branch, deadline_day: day, month }),
       });
+
       const data = await res.json();
       alertBox(data.message || "기한 설정 완료");
+
+      // ✅ JS 상 deadlineDay 즉시 반영
+      if (data.status === "success") {
+        const newDeadline = parseInt(day);
+        window.ManageStructureBoot.deadlineDay = newDeadline;
+        console.log(`✅ 새 기한 반영됨: ${newDeadline}일`);
+        checkInputAvailability(); // 즉시 섹션 활성화 여부 갱신
+      }
     } catch (err) {
       console.error(err);
       alertBox("기한 설정 중 오류가 발생했습니다.");
@@ -248,9 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================================================= */
   function getCSRFToken() {
     const name = "csrftoken";
-    const cookieValue = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith(name + "="));
+    const cookieValue = document.cookie.split("; ").find((row) => row.startsWith(name + "="));
     return cookieValue ? cookieValue.split("=")[1] : "";
   }
 
@@ -265,54 +274,60 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* =======================================================
-     📌 8. 입력 가능 여부 제어 + 기본 기한(10일) 적용
+     📌 8. 입력 가능 여부 제어 + 기본 기한(10일) 적용 (개선버전)
   ======================================================= */
-  const today = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const selectedYear = parseInt(yearSelect.value);
-  const selectedMonth = parseInt(monthSelect.value);
-  const deadlineDay = window.ManageStructureBoot.deadlineDay;
-
-  // ✅ 기한 없으면 기본 10일 적용
-  const effectiveDeadline = deadlineDay || 10;
-
-  // ✅ 안내문 표시
-  if (!deadlineDay) {
-    console.warn("⚠️ 기한이 설정되지 않아 기본 10일로 적용됩니다.");
-    const hintBox = document.getElementById("periodHints");
-    if (hintBox) {
-      const note = document.createElement("div");
-      note.className = "text-warning small mt-1";
-      note.textContent = "⚠️ 기한이 설정되지 않아 기본 10일로 적용됩니다.";
-      hintBox.appendChild(note);
-    }
-  }
-
-  // ✅ 입력 가능 여부 판단
   function checkInputAvailability() {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+
+    if (!yearSelect.value || !monthSelect.value) return;
+
+    const selectedYear = parseInt(yearSelect.value);
+    const selectedMonth = parseInt(monthSelect.value);
+    const deadlineDay = window.ManageStructureBoot.deadlineDay || 10;
+    const effectiveDeadline = parseInt(deadlineDay);
+
     inputSection.classList.remove("disabled-mode");
-    inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = false);
+    inputSection.querySelectorAll("input, select, button").forEach((el) => (el.disabled = false));
 
-    const isPastMonth =
-      selectedYear < currentYear ||
-      (selectedYear === currentYear && selectedMonth < currentMonth);
+    let reason = "";
 
-    const isDeadlineOver =
-      selectedYear === currentYear &&
-      selectedMonth === currentMonth &&
-      today.getDate() > effectiveDeadline;
-
-    if (isPastMonth || isDeadlineOver) {
-      inputSection.classList.add("disabled-mode");
-      inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = true);
+    if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      reason = "과거월은 입력이 불가능합니다.";
+    } else if (selectedYear === currentYear && selectedMonth === currentMonth && today.getDate() > effectiveDeadline) {
+      reason = `입력기한(${effectiveDeadline}일)이 지났습니다.`;
+    } else {
+      const futureUntil = window.ManageStructureBoot.futureUntil || "";
+      if (futureUntil) {
+        const [limitYear, limitMonth] = futureUntil.split("-").map(Number);
+        if (selectedYear > limitYear || (selectedYear === limitYear && selectedMonth > limitMonth)) {
+          reason = "미래 선택은 허용 범위를 초과했습니다.";
+        }
+      }
     }
+
+    if (reason) {
+      inputSection.classList.add("disabled-mode");
+      inputSection.querySelectorAll("input, select, button").forEach((el) => (el.disabled = true));
+      let note = document.getElementById("inputDisabledNote");
+      if (!note) {
+        note = document.createElement("div");
+        note.id = "inputDisabledNote";
+        note.className = "text-muted small mt-2";
+        inputSection.parentNode.insertBefore(note, inputSection.nextSibling);
+      }
+      note.textContent = `⚠️ ${reason}`;
+    } else {
+      const note = document.getElementById("inputDisabledNote");
+      if (note) note.remove();
+    }
+
+    console.log(`입력 가능 상태: ${!reason}, 사유: ${reason || "정상"}`);
   }
 
-  // 초기 및 변경 시 체크
-  checkInputAvailability();
+  // ✅ 모든 드롭다운 옵션 생성이 끝난 후 실행되도록 지연
+  setTimeout(checkInputAvailability, 200);
   yearSelect.addEventListener("change", checkInputAvailability);
   monthSelect.addEventListener("change", checkInputAvailability);
-
-  console.log("✅ Manage Structure JS Loaded with deadline rules");
 });
