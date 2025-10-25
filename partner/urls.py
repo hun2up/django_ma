@@ -5,10 +5,12 @@ from . import views
 app_name = "partner"
 
 urlpatterns = [
-    path('', views.redirect_to_calculate, name='cacluate_home'),  # 기본 접속 시 매출 대시보드로 이동
-    path('calculate/', views.manage_calculate, name='manage_calculate'),  # 매출
-    path('grades/', views.manage_grades, name='manage_grades'), # 리쿠르팅
+    path('', views.redirect_to_calculate, name='cacluate_home'),
+    path('calculate/', views.manage_calculate, name='manage_calculate'),
+    path('grades/', views.manage_grades, name='manage_grades'),
+    path("grades/upload/", views.upload_grades_excel, name="upload_grades_excel"),
     path("charts/", views.manage_charts, name="manage_charts"),
+    path("rate/", views.manage_charts, name="manage_rate"),
     path("api/save/", views.ajax_save, name="ajax_save"),
     path("api/delete/", views.ajax_delete, name="ajax_delete"),
     path("api/set-deadline/", views.ajax_set_deadline, name="ajax_set_deadline"),
