@@ -7,6 +7,7 @@ import pandas as pd
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -14,6 +15,7 @@ from django.views.decorators.http import require_POST
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp
+
 
 # ------------------------------------------------------------
 # 공용 상수
@@ -243,25 +245,50 @@ def ajax_fetch(request):
 
 
 # ------------------------------------------------------------
-# 📘 6. 권한관리 페이지
+# 📘 6. 권한관리 페이지 (상단: subadmin / 하단: 전체 사용자)
 # ------------------------------------------------------------
 @login_required
 def manage_grades(request):
+    """
+    권한관리 페이지
+    - superuser: 선택한 부서(part) or 전체 조회
+    - main_admin: 자신의 지점(branch) 기준으로만 조회
+    - sub_admin 이하 등급은 접근 제한
+    """
     user = request.user
     selected_part = request.GET.get("part", "").strip() or None
     parts = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"]
 
-    # ✅ 조회 기준 부서 결정
+    # ✅ 1️⃣ 조회 기준 구분
     if user.grade == "superuser":
-        # superuser가 부서를 선택하지 않은 경우 → 전체 조회
+        # superuser: 전체 or 선택한 부서만
         base_users = CustomUser.objects.filter(grade="sub_admin")
         if selected_part:
             base_users = base_users.filter(part=selected_part)
-    else:
-        # main_admin은 본인 부서(part)만
-        base_users = CustomUser.objects.filter(part=user.part, grade="sub_admin")
 
-    # ✅ SubAdminTemp 동기화 (데이터 존재시만)
+    elif user.grade == "main_admin":
+        # main_admin: 자신의 지점(branch) 기준 sub_admin만
+        if not user.branch:
+            return render(request, "partner/manage_grades.html", {
+                "parts": parts,
+                "selected_part": selected_part,
+                "users_subadmin": [],
+                "users_all": [],
+                "error_message": "지점 정보가 등록되지 않아 조회할 수 없습니다.",
+            })
+        base_users = CustomUser.objects.filter(branch=user.branch, grade="sub_admin")
+
+    else:
+        # 기타 권한은 접근 제한
+        return render(request, "partner/manage_grades.html", {
+            "parts": parts,
+            "selected_part": selected_part,
+            "users_subadmin": [],
+            "users_all": [],
+            "error_message": "접근 권한이 없습니다.",
+        })
+
+    # ✅ 2️⃣ SubAdminTemp 동기화
     for cu in base_users:
         SubAdminTemp.objects.get_or_create(
             user=cu,
@@ -269,53 +296,90 @@ def manage_grades(request):
                 "name": cu.name,
                 "part": cu.part,
                 "branch": cu.branch,
-                "grade": cu.grade,
             },
         )
 
-    # ✅ SubAdminTemp 조회 (데이터 없을 수 있음)
-    if selected_part:
-        users = SubAdminTemp.objects.filter(part=selected_part)
-    elif user.grade == "superuser":
-        users = SubAdminTemp.objects.all()
+    # ✅ 3️⃣ 상단: 중간관리자(SubAdminTemp)
+    if user.grade == "superuser":
+        users_subadmin = (
+            SubAdminTemp.objects.filter(part=selected_part)
+            if selected_part else SubAdminTemp.objects.all()
+        )
+    elif user.grade == "main_admin":
+        users_subadmin = SubAdminTemp.objects.filter(branch=user.branch)
     else:
-        users = SubAdminTemp.objects.filter(part=user.part)
+        users_subadmin = SubAdminTemp.objects.none()
 
-    # ✅ 템플릿에 메시지 전달용
-    empty_message = (
-        "추가된 중간관리자가 없습니다. 중간관리자 추가는 부서장에게 문의해주세요."
-        if not users.exists()
-        else ""
+    empty_message_subadmin = ""
+    if not users_subadmin.exists():
+        empty_message_subadmin = (
+            "추가된 중간관리자가 없습니다.\n"
+            "중간관리자 추가는 부서장에게 문의해주세요."
+        )
+
+    # ✅ 4️⃣ 하단: 전체 사용자 목록 (CustomUser + SubAdminTemp join)
+    from django.db.models import Prefetch
+
+    # SubAdminTemp 전체 미리 로드
+    subadmin_qs = SubAdminTemp.objects.all()
+
+    # 사용자 기본 쿼리
+    if user.grade == "superuser":
+        base_all = CustomUser.objects.all()
+        if selected_part:
+            base_all = base_all.filter(part=selected_part)
+    elif user.grade == "main_admin":
+        base_all = CustomUser.objects.filter(branch=user.branch)
+    else:
+        base_all = CustomUser.objects.none()
+
+    # ✅ Prefetch + 매핑 처리
+    users_all = (
+        base_all
+        .prefetch_related(Prefetch("subadmin_detail", queryset=subadmin_qs))
+        .order_by("name")
     )
 
+    # ✅ 5️⃣ 렌더링
     return render(request, "partner/manage_grades.html", {
         "parts": parts,
         "selected_part": selected_part,
-        "users": users,
-        "empty_message": empty_message,
+        "users_subadmin": users_subadmin,
+        "users_all": users_all,
+        "empty_message_subadmin": empty_message_subadmin,
     })
 
 
 # ------------------------------------------------------------
-# 📘 7. 권한관리 — 엑셀 업로드 처리
+# 📘 7. 권한관리 — 엑셀 업로드 처리 (grade 비노출)
 # ------------------------------------------------------------
 @transaction.atomic
 @login_required
 def upload_grades_excel(request):
-    """엑셀 업로드를 통한 권한관리 테이블 업데이트"""
+    """
+    엑셀 업로드를 통한 SubAdminTemp 업데이트
+    - '사번', '팀A', '팀B', '팀C', '직급' 컬럼 사용
+    - '등급' 컬럼이 있더라도 무시 (비노출 정책)
+    """
     if request.method == "POST" and request.FILES.get("excel_file"):
         file = request.FILES["excel_file"]
 
         try:
+            import pandas as pd
             df = pd.read_excel(file).fillna("")
-            required_cols = ["사번", "팀A", "팀B", "팀C", "직급", "등급"]
 
+            # ✅ 필수 컬럼 검증
+            required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
             for col in required_cols:
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
                     return redirect("partner:manage_grades")
 
-            updated, created = 0, 0
+            # ✅ 불필요한 '등급' 컬럼은 제거 (있어도 무시)
+            if "등급" in df.columns:
+                df = df.drop(columns=["등급"])
+
+            created, updated = 0, 0
             for _, row in df.iterrows():
                 user_id = str(row["사번"]).strip()
                 cu = CustomUser.objects.filter(id=user_id, grade="sub_admin").first()
@@ -329,7 +393,7 @@ def upload_grades_excel(request):
                         "team_b": row["팀B"],
                         "team_c": row["팀C"],
                         "position": row["직급"],
-                        "level": row["등급"],
+                        # level은 grade와 독립 → 선택적으로 나중 확장 가능
                     },
                 )
                 if is_created:
@@ -345,3 +409,40 @@ def upload_grades_excel(request):
         messages.warning(request, "엑셀 파일을 선택하세요.")
 
     return redirect("partner:manage_grades")
+
+
+# ------------------------------------------------------------
+# 📘 8. 권한관리 — 팀A/B/C 실시간 수정
+# ------------------------------------------------------------
+@require_POST
+@login_required
+def ajax_update_team(request):
+    """팀A/B/C 인라인 수정 처리 (AJAX)"""
+    try:
+        user_id = request.POST.get("user_id")
+        field = request.POST.get("field")
+        value = request.POST.get("value", "").strip()
+
+        if field not in ["team_a", "team_b", "team_c"]:
+            return JsonResponse({"success": False, "error": "Invalid field"}, status=400)
+
+        cu = CustomUser.objects.filter(id=user_id).first()
+        if not cu:
+            return JsonResponse({"success": False, "error": "User not found"}, status=404)
+
+        obj, _ = SubAdminTemp.objects.get_or_create(
+            user=cu,
+            defaults={
+                "name": cu.name,
+                "part": cu.part,
+                "branch": cu.branch,
+            },
+        )
+        setattr(obj, field, value)
+        obj.save(update_fields=[field, "updated_at"])
+
+        return JsonResponse({"success": True, "message": f"{field} 업데이트 완료"})
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
