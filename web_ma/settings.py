@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 # django_ma > web_ma > settings.py
 import os
+import logging
 from pathlib import Path
 import dj_database_url
 from decouple import config
@@ -225,6 +226,8 @@ LOGGING = {
         },
     },
 }
+
+logging.getLogger("django.server").setLevel(logging.ERROR)
 
 # 파일첨부 기능을 위한 media url 설정
 MEDIA_URL = '/media/'
