@@ -3,7 +3,7 @@
 {% block title %}권한관리{% endblock %}
 
 {% block content %}
-{% if user.grade not in 'superuser main_admin' %}
+{% if user.grade != 'superuser' and user.grade != 'main_admin' %}
   <div class="alert alert-danger">접근 권한이 없습니다.</div>
 {% endif %}
 
@@ -43,25 +43,15 @@
   </form>
 </div>
 
-<!-- ✅ 상단: 중간관리자(SubAdminTemp) 리스트 -->
+<!-- ✅ 상단: 중간관리자 -->
 <div class="card shadow p-3 border-0 rounded-4 mb-5">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h5 class="fw-bold mb-0" style="color:#003f7d;">중간관리자 명단</h5>
-  </div>
-
+  <h5 class="fw-bold mb-3" style="color:#003f7d;">중간관리자 명단</h5>
   <div class="table-responsive">
-    <table class="table table-striped align-middle datatable" id="subAdminTable">
+    <table class="table table-striped align-middle" id="subAdminTable">
       <thead class="table-light">
         <tr>
-          <th>부서</th>
-          <th>지점</th>
-          <th>성명</th>
-          <th>사번</th>
-          <th>직급</th>
-          <th>팀A</th>
-          <th>팀B</th>
-          <th>팀C</th>
-          <th style="display:none;">등급</th>
+          <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
+          <th>팀A</th><th>팀B</th><th>팀C</th>
         </tr>
       </thead>
       <tbody>
@@ -75,64 +65,86 @@
           <td class="editable" data-field="team_a">{{ u.team_a|default:"-" }}</td>
           <td class="editable" data-field="team_b">{{ u.team_b|default:"-" }}</td>
           <td class="editable" data-field="team_c">{{ u.team_c|default:"-" }}</td>
-          <td style="display:none;">{{ u.level|default:"-" }}</td>
         </tr>
         {% empty %}
-        <tr>
-          <td colspan="8" class="text-center text-muted py-3" style="white-space: pre-line;">
-            {{ empty_message_subadmin }}
-          </td>
-        </tr>
+        <tr><td colspan="8" class="text-center text-muted py-3" style="white-space: pre-line;">{{ empty_message_subadmin }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- ✅ 하단: 전체 사용자 목록 (CustomUser) -->
+<!-- ✅ 하단: 전체 사용자 (Ajax 서버사이드) -->
 <div class="card shadow p-3 border-0 rounded-4">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h5 class="fw-bold mb-0" style="color:#003f7d;">전체 사용자 목록</h5>
-  </div>
-
+  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체 사용자 목록</h5>
   <div class="table-responsive">
-    <table class="table table-striped align-middle datatable" id="allUserTable">
+    <table id="allUserTable" class="table table-striped align-middle" data-ajax-url="{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}">
       <thead class="table-light">
         <tr>
-          <th>부서</th>
-          <th>지점</th>
-          <th>성명</th>
-          <th>사번</th>
-          <th>직급</th>
-          <th>팀A</th>
-          <th>팀B</th>
-          <th>팀C</th>
-          <th style="display:none;">등급</th>
+          <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
+          <th>팀A</th><th>팀B</th><th>팀C</th>
         </tr>
       </thead>
-      <tbody>
-        {% for u in users_all %}
-        <tr data-user-id="{{ u.id }}">
-          <td>{{ u.part|default:"-" }}</td>
-          <td>{{ u.branch|default:"-" }}</td>
-          <td>{{ u.name|default:"-" }}</td>
-          <td>{{ u.id|default:"-" }}</td>
-          <td>{{ u.position|default:"-" }}</td>
-          <td class="editable" data-field="team_a">{{ u.team_a|default:"-" }}</td>
-          <td class="editable" data-field="team_b">{{ u.team_b|default:"-" }}</td>
-          <td class="editable" data-field="team_c">{{ u.team_c|default:"-" }}</td>
-          <td style="display:none;">{{ u.level|default:"-" }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="8" class="text-center text-muted py-3">등록된 사용자가 없습니다.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
     </table>
   </div>
 </div>
 
-<!-- ✅ JS 연결 -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // ✅ 부서 선택 시 자동 조회
+  document.getElementById('partSelect')?.addEventListener('change', () => {
+    document.getElementById('controlsForm').submit();
+  });
+
+  // ✅ Ajax DataTable 초기화
+  if (!$.fn.DataTable.isDataTable('#allUserTable')) {
+    $("#allUserTable").DataTable({
+      serverSide: true,
+      processing: true,
+      ajax: {
+        url: "{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}",
+        type: "GET",
+      },
+      columns: [
+        { data: "part" },      // 부서
+        { data: "branch" },    // 지점
+        { data: "name" },      // 성명
+        { data: "user_id" },   // 사번
+        { data: "position" },  // 직급
+        { data: "team_a" },    // 팀A
+        { data: "team_b" },    // 팀B
+        { data: "team_c" },    // 팀C
+      ],
+      pageLength: 10,
+      lengthMenu: [[10, 25, 50, 100], ["10개", "25개", "50개", "100개"]],
+      language: {
+        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
+        lengthMenu: "페이지당 사용자수 _MENU_",
+        search: "검색:",
+        processing: "로딩 중...",
+      },
+      dom: `
+        <'d-flex justify-content-between align-items-center mb-2'
+          <'d-flex align-items-center gap-2'lB>
+          f
+        >rtip
+      `,
+      buttons: [
+        {
+          extend: "excel",
+          text: "<i class='bi bi-download'></i> 엑셀 다운로드",
+          className: "btn btn-success btn-sm",
+          exportOptions: { columns: ':visible' },
+        },
+      ],
+    });
+  }
+});
+</script>
+
 <script src="{% static 'js/partner/manage_grades.js' %}"></script>
 {% endblock %}

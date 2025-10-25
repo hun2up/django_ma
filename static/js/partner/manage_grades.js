@@ -6,7 +6,7 @@
  * 1. DataTables 초기화 및 중복 방지
  * 2. 엑셀 업로드 자동 처리
  * 3. 인라인 수정 (팀A/B/C) — 양방향 실시간 동기화
- * 4. DataTables DOM 재구성에도 이벤트 유지 (위임 방식)
+ * 4. DataTables Ajax 모드에서도 이벤트 유지
  * ---------------------------------------------------
  */
 
@@ -17,67 +17,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('excelUploadForm');
 
   /* =======================================================
-   ⚙️ 0. DataTables 경고 무시
+     ⚙️ 0. DataTables 경고 무시
   ======================================================= */
   $.fn.dataTable.ext.errMode = 'none';
 
   /* =======================================================
-   📘 1. DataTables 초기화 함수
+     📘 1. 엑셀 업로드 자동 처리
   ======================================================= */
-  const initDataTable = (table) => {
-    if ($.fn.dataTable.isDataTable(table)) {
-      $(table).DataTable().clear().destroy();
-    }
-
-    $(table).DataTable({
-      responsive: true,
-      autoWidth: false,
-      pageLength: 10,
-      lengthMenu: [
-        [10, 25, 50, 100, -1],
-        ['10개', '25개', '50개', '100개', '전체'],
-      ],
-      order: [],
-      language: {
-        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json',
-        lengthMenu: '페이지당 사용자수 _MENU_',
-        search: '검색:',
-      },
-      dom: `
-        <'d-flex justify-content-between align-items-center mb-2'
-          <'d-flex align-items-center gap-2'lB>
-          f
-        >rtip
-      `,
-      buttons: [
-        {
-          extend: 'excel',
-          text: '<i class="bi bi-download"></i> 엑셀 다운로드',
-          className: 'btn btn-success btn-sm',
-          exportOptions: { columns: ':visible' },
-        },
-      ],
-    });
-  };
-  
-
-  /* =======================================================
-   📘 2. 엑셀 업로드 자동 처리
-  ======================================================= */
-  const initExcelUpload = () => {
-    if (!uploadBtn || !fileInput || !form) return;
+  if (uploadBtn && fileInput && form) {
     uploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
       if (!fileInput.files.length) return;
       const fileName = fileInput.files[0].name;
-      const confirmMsg = `"${fileName}" 파일을 업로드하여 데이터를 수정/추가하시겠습니까?`;
-      if (confirm(confirmMsg)) form.submit();
-      else fileInput.value = '';
+      if (confirm(`"${fileName}" 파일을 업로드하여 데이터를 수정/추가하시겠습니까?`)) {
+        form.submit();
+      } else {
+        fileInput.value = '';
+      }
     });
-  };
+  }
 
   /* =======================================================
-   📘 3. 인라인 수정 핸들러 (공용)
+     📘 2. 인라인 수정 (공통 함수)
   ======================================================= */
   function handleEditableCell(cell, tableId) {
     const row = cell.closest('tr');
@@ -86,14 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const oldValue = cell.textContent.trim();
 
     if (!userId || cell.querySelector('input')) return;
-
     const input = document.createElement('input');
     input.type = 'text';
     input.value = oldValue === '-' ? '' : oldValue;
     input.className = 'form-control form-control-sm';
-    input.style.minWidth = '100px';
+    input.style.minWidth = '80px';
     input.style.fontSize = '13px';
-
     cell.textContent = '';
     cell.appendChild(input);
     input.focus();
@@ -120,12 +79,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
-            // ✅ 현재 테이블 갱신
             cell.textContent = newValue || '-';
             cell.classList.add('bg-success-subtle');
             setTimeout(() => cell.classList.remove('bg-success-subtle'), 1000);
 
-            // ✅ 상대 테이블 갱신
+            // ✅ 상대 테이블에 즉시 반영
             const otherTableId =
               tableId === 'subAdminTable' ? 'allUserTable' : 'subAdminTable';
             const otherTable = document.getElementById(otherTableId);
@@ -140,10 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (targetCell) {
                   targetCell.textContent = newValue || '-';
                   targetCell.classList.add('bg-info-subtle');
-                  setTimeout(
-                    () => targetCell.classList.remove('bg-info-subtle'),
-                    1000
-                  );
+                  setTimeout(() => targetCell.classList.remove('bg-info-subtle'), 1000);
                 }
               }
             }
@@ -166,19 +121,56 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* =======================================================
-   📘 4. 실행 — DataTables + 이벤트 위임(양쪽 테이블 공통)
+     📘 3. DataTables 초기화
+  ======================================================= */
+  if (!$.fn.DataTable.isDataTable('#allUserTable')) {
+    $('#allUserTable').DataTable({
+      serverSide: true,
+      processing: true,
+      ajax: {
+        url: $('#allUserTable').data('ajax-url'),
+        type: 'GET',
+      },
+      columns: [
+        { data: 'part' },
+        { data: 'branch' },
+        { data: 'name' },
+        { data: 'user_id' },
+        { data: 'position' },
+        {
+          data: 'team_a',
+          render: (d, t, r) => `<td class="editable" data-field="team_a">${d || '-'}</td>`,
+        },
+        {
+          data: 'team_b',
+          render: (d, t, r) => `<td class="editable" data-field="team_b">${d || '-'}</td>`,
+        },
+        {
+          data: 'team_c',
+          render: (d, t, r) => `<td class="editable" data-field="team_c">${d || '-'}</td>`,
+        },
+      ],
+      createdRow: function (row, data) {
+        row.dataset.userId = data.user_id;
+      },
+      pageLength: 10,
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json',
+      },
+    });
+  }
+
+  /* =======================================================
+     📘 4. 인라인 수정 이벤트 (양쪽 테이블 공통)
   ======================================================= */
   tables.forEach((id) => {
     const table = document.getElementById(id);
     if (!table) return;
-    initDataTable(table);
 
-    // ✅ 이벤트 위임으로 인라인 수정 활성화 (DataTables DOM 교체에도 유지됨)
+    // ✅ DataTables Ajax 모드에도 대응하도록 위임
     table.addEventListener('click', (e) => {
       const cell = e.target.closest('td.editable');
       if (cell) handleEditableCell(cell, id);
     });
   });
-
-  initExcelUpload();
 });
