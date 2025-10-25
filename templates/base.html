@@ -65,10 +65,13 @@
           <!-- ✅ 조직관리 -->
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">조직관리</a>
-            <ul class="dropdown-menu" aria-labelledby="boardMenu">
-              <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
+            <ul class="dropdown-menu" aria-labelledby="boardMenu">              
               <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
-              <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+              <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
+              <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+                <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+              {% endif %}
             </ul>
           </li>
         {% endif %}
@@ -134,6 +137,29 @@
 
 <!-- ✅ 공통 UI 동작 (별도 파일) -->
 <script src="{% static 'js/base_ui.js' %}"></script>
+
+<!-- ✅ DataTables + Export Buttons CDN -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="{% static 'css/datatable_custom.css' %}">
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+
+<!-- ✅ Export Buttons -->
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+
+<!-- ✅ 공용 초기화 JS -->
+<script src="{% static 'js/datatable_config.js' %}"></script>
+
+<script src="{% static 'js/excel_upload.js' %}"></script>
 
 <!-- ✅ 페이지별 추가 스크립트 로딩 영역 -->
 {% block extra_js %}{% endblock %}

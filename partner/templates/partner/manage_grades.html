@@ -1,10 +1,91 @@
-<!--django_ma/partner/templates/partner/manage_grades.html-->
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}권한관리{% endblock %}
 
 {% block content %}
-<div class="container text-center mt-5">
-  <h2 class="fw-bold" style="color:#003f7d;">권한관리 페이지</h2>
-  <p class="text-muted mt-3">🚧 제작중입니다 🚧</p>
-</div>
+  {% if user.grade not in 'superuser main_admin' %}
+    <div class="alert alert-danger">접근 권한이 없습니다.</div>
+  {% endif %}
+
+  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">권한관리 페이지</h3>
+
+  {% if user.grade == 'superuser' %}
+  <!-- 🔹 부서 선택 폼 -->
+  <div class="card shadow p-3 border-0 rounded-4 mb-3">
+    <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
+      <div>
+        <label class="form-label mb-1">부서</label>
+        <select name="part" class="form-select form-select-sm" style="width:140px;">
+          <option value="">선택</option>
+          {% for p in parts %}
+            <option value="{{ p }}" {% if selected_part == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label mb-1 d-none d-md-block">&nbsp;</label>
+        <button type="submit" class="btn btn-outline-primary btn-sm px-3">조회</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- 🔹 엑셀 업로드 -->
+  <div class="d-flex justify-content-end mb-3 gap-2">
+    <form id="excelUploadForm" method="post" enctype="multipart/form-data" action="{% url 'partner:upload_grades_excel' %}">
+      {% csrf_token %}
+      <input type="file" name="excel_file" id="excelFile" accept=".xlsx,.xls" hidden>
+      <button type="button" class="btn btn-success btn-sm" id="uploadBtn">
+        <i class="bi bi-file-earmark-excel"></i> 엑셀 업로드
+      </button>
+    </form>
+  </div>
+
+  <!-- 🔹 데이터 테이블 -->
+  <div class="card shadow p-3 border-0 rounded-4">
+    <div class="table-responsive">
+      <table class="table table-striped align-middle" id="mainTable">
+        <thead class="table-light text-center align-middle">
+          <tr>
+            <th>부서</th>
+            <th>지점</th>
+            <th>팀A</th>
+            <th>팀B</th>
+            <th>팀C</th>
+            <th>성명</th>
+            <th>사번</th>
+            <th>직급</th>
+            <th>등급</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if users %}
+            {% for u in users %}
+            <tr>
+              <td>{{ u.part|default:"-" }}</td>
+              <td>{{ u.branch|default:"-" }}</td>
+              <td>{{ u.team_a|default:"-" }}</td>
+              <td>{{ u.team_b|default:"-" }}</td>
+              <td>{{ u.team_c|default:"-" }}</td>
+              <td>{{ u.name|default:"-" }}</td>
+              <td>{{ u.user.id|default:"-" }}</td>
+              <td>{{ u.position|default:"-" }}</td>
+              <td>{{ u.level|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <!-- ✅ 데이터가 없을 때도 9열 유지 (DataTables 경고 방지) -->
+            <tr>
+              <td colspan="9" class="text-center text-muted py-3">
+                {{ empty_message|default:"추가된 중간관리자가 없습니다. 중간관리자 추가는 부서장에게 문의해주세요." }}
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ✅ JS 연결 -->
+  <script src="{% static 'js/partner/manage_grades.js' %}"></script>
 {% endblock %}
