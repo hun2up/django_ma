@@ -1,57 +1,29 @@
 /**
  * manage_grades.js
  * ---------------------------------------------------
- * 권한관리 페이지 전용 스크립트
+ * 권한관리 페이지 전용 스크립트 (상단 SubAdmin + 하단 AllUser)
  * 기능:
- * 1. DataTables 중복 초기화 방지 및 안전 검증
- * 2. 빈 테이블 시 placeholder 자동 추가
- * 3. 열 개수 불일치 방지 및 경고 무시 설정
- * 4. 엑셀 업로드 자동 처리
- * 5. Export 버튼
+ * 1. DataTables 초기화 및 중복 방지
+ * 2. 엑셀 업로드 자동 처리
+ * 3. 인라인 수정 (팀A/B/C) — 양방향 실시간 동기화
+ * 4. DataTables DOM 재구성에도 이벤트 유지 (위임 방식)
  * ---------------------------------------------------
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const tableEl = document.getElementById('mainTable');
+  const tables = ['subAdminTable', 'allUserTable'];
   const uploadBtn = document.getElementById('uploadBtn');
   const fileInput = document.getElementById('excelFile');
   const form = document.getElementById('excelUploadForm');
 
-  /** =======================================================
-   * ⚙️ 0. DataTables 전역 에러 무시 설정
-   * (Incorrect column count 등의 경고창 차단)
-   ======================================================= */
+  /* =======================================================
+   ⚙️ 0. DataTables 경고 무시
+  ======================================================= */
   $.fn.dataTable.ext.errMode = 'none';
 
-  /** =======================================================
-   * 📘 1. 테이블 구조 점검 및 placeholder 삽입
-   ======================================================= */
-  const ensureTableStructure = (table) => {
-    const thCount = table.querySelectorAll('thead th').length;
-    const tbody = table.querySelector('tbody');
-    let firstRow = tbody.querySelector('tr');
-    let tdCount = firstRow ? firstRow.querySelectorAll('td').length : 0;
-
-    // ✅ 빈 tbody이거나 colspan 구조인 경우 안전하게 placeholder 생성
-    if (!firstRow || tdCount < thCount) {
-      console.warn('⚠️ 테이블 데이터 없음 — placeholder 행 자동 생성');
-      tbody.innerHTML = '';
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.setAttribute('colspan', thCount);
-      cell.classList.add('text-center', 'text-muted');
-      cell.innerHTML = '추가된 중간관리자가 없습니다.<br>중간관리자 추가는 부서장에게 문의해주세요.';
-      row.appendChild(cell);
-      tbody.appendChild(row);
-      tdCount = thCount;
-    }
-
-    return { thCount, tdCount };
-  };
-
-  /** =======================================================
-   * 📘 2. DataTables 초기화 (중복 방지)
-   ======================================================= */
+  /* =======================================================
+   📘 1. DataTables 초기화 함수
+  ======================================================= */
   const initDataTable = (table) => {
     if ($.fn.dataTable.isDataTable(table)) {
       $(table).DataTable().clear().destroy();
@@ -60,12 +32,23 @@ document.addEventListener('DOMContentLoaded', () => {
     $(table).DataTable({
       responsive: true,
       autoWidth: false,
-      pageLength: 25,
+      pageLength: 10,
+      lengthMenu: [
+        [10, 25, 50, 100, -1],
+        ['10개', '25개', '50개', '100개', '전체'],
+      ],
       order: [],
       language: {
         url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json',
+        lengthMenu: '페이지당 사용자수 _MENU_',
+        search: '검색:',
       },
-      dom: 'Bfrtip',
+      dom: `
+        <'d-flex justify-content-between align-items-center mb-2'
+          <'d-flex align-items-center gap-2'lB>
+          f
+        >rtip
+      `,
       buttons: [
         {
           extend: 'excel',
@@ -76,10 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
       ],
     });
   };
+  
 
-  /** =======================================================
-   * 📘 3. 엑셀 업로드 자동 처리
-   ======================================================= */
+  /* =======================================================
+   📘 2. 엑셀 업로드 자동 처리
+  ======================================================= */
   const initExcelUpload = () => {
     if (!uploadBtn || !fileInput || !form) return;
     uploadBtn.addEventListener('click', () => fileInput.click());
@@ -92,20 +76,109 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  /** =======================================================
-   * 📘 4. 실행 흐름
-   ======================================================= */
-  if (tableEl) {
-    const { thCount, tdCount } = ensureTableStructure(tableEl);
+  /* =======================================================
+   📘 3. 인라인 수정 핸들러 (공용)
+  ======================================================= */
+  function handleEditableCell(cell, tableId) {
+    const row = cell.closest('tr');
+    const userId = row.dataset.userId;
+    const field = cell.dataset.field;
+    const oldValue = cell.textContent.trim();
 
-    if (thCount !== tdCount) {
-      console.warn(
-        `⚠️ [DataTables Skip] 헤더(${thCount})와 바디(${tdCount}) 열 개수가 다릅니다. DataTables 초기화를 건너뜁니다.`
-      );
-    } else {
-      initDataTable(tableEl);
-    }
+    if (!userId || cell.querySelector('input')) return;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldValue === '-' ? '' : oldValue;
+    input.className = 'form-control form-control-sm';
+    input.style.minWidth = '100px';
+    input.style.fontSize = '13px';
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+
+    const saveChange = () => {
+      const newValue = input.value.trim();
+      if (newValue === oldValue) {
+        cell.textContent = oldValue;
+        return;
+      }
+
+      fetch('/partner/ajax/update-team/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          user_id: userId,
+          field,
+          value: newValue,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            // ✅ 현재 테이블 갱신
+            cell.textContent = newValue || '-';
+            cell.classList.add('bg-success-subtle');
+            setTimeout(() => cell.classList.remove('bg-success-subtle'), 1000);
+
+            // ✅ 상대 테이블 갱신
+            const otherTableId =
+              tableId === 'subAdminTable' ? 'allUserTable' : 'subAdminTable';
+            const otherTable = document.getElementById(otherTableId);
+            if (otherTable) {
+              const targetRow = otherTable.querySelector(
+                `tr[data-user-id="${userId}"]`
+              );
+              if (targetRow) {
+                const targetCell = targetRow.querySelector(
+                  `td[data-field="${field}"]`
+                );
+                if (targetCell) {
+                  targetCell.textContent = newValue || '-';
+                  targetCell.classList.add('bg-info-subtle');
+                  setTimeout(
+                    () => targetCell.classList.remove('bg-info-subtle'),
+                    1000
+                  );
+                }
+              }
+            }
+          } else {
+            alert(`❌ 저장 실패: ${data.error}`);
+            cell.textContent = oldValue;
+          }
+        })
+        .catch((err) => {
+          console.error('서버 오류:', err);
+          cell.textContent = oldValue;
+        });
+    };
+
+    input.addEventListener('blur', saveChange);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') input.blur();
+      if (e.key === 'Escape') cell.textContent = oldValue;
+    });
   }
+
+  /* =======================================================
+   📘 4. 실행 — DataTables + 이벤트 위임(양쪽 테이블 공통)
+  ======================================================= */
+  tables.forEach((id) => {
+    const table = document.getElementById(id);
+    if (!table) return;
+    initDataTable(table);
+
+    // ✅ 이벤트 위임으로 인라인 수정 활성화 (DataTables DOM 교체에도 유지됨)
+    table.addEventListener('click', (e) => {
+      const cell = e.target.closest('td.editable');
+      if (cell) handleEditableCell(cell, id);
+    });
+  });
 
   initExcelUpload();
 });
