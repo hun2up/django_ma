@@ -35,13 +35,32 @@ def manage_calculate(request):
 def manage_charts(request):
     """편제변경 메인 페이지"""
     now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+    month_str = f"{current_year}-{current_month:02d}"
+
+    # ✅ 현재 로그인 사용자의 branch 가져오기
+    user_branch = getattr(request.user, "branch", None)
+
+    # ✅ 현재월 기준 기한 불러오기
+    deadline_day = None
+    if user_branch:
+        deadline_day = (
+            StructureDeadline.objects.filter(branch=user_branch, month=month_str)
+            .values_list("deadline_day", flat=True)
+            .first()
+        )
+
     context = {
-        "current_year": now.year,
-        "current_month": now.month,
-        "available_periods": [f"{now.year}-{m:02d}" for m in range(1, now.month + 1)],  # 예시용
-        "future_select_until": f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01",
+        "current_year": current_year,
+        "current_month": current_month,
+        "available_periods": [f"{current_year}-{m:02d}" for m in range(1, current_month + 1)],
+        "future_select_until": f"{current_year}-{current_month + 1:02d}" if current_month < 12 else f"{current_year + 1}-01",
         "branches": ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"],
-        "deadline_day": None,
+
+        # ✅ 현재월 기준 실제 기한값 전달
+        "deadline_day": deadline_day if deadline_day else None,
+
         "data_fetch_url": "/partner/api/fetch/",
         "data_save_url": "/partner/api/save/",
         "data_delete_url": "/partner/api/delete/",
