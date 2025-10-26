@@ -35,6 +35,8 @@ STATUS_CHOICES = ["확인중", "진행중", "보완요청", "완료", "반려"]
 @grade_required(["superuser"])
 @login_required
 def manage_sign(request):
+    print("--- 현재 사용자 인증 상태:", request.user.is_authenticated)
+    print("--- 현재 사용자 이름:", request.user.name) # 이름도 출력해 보세요
     return render(request, "board/manage_sign.html")
 
 
@@ -260,6 +262,7 @@ def post_edit(request, pk):
 # 📘 업무요청서 작성 페이지
 # ===========================================
 @login_required
+@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
 def support_form(request):
     """업무요청서 작성 페이지"""
     fields = [
@@ -283,6 +286,7 @@ def support_form(request):
 # 📘 소명서 작성 페이지
 # ===========================================
 @login_required
+@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
 def states_form(request):
     """업무요청서 작성 페이지"""
     fields = [
