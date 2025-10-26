@@ -161,20 +161,34 @@ def generate_request_support(request):
     ]))
     elements += [Paragraph("요청내용", styles["Korean"]), table4, Spacer(1, 25)]
 
+    '''
     # -------------------------------------------
     # ✍️ 요청자 서명란 추가
     # -------------------------------------------
     requester_sign = f"요청자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
     elements.append(Paragraph(requester_sign, styles["RightAlign"]))
     elements.append(Spacer(1, 10))
+    '''
 
     # -------------------------------------------
     # ✅ 본부장 확인
     # -------------------------------------------
     admin = CustomUser.objects.filter(branch=request.user.branch, grade="main_admin").first()
     admin_name = admin.name if admin else "(미등록)"
-    confirm_text = f"최상위관리자 확인 : {request.user.branch} 본부장(사업단장)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{admin_name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
-    elements.append(Paragraph(confirm_text, styles["RightAlign"]))
+    confirm_admin = f"최상위관리자 확인 : {request.user.branch} 본부장(사업단장)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{admin_name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
+    elements.append(Paragraph(confirm_admin, styles["RightAlign"]))
+    elements.append(Spacer(1, 20))
+
+    # -------------------------------------------
+    # ✅ 사업부장 자서
+    # -------------------------------------------
+    officer = CustomUser.objects.filter(part=request.user.part, grade="superuser").first()
+    officer_name = officer.name if officer else "(미등록)"
+    confirm_officer = (
+        f"사업부장 자서확인 : {request.user.part} 사업부장&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+        f"{officer_name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
+    )
+    elements.append(Paragraph(confirm_officer, styles["RightAlign"]))
     elements.append(Spacer(1, 20))
 
     # -------------------------------------------
@@ -183,138 +197,6 @@ def generate_request_support(request):
     try:
         doc.build(elements)
         logger.info(f"[PDF] 업무요청서 생성 완료 — {request.user.name} ({request.user.branch})")
-    except Exception as e:
-        logger.error(f"[PDF 생성 오류] {e}")
-        return None
-
-    return response
-
-# ===========================================
-# ✅ 소명서 PDF 생성 메인 함수 (최종 정리본)
-# ===========================================
-def generate_request_states(request):
-    """
-    [유틸함수] 소명서 PDF 생성
-    - 요청자, 계약사항, 요청내용(제목·발생경위·개선방안) 포함
-    - logo + 한글폰트 + 자동 서명 표시
-    - 대상자 정보(요청대상) 섹션 완전 제거됨
-    """
-    if request.method != "POST":
-        return None  # 뷰 단에서 redirect 처리
-
-    # 🔸 폰트 등록
-    if PDF_CONFIG["FONT_NAME"] not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(PDF_CONFIG["FONT_NAME"], PDF_CONFIG["FONT_PATH"]))
-
-    # 🔸 기본 설정
-    response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="소명서.pdf"'
-    doc = SimpleDocTemplate(response, pagesize=A4, **PDF_CONFIG["MARGINS"])
-
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="Korean", fontName=PDF_CONFIG["FONT_NAME"], fontSize=11, leading=16))
-    styles.add(ParagraphStyle(name="TitleBold", fontName=PDF_CONFIG["FONT_NAME"], fontSize=18, alignment=1, spaceAfter=10))
-    styles.add(ParagraphStyle(name="RightAlign", fontName=PDF_CONFIG["FONT_NAME"], fontSize=11, alignment=2))
-
-    elements = []
-
-    # -------------------------------------------
-    # 🏢 로고 + 제목
-    # -------------------------------------------
-    logo_path = PDF_CONFIG["LOGO_PATH"]
-    if os.path.exists(logo_path):
-        elements.append(Image(logo_path, width=140, height=20, hAlign="LEFT"))
-
-    elements += [
-        Paragraph("<b>FA 소명서</b>", styles["TitleBold"]),
-        Paragraph(f"요청일자 : {date.today():%Y-%m-%d}", styles["RightAlign"]),
-        Spacer(1, 15),
-    ]
-
-    # -------------------------------------------
-    # 👤 요청자 정보
-    # -------------------------------------------
-    enter = getattr(request.user, "enter", "")
-    if hasattr(enter, "strftime"):
-        enter = enter.strftime("%Y-%m-%d")
-
-    requester_data = [
-        ["성명", "사번", "소속", "입사일"],
-        [request.user.name, str(request.user.id), request.user.branch, enter or "-"],
-    ]
-    table1 = Table(requester_data, colWidths=[120, 100, 140, 140])
-    table1.setStyle(base_table_style())
-    elements += [Paragraph("요청자", styles["Korean"]), table1, Spacer(1, 20)]
-
-    # -------------------------------------------
-    # 💼 계약사항
-    # -------------------------------------------
-    contract_rows = [["보험사", "증권번호", "계약자(피보험자)", "보험료"]]
-    for i in range(1, 6):
-        premium = request.POST.get(f"premium_{i}", "").replace(",", "")
-        premium_fmt = f"{int(premium):,}" if premium.isdigit() else premium
-        row = [
-            request.POST.get(f"insurer_{i}", "-"),
-            request.POST.get(f"policy_no_{i}", "-"),
-            request.POST.get(f"contractor_{i}", "-"),
-            premium_fmt or "-",
-        ]
-        if any(v.strip("-") for v in row):
-            contract_rows.append(row)
-    if len(contract_rows) == 1:
-        contract_rows.append(["-", "-", "-", "-"])
-
-    table3 = Table(contract_rows, colWidths=[120, 140, 140, 100])
-    table3.setStyle(base_table_style())
-    elements += [Paragraph("계약사항", styles["Korean"]), table3, Spacer(1, 20)]
-
-    # -------------------------------------------
-    # 📝 요청 내용
-    # -------------------------------------------
-    title = request.POST.get("title", "-")
-    reason = request.POST.get("reason", "-")
-    solution = request.POST.get("solution", "-")
-
-    content_table = [
-        ["제목", Paragraph(title, styles["Korean"])],
-        ["발생경위", Paragraph(reason, styles["Korean"])],
-        ["개선방안", Paragraph(solution, styles["Korean"])],
-    ]
-    table4 = Table(content_table, colWidths=[60, 440], minRowHeights=[20, 200])
-    table4.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), PDF_CONFIG["FONT_NAME"]),
-        ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
-        ("BACKGROUND", (0, 0), (0, 1), colors.whitesmoke),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (0, 1), "CENTER"),
-    ]))
-    elements += [Paragraph("요청내용", styles["Korean"]), table4, Spacer(1, 25)]
-
-    # -------------------------------------------
-    # ✍️ 요청자 서명란 추가
-    # -------------------------------------------
-    requester_sign = f"요청자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
-    elements.append(Paragraph(requester_sign, styles["RightAlign"]))
-    elements.append(Spacer(1, 10))
-
-    # -------------------------------------------
-    # ✅ 본부장 확인
-    # -------------------------------------------
-    admin = CustomUser.objects.filter(branch=request.user.branch, grade="main_admin").first()
-    admin_name = admin.name if admin else "(미등록)"
-    confirm_text = (
-        f"최상위관리자 확인 : {request.user.branch} 본부장(사업단장)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-        f"{admin_name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
-    )
-    elements.append(Paragraph(confirm_text, styles["RightAlign"]))
-    elements.append(Spacer(1, 20))
-
-    # -------------------------------------------
-    # 🔧 PDF 빌드
-    # -------------------------------------------
-    try:
-        doc.build(elements)
-        logger.info(f"[PDF] FA 소명서 생성 완료 — {request.user.name} ({request.user.branch})")
     except Exception as e:
         logger.error(f"[PDF 생성 오류] {e}")
         return None

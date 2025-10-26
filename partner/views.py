@@ -251,6 +251,7 @@ def ajax_fetch(request):
 # ------------------------------------------------------------
 # partner/views.py
 @login_required
+@grade_required(["superuser", "main_admin"])
 def manage_grades(request):
     """권한관리 페이지"""
     user = request.user
@@ -266,6 +267,7 @@ def manage_grades(request):
         else:
             subadmin_qs = SubAdminTemp.objects.none()  # 선택 전엔 빈 상태
     elif user.grade == "main_admin":
+        selected_part = user.branch
         subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch, user__in=base_user_qs)
     else:
         subadmin_qs = SubAdminTemp.objects.none()
@@ -295,7 +297,6 @@ def manage_grades(request):
         "empty_message_subadmin": empty_message_subadmin,
         "levels": LEVELS,
     })
-
 
 
 # ------------------------------------------------------------

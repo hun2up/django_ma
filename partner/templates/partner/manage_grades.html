@@ -40,7 +40,10 @@
 
 <!-- ✅ 상단: 중간관리자 명단 -->
 <div class="card shadow p-3 border-0 rounded-4 mb-5">
-  <h5 class="fw-bold mb-3" style="color:#003f7d;">중간관리자 명단</h5>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0" style="color:#003f7d;">중간관리자 명단</h5>
+    <span class="text-muted small" style="white-space: nowrap;">※ 중간관리자 추가/제외는 부서장에게 문의바랍니다.</span>
+  </div>
   <div class="table-responsive">
     <table class="table table-striped align-middle" id="subAdminTable">
       <thead class="table-light">
@@ -82,7 +85,7 @@
 
 <!-- ✅ 하단: 전체 사용자 목록 -->
 <div class="card shadow p-3 border-0 rounded-4">
-  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체사용자 목록</h5>
+  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체설계사 명단</h5>
   <div class="table-responsive">
     <table id="allUserTable" class="table table-striped align-middle"
       data-ajax-url="{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}">
