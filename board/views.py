@@ -12,11 +12,13 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 
+from accounts.decorators import grade_required
 from accounts.models import CustomUser
 from .forms import PostForm, CommentForm
 from .models import Post, Attachment, Comment
 from board.utils.pdf_support_utils import generate_request_support as build_support
 from board.utils.pdf_states_utils import generate_request_states as build_states
+
 
 # ===========================================
 # 🔧 기본 설정 / 상수
@@ -30,6 +32,7 @@ STATUS_CHOICES = ["확인중", "진행중", "보완요청", "완료", "반려"]
 # ===========================================
 # 📋 결재관리
 # ===========================================
+@grade_required(["superuser"])
 @login_required
 def manage_sign(request):
     return render(request, "board/manage_sign.html")

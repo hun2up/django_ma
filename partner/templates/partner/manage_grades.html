@@ -46,18 +46,25 @@
       <thead class="table-light">
         <tr>
           <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
-          <th>팀A</th><th>팀B</th><th>팀C</th>
+          <th>레벨</th><th>팀A</th><th>팀B</th><th>팀C</th>
         </tr>
       </thead>
       <tbody>
         {% if selected_part %}
           {% for u in users_subadmin %}
-          <tr>
+          <tr data-user-id="{{ u.user.id }}">
             <td>{{ u.part|default:"-" }}</td>
             <td>{{ u.branch|default:"-" }}</td>
             <td>{{ u.name|default:"-" }}</td>
             <td>{{ u.user.id|default:"-" }}</td>
             <td>{{ u.position|default:"-" }}</td>
+            <td>
+              <select class="form-select form-select-sm level-select">
+                {% for lv in levels %}
+                  <option value="{{ lv }}" {% if u.level == lv %}selected{% endif %}>{{ lv }}</option>
+                {% endfor %}
+              </select>
+            </td>
             <td>{{ u.team_a|default:"-" }}</td>
             <td>{{ u.team_b|default:"-" }}</td>
             <td>{{ u.team_c|default:"-" }}</td>
@@ -88,6 +95,17 @@
     </table>
   </div>
 </div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+  <div id="statusToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <strong class="me-auto" id="toastTitle">처리 결과</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastBody">
+      </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -112,13 +130,14 @@ document.addEventListener("DOMContentLoaded", () => {
     autoWidth: false,
     columnDefs: [
       { width: "8%", targets: 0 },  // 부서
-      { width: "15%", targets: 1 }, // 지점
+      { width: "12%", targets: 1 }, // 지점
       { width: "12%", targets: 2 }, // 성명
-      { width: "10%", targets: 3 }, // 사번
+      { width: "8%", targets: 3 }, // 사번
       { width: "10%", targets: 4 }, // 직급
-      { width: "15%", targets: 5 }, // 팀A
-      { width: "15%", targets: 6 }, // 팀B
-      { width: "15%", targets: 7 }, // 팀C
+      { width: "14%", targets: 5 }, // 레벨
+      { width: "12%", targets: 6 }, // 팀A
+      { width: "12%", targets: 7 }, // 팀B
+      { width: "12%", targets: 8 }, // 팀C
     ],
     lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
     language: {
@@ -205,6 +224,74 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       this.value = "";
     }
+  });
+});
+</script>
+
+
+<script>
+// ✅ 토스트 메시지 표시 함수
+function showToast(message, isSuccess) {
+    const toastElement = document.getElementById('statusToast');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastBody = document.getElementById('toastBody');
+    
+    // 제목 및 색상 설정
+    if (isSuccess) {
+        toastTitle.textContent = '✅ 저장 성공';
+        toastElement.classList.remove('text-bg-danger');
+        toastElement.classList.add('text-bg-success');
+    } else {
+        toastTitle.textContent = '❌ 저장 실패';
+        toastElement.classList.remove('text-bg-success');
+        toastElement.classList.add('text-bg-danger');
+    }
+    
+    toastBody.textContent = message;
+    
+    // 부트스트랩 Toast 객체 생성 및 표시
+    const toast = new bootstrap.Toast(toastElement, {
+        delay: 3000 // 3초 후 자동 사라짐
+    });
+    toast.show();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const subTable = $("#subAdminTable");
+
+  // ✅ 레벨 변경 이벤트
+  subTable.on("change", ".level-select", function () {
+    const row = $(this).closest("tr");
+    const userId = row.data("user-id");
+    const newLevel = $(this).val();
+
+    fetch("{% url 'partner:ajax_update_level' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": "{{ csrf_token }}",
+      },
+      body: new URLSearchParams({
+        user_id: userId,
+        level: newLevel,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          console.log(`✅ user ${userId} → ${newLevel} 저장 성공`);
+          // 👇 alert 대신 showToast 호출
+          showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
+        } else {
+          // 👇 alert 대신 showToast 호출
+          showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
+        }
+      })
+      .catch(err => {
+        console.error("요청 실패:", err);
+        // 👇 alert 대신 showToast 호출
+        showToast("서버 요청 중 오류가 발생했습니다.", false);
+      });
   });
 });
 </script>
