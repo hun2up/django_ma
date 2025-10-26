@@ -17,7 +17,7 @@
       <div>
         <label class="form-label mb-1">부서</label>
         <select id="partSelect" name="part" class="form-select form-select-sm" style="width:140px;">
-          <option value="">전체</option>
+          <option value="" disabled {% if not selected_part %}selected{% endif %} hidden>선택</option>
           {% for p in parts %}
             <option value="{{ p }}" {% if selected_part == p %}selected{% endif %}>{{ p }}</option>
           {% endfor %}
@@ -32,18 +32,13 @@
 </div>
 {% endif %}
 
-<!-- ✅ 엑셀 업로드 -->
-<div class="d-flex justify-content-end mb-3 gap-2">
-  <form id="excelUploadForm" method="post" enctype="multipart/form-data" action="{% url 'partner:upload_grades_excel' %}">
-    {% csrf_token %}
-    <input type="file" name="excel_file" id="excelFile" accept=".xlsx,.xls" hidden>
-    <button type="button" class="btn btn-success btn-sm" id="uploadBtn">
-      <i class="bi bi-file-earmark-excel"></i> 엑셀 업로드
-    </button>
-  </form>
-</div>
+<!-- ✅ 숨겨진 업로드 폼 -->
+<form id="excelUploadForm" method="post" enctype="multipart/form-data" action="{% url 'partner:upload_grades_excel' %}">
+  {% csrf_token %}
+  <input type="file" name="excel_file" id="excelFile" accept=".xlsx,.xls" hidden>
+</form>
 
-<!-- ✅ 상단: 중간관리자 -->
+<!-- ✅ 상단: 중간관리자 명단 -->
 <div class="card shadow p-3 border-0 rounded-4 mb-5">
   <h5 class="fw-bold mb-3" style="color:#003f7d;">중간관리자 명단</h5>
   <div class="table-responsive">
@@ -55,30 +50,35 @@
         </tr>
       </thead>
       <tbody>
-        {% for u in users_subadmin %}
-        <tr data-user-id="{{ u.user.id }}">
-          <td>{{ u.part|default:"-" }}</td>
-          <td>{{ u.branch|default:"-" }}</td>
-          <td>{{ u.name|default:"-" }}</td>
-          <td>{{ u.user.id|default:"-" }}</td>
-          <td>{{ u.position|default:"-" }}</td>
-          <td class="editable" data-field="team_a">{{ u.team_a|default:"-" }}</td>
-          <td class="editable" data-field="team_b">{{ u.team_b|default:"-" }}</td>
-          <td class="editable" data-field="team_c">{{ u.team_c|default:"-" }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="text-center text-muted py-3" style="white-space: pre-line;">{{ empty_message_subadmin }}</td></tr>
-        {% endfor %}
+        {% if selected_part %}
+          {% for u in users_subadmin %}
+          <tr>
+            <td>{{ u.part|default:"-" }}</td>
+            <td>{{ u.branch|default:"-" }}</td>
+            <td>{{ u.name|default:"-" }}</td>
+            <td>{{ u.user.id|default:"-" }}</td>
+            <td>{{ u.position|default:"-" }}</td>
+            <td>{{ u.team_a|default:"-" }}</td>
+            <td>{{ u.team_b|default:"-" }}</td>
+            <td>{{ u.team_c|default:"-" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-3">해당 부서의 중간관리자가 없습니다.</td></tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-3">부서를 선택하세요.</td></tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- ✅ 하단: 전체 사용자 (Ajax 서버사이드) -->
+<!-- ✅ 하단: 전체 사용자 목록 -->
 <div class="card shadow p-3 border-0 rounded-4">
-  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체 사용자 목록</h5>
+  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체사용자 목록</h5>
   <div class="table-responsive">
-    <table id="allUserTable" class="table table-striped align-middle" data-ajax-url="{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}">
+    <table id="allUserTable" class="table table-striped align-middle"
+      data-ajax-url="{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}">
       <thead class="table-light">
         <tr>
           <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
@@ -88,63 +88,124 @@
     </table>
   </div>
 </div>
+{% endblock %}
 
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-
+{% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  // ✅ 부서 선택 시 자동 조회
-  document.getElementById('partSelect')?.addEventListener('change', () => {
-    document.getElementById('controlsForm').submit();
+  const selectedPart = "{{ selected_part|default:'' }}";
+  const subTable = $("#subAdminTable");
+  const allTable = $("#allUserTable");
+
+  // ✅ 부서 미선택(superuser 첫 접속 시) — DataTable 미초기화
+  if (!selectedPart) {
+    console.log("부서 미선택 상태 — DataTables 초기화 생략");
+    return;
+  }
+
+  /* ✅ 중간관리자 명단 */
+  subTable.DataTable({
+    paging: true,
+    searching: true,
+    info: true,
+    pageLength: 10,
+    autoWidth: false,
+    columnDefs: [
+      { width: "8%", targets: 0 },  // 부서
+      { width: "15%", targets: 1 }, // 지점
+      { width: "12%", targets: 2 }, // 성명
+      { width: "10%", targets: 3 }, // 사번
+      { width: "10%", targets: 4 }, // 직급
+      { width: "15%", targets: 5 }, // 팀A
+      { width: "15%", targets: 6 }, // 팀B
+      { width: "15%", targets: 7 }, // 팀C
+    ],
+    lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
+    language: {
+      url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
+      lengthMenu: "페이지당 인원 _MENU_",
+      search: "검색:",
+      zeroRecords: "표시할 데이터가 없습니다.",
+      info: "총 _TOTAL_명 중 _START_–_END_ 표시",
+      infoEmpty: "데이터 없음",
+    },
+    dom: `
+      <'d-flex justify-content-between align-items-center mb-2'
+        <'d-flex align-items-center gap-2'l>
+        f
+      >rtip
+    `,
   });
 
-  // ✅ Ajax DataTable 초기화
-  if (!$.fn.DataTable.isDataTable('#allUserTable')) {
-    $("#allUserTable").DataTable({
-      serverSide: true,
-      processing: true,
-      ajax: {
-        url: "{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}",
-        type: "GET",
+  /* ✅ 전체 사용자 목록 (Ajax) */
+  allTable.DataTable({
+    serverSide: true,
+    processing: true,
+    ajax: { url: allTable.data("ajax-url"), type: "GET" },
+    columns: [
+      { data: "part" },
+      { data: "branch" },
+      { data: "name" },
+      { data: "user_id" },
+      { data: "position" },
+      { data: "team_a" },
+      { data: "team_b" },
+      { data: "team_c" },
+    ],
+    pageLength: 10,
+    autoWidth: false,
+    columnDefs: [
+      { width: "8%", targets: 0 },  // 부서
+      { width: "15%", targets: 1 }, // 지점
+      { width: "12%", targets: 2 }, // 성명
+      { width: "10%", targets: 3 }, // 사번
+      { width: "10%", targets: 4 }, // 직급
+      { width: "15%", targets: 5 }, // 팀A
+      { width: "15%", targets: 6 }, // 팀B
+      { width: "15%", targets: 7 }, // 팀C
+    ],
+    lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
+    language: {
+      url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
+      lengthMenu: "페이지당 인원 _MENU_",
+      search: "검색:",
+      processing: "로딩 중...",
+      zeroRecords: "표시할 데이터가 없습니다.",
+    },
+    dom: `
+      <'d-flex justify-content-between align-items-center mb-2'
+        <'d-flex align-items-center gap-2'lB>
+        f
+      >rtip
+    `,
+    buttons: [
+      {
+        extend: "excel",
+        text: "<i class='bi bi-download'></i> 엑셀 다운로드",
+        className: "btn btn-success btn-sm",
       },
-      columns: [
-        { data: "part" },      // 부서
-        { data: "branch" },    // 지점
-        { data: "name" },      // 성명
-        { data: "user_id" },   // 사번
-        { data: "position" },  // 직급
-        { data: "team_a" },    // 팀A
-        { data: "team_b" },    // 팀B
-        { data: "team_c" },    // 팀C
-      ],
-      pageLength: 10,
-      lengthMenu: [[10, 25, 50, 100], ["10개", "25개", "50개", "100개"]],
-      language: {
-        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
-        lengthMenu: "페이지당 사용자수 _MENU_",
-        search: "검색:",
-        processing: "로딩 중...",
-      },
-      dom: `
-        <'d-flex justify-content-between align-items-center mb-2'
-          <'d-flex align-items-center gap-2'lB>
-          f
-        >rtip
-      `,
-      buttons: [
-        {
-          extend: "excel",
-          text: "<i class='bi bi-download'></i> 엑셀 다운로드",
-          className: "btn btn-success btn-sm",
-          exportOptions: { columns: ':visible' },
+      {
+        text: "<i class='bi bi-upload'></i> 엑셀 업로드",
+        className: "btn btn-success btn-sm",
+        action: function () {
+          document.getElementById("excelFile").click();
         },
-      ],
-    });
-  }
+      },
+    ],
+  });
+
+  /* ✅ 엑셀 업로드 자동 제출 */
+  const excelFile = document.getElementById("excelFile");
+  const excelForm = document.getElementById("excelUploadForm");
+  excelFile.addEventListener("change", function () {
+    if (!this.files.length) return;
+    const fileName = this.files[0].name;
+    if (confirm(`"${fileName}" 파일을 업로드하시겠습니까?`)) {
+      excelForm.submit();
+    } else {
+      this.value = "";
+    }
+  });
 });
 </script>
-
-<script src="{% static 'js/partner/manage_grades.js' %}"></script>
 {% endblock %}

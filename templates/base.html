@@ -58,6 +58,9 @@
             {% if user.grade != 'inactive' %}
               <li><a class="dropdown-item" href="{% url 'states_form' %}">FA소명서</a></li>
             {% endif %}
+            {% if user.grade == 'superuser' %}
+              <li><a class="dropdown-item" href="{% url 'manage_sign' %}">결재관리</a></li>
+            {% endif %}
           </ul>
         </li>
 
