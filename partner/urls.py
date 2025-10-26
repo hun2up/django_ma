@@ -17,4 +17,5 @@ urlpatterns = [
     path("api/delete/", views.ajax_delete, name="ajax_delete"),
     path("api/set-deadline/", views.ajax_set_deadline, name="ajax_set_deadline"),
     path("api/fetch/", views.ajax_fetch, name="ajax_fetch"),
+    path("ajax/update-level/", views.ajax_update_level, name="ajax_update_level"),
 ]

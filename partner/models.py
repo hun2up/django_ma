@@ -132,7 +132,15 @@ class SubAdminTemp(models.Model):
     team_b = models.CharField(max_length=50, blank=True, null=True)
     team_c = models.CharField(max_length=50, blank=True, null=True)
     position = models.CharField(max_length=30, blank=True, null=True)
-    level = models.CharField(max_length=30, blank=True, null=True)
+
+    LEVEL_CHOICES = [
+        ("-", "-"),
+        ("A레벨", "A레벨"),
+        ("B레벨", "B레벨"),
+        ("C레벨", "C레벨"),
+    ]
+
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default="-", verbose_name='레벨')
 
     updated_at = models.DateTimeField(auto_now=True)
 

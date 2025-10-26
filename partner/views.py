@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
@@ -256,14 +257,16 @@ def manage_grades(request):
     selected_part = request.GET.get("part", "").strip() or None
     parts = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"]
 
+    base_user_qs = CustomUser.objects.filter(grade="sub_admin")
+    
     # ✅ 중간관리자(SubAdminTemp)
     if user.grade == "superuser":
         if selected_part:
-            subadmin_qs = SubAdminTemp.objects.filter(part=selected_part)
+            subadmin_qs = SubAdminTemp.objects.filter(part=selected_part, user__in=base_user_qs)
         else:
             subadmin_qs = SubAdminTemp.objects.none()  # 선택 전엔 빈 상태
     elif user.grade == "main_admin":
-        subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch)
+        subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch, user__in=base_user_qs)
     else:
         subadmin_qs = SubAdminTemp.objects.none()
 
@@ -282,12 +285,15 @@ def manage_grades(request):
     if not subadmin_qs.exists():
         empty_message_subadmin = "표시할 중간관리자가 없습니다."
 
+    LEVELS = ["-", "A레벨", "B레벨", "C레벨"]
+
     return render(request, "partner/manage_grades.html", {
         "parts": parts,
         "selected_part": selected_part,
         "users_subadmin": subadmin_qs,
         "users_all": users_all,
         "empty_message_subadmin": empty_message_subadmin,
+        "levels": LEVELS,
     })
 
 
@@ -417,3 +423,25 @@ def ajax_users_data(request):
         "recordsTotal": total_count,
         "recordsFiltered": total_count,
     })
+
+
+
+# ------------------------------------------------------------
+# 📘 9. 레벨관리
+# ------------------------------------------------------------
+@require_POST
+@csrf_exempt  # ⚠️ 필요 시만 (ajax 요청시 CSRF 토큰 안 보낼 경우)
+def ajax_update_level(request):
+    user_id = request.POST.get("user_id")
+    level = request.POST.get("level")
+
+    try:
+        sub_admin = SubAdminTemp.objects.get(user_id=user_id)
+        sub_admin.level = level
+        sub_admin.save()
+        return JsonResponse({"success": True})
+    except SubAdminTemp.DoesNotExist:
+        return JsonResponse({"success": False, "error": "User not found"})
+
+
+
