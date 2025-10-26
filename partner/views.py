@@ -4,7 +4,6 @@ import traceback
 from datetime import datetime
 
 import pandas as pd
-from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -247,72 +246,42 @@ def ajax_fetch(request):
 
 
 # ------------------------------------------------------------
-# 📘 6. 권한관리 페이지 (속도 최적화 버전)
+# 📘 6. 권한관리 페이지 (조회 전용 버전)
 # ------------------------------------------------------------
+# partner/views.py
 @login_required
 def manage_grades(request):
-    """
-    권한관리 페이지 (속도 최적화 버전)
-    ------------------------------------------------
-    개선사항:
-    1. SubAdminTemp 동기화 루프 제거 → 페이지 로딩 속도 향상
-    2. Prefetch 제거 및 조회 제한 (300명 상한)
-    3. select_related, only()로 DB 트래픽 최소화
-    4. Superuser: 선택 부서(part) 필터링
-       MainAdmin: 자신의 지점(branch) 기준 필터링
-    ------------------------------------------------
-    """
+    """권한관리 페이지"""
     user = request.user
     selected_part = request.GET.get("part", "").strip() or None
     parts = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"]
 
-    # ✅ 1️⃣ 권한 확인
-    if user.grade not in ["superuser", "main_admin"]:
-        return render(request, "partner/manage_grades.html", {
-            "parts": parts,
-            "selected_part": selected_part,
-            "users_subadmin": [],
-            "users_all": [],
-            "error_message": "접근 권한이 없습니다.",
-        })
-
-    # ✅ 2️⃣ 중간관리자(SubAdminTemp) — branch/part 필터 적용
+    # ✅ 중간관리자(SubAdminTemp)
     if user.grade == "superuser":
-        subadmin_qs = (
-            SubAdminTemp.objects.filter(part=selected_part)
-            if selected_part else SubAdminTemp.objects.all()
-        )
+        if selected_part:
+            subadmin_qs = SubAdminTemp.objects.filter(part=selected_part)
+        else:
+            subadmin_qs = SubAdminTemp.objects.none()  # 선택 전엔 빈 상태
     elif user.grade == "main_admin":
         subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch)
     else:
         subadmin_qs = SubAdminTemp.objects.none()
 
-    # ✅ 빈 테이블 안내문
-    empty_message_subadmin = ""
-    if not subadmin_qs.exists():
-        empty_message_subadmin = (
-            "추가된 중간관리자가 없습니다.\n"
-            "중간관리자 추가는 부서장에게 문의해주세요."
-        )
-
-    # ✅ 3️⃣ 전체 사용자(CustomUser) — Prefetch 제거 + 제한 추가
+    # ✅ 전체 사용자(CustomUser)
     if user.grade == "superuser":
-        users_all = CustomUser.objects.all()
         if selected_part:
-            users_all = users_all.filter(part=selected_part)
+            users_all = CustomUser.objects.filter(part=selected_part)
+        else:
+            users_all = CustomUser.objects.none()  # 선택 전엔 빈 상태
     elif user.grade == "main_admin":
         users_all = CustomUser.objects.filter(branch=user.branch)
     else:
         users_all = CustomUser.objects.none()
 
-    # ✅ DB 부하 최소화 (필드 제한 + 정렬 + 상한)
-    users_all = (
-        users_all
-        .only("id", "name", "part", "branch", "grade")
-        .order_by("name")[:300]
-    )
+    empty_message_subadmin = ""
+    if not subadmin_qs.exists():
+        empty_message_subadmin = "표시할 중간관리자가 없습니다."
 
-    # ✅ 4️⃣ 렌더링
     return render(request, "partner/manage_grades.html", {
         "parts": parts,
         "selected_part": selected_part,
@@ -322,8 +291,9 @@ def manage_grades(request):
     })
 
 
+
 # ------------------------------------------------------------
-# 📘 7. 권한관리 — 엑셀 업로드 처리 (grade 비노출)
+# 📘 7. 권한관리 — 엑셀 업로드 처리 (조회 외 유일 수정 기능)
 # ------------------------------------------------------------
 @transaction.atomic
 @login_required
@@ -331,23 +301,19 @@ def upload_grades_excel(request):
     """
     엑셀 업로드를 통한 SubAdminTemp 업데이트
     - '사번', '팀A', '팀B', '팀C', '직급' 컬럼 사용
-    - '등급' 컬럼이 있더라도 무시 (비노출 정책)
     """
     if request.method == "POST" and request.FILES.get("excel_file"):
         file = request.FILES["excel_file"]
 
         try:
-            import pandas as pd
             df = pd.read_excel(file).fillna("")
 
-            # ✅ 필수 컬럼 검증
             required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
             for col in required_cols:
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
                     return redirect("partner:manage_grades")
 
-            # ✅ 불필요한 '등급' 컬럼은 제거 (있어도 무시)
             if "등급" in df.columns:
                 df = df.drop(columns=["등급"])
 
@@ -365,7 +331,6 @@ def upload_grades_excel(request):
                         "team_b": row["팀B"],
                         "team_c": row["팀C"],
                         "position": row["직급"],
-                        # level은 grade와 독립 → 선택적으로 나중 확장 가능
                     },
                 )
                 if is_created:
@@ -384,54 +349,14 @@ def upload_grades_excel(request):
 
 
 # ------------------------------------------------------------
-# 📘 8. 권한관리 — 팀A/B/C 실시간 수정
+# 📘 8. 권한관리 — 전체 사용자 Ajax 조회 (조회 전용)
 # ------------------------------------------------------------
-@require_POST
-@login_required
-def ajax_update_team(request):
-    """팀A/B/C 인라인 수정 처리 (AJAX)"""
-    try:
-        user_id = request.POST.get("user_id")
-        field = request.POST.get("field")
-        value = request.POST.get("value", "").strip()
-
-        if field not in ["team_a", "team_b", "team_c"]:
-            return JsonResponse({"success": False, "error": "Invalid field"}, status=400)
-
-        cu = CustomUser.objects.filter(id=user_id).first()
-        if not cu:
-            return JsonResponse({"success": False, "error": "User not found"}, status=404)
-
-        obj, _ = SubAdminTemp.objects.get_or_create(
-            user=cu,
-            defaults={
-                "name": cu.name,
-                "part": cu.part,
-                "branch": cu.branch,
-            },
-        )
-        setattr(obj, field, value)
-        obj.save(update_fields=[field, "updated_at"])
-
-        return JsonResponse({"success": True, "message": f"{field} 업데이트 완료"})
-
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
-
-
-# ------------------------------------------------------------
-# 📘 10. 권한관리 — 전체 사용자 Ajax 서버사이드 조회 (완성형)
-# ------------------------------------------------------------
-
-
 @login_required
 def ajax_users_data(request):
     """
-    DataTables 서버사이드 모드용 JSON 응답 (권한관리용)
+    DataTables 서버사이드 조회 전용
     ------------------------------------------------------------
-    - /partner/ajax/users/
-    - 부서(part) 필터링 + 검색 + 정렬 + 페이지네이션
-    - 컬럼: 부서 / 지점 / 성명 / 사번 / 직급 / 팀A / 팀B / 팀C
+    수정 불가, 조회 전용 버전
     ------------------------------------------------------------
     """
     user = request.user
@@ -440,7 +365,6 @@ def ajax_users_data(request):
     search = request.GET.get("search[value]", "").strip()
     selected_part = request.GET.get("part", "").strip() or None
 
-    # ✅ 권한별 조회 범위 제한
     if user.grade == "superuser":
         qs = CustomUser.objects.all()
         if selected_part:
@@ -450,44 +374,20 @@ def ajax_users_data(request):
     else:
         return JsonResponse({"data": [], "recordsTotal": 0, "recordsFiltered": 0})
 
-    # ✅ 검색 필터 (이름, 사번, 지점, 직급, 팀명)
     if search:
         qs = qs.filter(
             Q(name__icontains=search)
             | Q(id__icontains=search)
             | Q(branch__icontains=search)
             | Q(part__icontains=search)
-            | Q(grade__icontains=search)
         )
 
-    # ✅ 전체 개수
     total_count = qs.count()
 
-    # ✅ 정렬 처리 (DataTables 요청 파라미터 기반)
-    order_column_index = request.GET.get("order[0][column]", "0")
-    order_dir = request.GET.get("order[0][dir]", "asc")
-
-    column_map = {
-        "0": "part",
-        "1": "branch",
-        "2": "name",
-        "3": "id",
-        "4": "grade",
-        "5": "grade",  # 직급(임시)
-    }
-
-    order_field = column_map.get(order_column_index, "name")
-    if order_dir == "desc":
-        order_field = f"-{order_field}"
-
-    qs = qs.order_by(order_field)
-
-    # ✅ 페이지네이션
     paginator = Paginator(qs.only("id", "name", "branch", "part", "grade")[:2000], length)
     page_number = start // length + 1
     page = paginator.get_page(page_number)
 
-    # ✅ SubAdminTemp 데이터 매핑 (팀/직급)
     subadmin_map = {
         str(sa.user_id): {
             "position": sa.position or "",
@@ -498,7 +398,6 @@ def ajax_users_data(request):
         for sa in SubAdminTemp.objects.filter(user_id__in=[u.id for u in page])
     }
 
-    # ✅ JSON 데이터 구성
     data = []
     for u in page:
         sa_info = subadmin_map.get(str(u.id), {})
@@ -518,4 +417,3 @@ def ajax_users_data(request):
         "recordsTotal": total_count,
         "recordsFiltered": total_count,
     })
-

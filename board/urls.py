@@ -12,4 +12,5 @@ urlpatterns = [
     path('search-user/', views.search_user, name='search_user'),
     path('generate-support/', views.generate_request_support, name='generate_request_support'),
     path('generate-states/', views.generate_request_states, name='generate_request_states'),
+    path('sign/', views.manage_sign, name='manage_sign'),
 ]
