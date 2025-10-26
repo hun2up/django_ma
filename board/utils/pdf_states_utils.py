@@ -77,7 +77,7 @@ def generate_request_states(request):
     ]
 
     # -------------------------------------------
-    # 👤 요청자 정보
+    # 👤 작성자 정보
     # -------------------------------------------
     enter = getattr(request.user, "enter", "")
     if hasattr(enter, "strftime"):
@@ -89,7 +89,7 @@ def generate_request_states(request):
     ]
     table1 = Table(requester_data, colWidths=[120, 100, 140, 140])
     table1.setStyle(base_table_style())
-    elements += [Paragraph("요청자", styles["Korean"]), table1, Spacer(1, 20)]
+    elements += [Paragraph("작성자", styles["Korean"]), table1, Spacer(1, 20)]
 
     # -------------------------------------------
     # 💼 계약사항
@@ -136,9 +136,9 @@ def generate_request_states(request):
     elements += [Paragraph("요청내용", styles["Korean"]), table4, Spacer(1, 25)]
 
     # -------------------------------------------
-    # ✍️ 요청자 서명란
+    # ✍️ 작성자 서명란
     # -------------------------------------------
-    requester_sign = f"요청자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
+    requester_sign = f"작성자 : {request.user.branch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{request.user.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)"
     elements.append(Paragraph(requester_sign, styles["RightAlign"]))
     elements.append(Spacer(1, 10))
 
