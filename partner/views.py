@@ -313,13 +313,19 @@ def upload_grades_excel(request):
         file = request.FILES["excel_file"]
 
         try:
-            df = pd.read_excel(file).fillna("")
+            df = pd.read_excel(file, sheet_name="업로드").fillna("")
 
             required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
             for col in required_cols:
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
                     return redirect("partner:manage_grades")
+            
+            # ✅ 부서/지점은 업로드 반영 금지
+            ignore_cols = ["부서", "지점"]
+            for col in ignore_cols:
+                if col in df.columns:
+                    df = df.drop(columns=[col])
 
             if "등급" in df.columns:
                 df = df.drop(columns=["등급"])
@@ -379,7 +385,7 @@ def ajax_users_data(request):
     elif user.grade == "main_admin":
         qs = CustomUser.objects.filter(branch=user.branch)
     else:
-        return JsonResponse({"data": [], "recordsTotal": 0, "recordsFiltered": 0})
+        return JsonResponse({"data": data, "recordsTotal": total_count, "recordsFiltered": total_count,}, safe=False)
 
     if search:
         qs = qs.filter(

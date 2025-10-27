@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'commission',
     'dash',
-    'partner',
+    'partner.apps.PartnerConfig',
     'django_extensions',
 ]
 
