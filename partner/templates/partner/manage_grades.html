@@ -13,7 +13,6 @@
     {% for message in messages %}
       <div class="alert alert-{{ message.tags }} text-center fw-bold" role="alert">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endfor %}
   </div>
@@ -122,12 +121,6 @@
   </div>
 </div>
 {% endblock %}
-
-<!-- ✅ 엑셀 업로드 로딩 오버레이 -->
-<div id="uploadOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-dark bg-opacity-50 text-white" style="z-index: 2000; display: none;">
-  <div class="spinner-border text-light mb-3" role="status"></div>
-  <div class="fw-bold fs-5">파일 업로드 중입니다.<br>잠시만 기다려주세요...</div>
-</div>
 
 
 {% block extra_js %}
@@ -279,17 +272,12 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ✅ 엑셀 업로드 자동 제출 + 로딩 오버레이 표시 */
   const excelFile = document.getElementById("excelFile");
   const excelForm = document.getElementById("excelUploadForm");
-  const uploadOverlay = document.getElementById("uploadOverlay");
 
   excelFile.addEventListener("change", function () {
     if (!this.files.length) return;
     const fileName = this.files[0].name;
 
     if (confirm(`"${fileName}" 파일을 업로드하시겠습니까?`)) {
-      // ✅ 로딩 오버레이 표시
-      uploadOverlay.style.display = "flex";
-
-      // ✅ 폼 전송
       excelForm.submit();
     } else {
       this.value = "";

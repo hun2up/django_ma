@@ -1,14 +1,13 @@
 /**
- * manage_structure.js
+ * manage_structure.js (리팩토링 버전)
  * -----------------------------------------------------
  * 편제변경(Manage Structure) 페이지 전용 스크립트
  * 기능:
- * 1. 월도 데이터 fetch() 연동
- * 2. 대상자 행 추가/초기화/저장(Ajax)
- * 3. 삭제/기한설정 Ajax
- * 4. DataTables 초기화
- * 5. 로딩/검증/중복사번 방지
- * 6. 기한 기본값(10일) + 입력제한/비활성화 표시
+ * 1. 데이터 조회 (fetch)
+ * 2. 데이터 저장 / 삭제 (Ajax)
+ * 3. 기한 설정
+ * 4. 입력 가능 여부 제어
+ * 5. 초기 상태별 동작(main_admin 자동조회 / superuser 수동조회)
  * -----------------------------------------------------
  */
 
@@ -17,84 +16,83 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!root) return;
 
   /* =======================================================
-     📌 기본 DOM 요소
+     📌 기본 요소 참조
   ======================================================= */
-  const yearSelect = document.getElementById("yearSelect");
-  const monthSelect = document.getElementById("monthSelect");
-  const branchSelect = document.getElementById("branchSelect");
-  const deadlineSelect = document.getElementById("deadlineSelect");
-  const btnSearchPeriod = document.getElementById("btnSearchPeriod");
-  const btnSetDeadline = document.getElementById("btnSetDeadline");
-  const inputSection = document.getElementById("inputSection");
-  const btnAddRow = document.getElementById("btnAddRow");
-  const btnResetRows = document.getElementById("btnResetRows");
-  const btnSaveRows = document.getElementById("btnSaveRows");
-  const inputTable = document.getElementById("inputTable");
-  const mainTable = document.getElementById("mainTable");
-  const loadingOverlay = document.getElementById("loadingOverlay");
-  const searchModal = document.getElementById("searchUserModal");
-  const btnDoSearch = document.getElementById("btnDoSearch");
-  const searchResults = document.getElementById("searchResults");
-
-  const {
-    userGrade,
-    dataFetchUrl,
-    dataSaveUrl,
-    dataDeleteUrl,
-    setDeadlineUrl,
-  } = root.dataset;
-
-  const showLoading = (msg = "처리 중...") => {
-    loadingOverlay.querySelector(".mt-2").textContent = msg;
-    loadingOverlay.hidden = false;
+  const els = {
+    year: document.getElementById("yearSelect"),
+    month: document.getElementById("monthSelect"),
+    branch: document.getElementById("branchSelect"),
+    deadline: document.getElementById("deadlineSelect"),
+    btnSearch: document.getElementById("btnSearchPeriod"),
+    btnDeadline: document.getElementById("btnSetDeadline"),
+    inputSection: document.getElementById("inputSection"),
+    btnAddRow: document.getElementById("btnAddRow"),
+    btnResetRows: document.getElementById("btnResetRows"),
+    btnSaveRows: document.getElementById("btnSaveRows"),
+    inputTable: document.getElementById("inputTable"),
+    mainTable: document.getElementById("mainTable"),
+    loading: document.getElementById("loadingOverlay"),
   };
 
-  const hideLoading = () => (loadingOverlay.hidden = true);
+  const { userGrade, dataFetchUrl, dataSaveUrl, dataDeleteUrl, setDeadlineUrl } =
+    root.dataset;
+
+  /* =======================================================
+     📌 공통 유틸 함수
+  ======================================================= */
+  const showLoading = (msg = "처리 중...") => {
+    els.loading.querySelector(".mt-2").textContent = msg;
+    els.loading.hidden = false;
+  };
+  const hideLoading = () => (els.loading.hidden = true);
   const alertBox = (msg) => alert(msg);
 
+  const getCSRFToken = () => {
+    return window.csrfToken || (document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "");
+  };
+
+  const pad2 = (n) => (String(n).length === 1 ? "0" + n : String(n));
+  const selectedYM = () => `${els.year.value}-${pad2(els.month.value)}`;
+
   /* =======================================================
-     📌 1. 기초 셀렉트 옵션 생성
+     📌 1. 기본 Select 옵션 세팅
   ======================================================= */
   const now = new Date();
-  const thisYear = now.getFullYear();
-  const thisMonth = now.getMonth() + 1;
+  const [thisY, thisM] = [now.getFullYear(), now.getMonth() + 1];
 
-  for (let y = thisYear - 2; y <= thisYear + 1; y++) {
-    const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = `${y}년`;
-    if (y === thisYear) opt.selected = true;
-    yearSelect.appendChild(opt);
+  for (let y = thisY - 2; y <= thisY + 1; y++) {
+    els.year.insertAdjacentHTML(
+      "beforeend",
+      `<option value="${y}" ${y === thisY ? "selected" : ""}>${y}년</option>`
+    );
   }
-
   for (let m = 1; m <= 12; m++) {
-    const opt = document.createElement("option");
-    opt.value = m;
-    opt.textContent = `${m}월`;
-    if (m === thisMonth) opt.selected = true;
-    monthSelect.appendChild(opt);
+    els.month.insertAdjacentHTML(
+      "beforeend",
+      `<option value="${m}" ${m === thisM ? "selected" : ""}>${m}월</option>`
+    );
   }
-
-  for (let d = 1; d <= 31; d++) {
-    const opt = document.createElement("option");
-    opt.value = d;
-    opt.textContent = `${d}일`;
-    deadlineSelect?.appendChild(opt);
+  if (els.deadline) {
+    for (let d = 1; d <= 31; d++) {
+      els.deadline.insertAdjacentHTML("beforeend", `<option value="${d}">${d}일</option>`);
+    }
   }
 
   /* =======================================================
-     📌 2. 월도 선택 후 데이터 불러오기 (fetch)
+     📌 2. 데이터 조회
   ======================================================= */
   async function fetchData() {
-    const y = yearSelect.value;
-    const m = monthSelect.value;
-    const ym = `${y}-${m.padStart ? m.padStart(2, "0") : ("0" + m).slice(-2)}`;
+    const y = els.year.value;
+    const m = els.month.value;
+    const b = els.branch?.value || "";
+    const ym = `${y}-${pad2(m)}`;
+
+    if (userGrade === "superuser" && !b) return alertBox("부서를 선택해주세요.");
 
     showLoading("데이터 불러오는 중...");
-
     try {
-      const res = await fetch(`${dataFetchUrl}?month=${ym}`);
-      if (!res.ok) throw new Error("데이터 조회 실패");
+      const res = await fetch(`${dataFetchUrl}?month=${ym}&branch=${b}`);
+      if (!res.ok) throw new Error("조회 실패");
       const data = await res.json();
       renderMainTable(data.rows || []);
     } catch (err) {
@@ -106,70 +104,69 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderMainTable(rows) {
-    const tbody = mainTable.querySelector("tbody");
+    const tbody = els.mainTable.querySelector("tbody");
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="13" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="16" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
       return;
     }
 
     rows.forEach((r) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.requester_name || "-"}</td>
-        <td>${r.requester_id || "-"}</td>
-        <td>${r.branch || "-"}</td>
-        <td>${r.target_name || "-"}</td>
-        <td>${r.target_id || "-"}</td>
-        <td>${r.target_branch || "-"}</td>
-        <td>${r.chg_branch || "-"}</td>
-        <td>${r.rank || "-"}</td>
-        <td>${r.chg_rank || "-"}</td>
-        <td>${r.memo || "-"}</td>
-        <td>${r.request_date || "-"}</td>
-        <td>${r.process_date || "-"}</td>
-        <td><button class="btn btn-outline-danger btn-sm btnDeleteRow" data-id="${r.id}">삭제</button></td>
-      `;
-      tbody.appendChild(tr);
+      tbody.insertAdjacentHTML(
+        "beforeend",
+        `
+        <tr>
+          <td>${r.requester_name || "-"}</td>
+          <td>${r.requester_id || "-"}</td>
+          <td>${r.branch || "-"}</td>
+          <td>${r.target_name || "-"}</td>
+          <td>${r.target_id || "-"}</td>
+          <td>${r.target_branch || "-"}</td>
+          <td>${r.chg_branch || "-"}</td>
+          <td>${r.rank || "-"}</td>
+          <td>${r.chg_rank || "-"}</td>
+          <td>${r.table_name || "-"}</td>
+          <td>${r.rate || "-"}</td>
+          <td>${r.chg_table || "-"}</td>
+          <td>${r.chg_rate || "-"}</td>
+          <td>${r.memo || "-"}</td>
+          <td>${r.request_date || "-"}</td>
+          <td>${r.process_date || "-"}</td>
+          <td><button class="btn btn-outline-danger btn-sm btnDeleteRow" data-id="${r.id}">삭제</button></td>
+        </tr>`
+      );
     });
-
     attachDeleteHandlers();
   }
 
-  btnSearchPeriod?.addEventListener("click", fetchData);
+  els.btnSearch?.addEventListener("click", fetchData);
 
   /* =======================================================
-     📌 3. 데이터 저장 (ajax_save)
+     📌 3. 데이터 저장
   ======================================================= */
   async function saveRows() {
-    const rows = [...inputTable.querySelectorAll("tbody tr")].map((tr) => {
+    const rows = Array.from(els.inputTable.querySelectorAll("tbody tr")).map((tr) => {
       const obj = {};
-      tr.querySelectorAll("input,select").forEach((el) => {
-        if (el.type === "checkbox") obj[el.name] = el.checked;
-        else obj[el.name] = el.value.trim();
+      tr.querySelectorAll("input, select").forEach((el) => {
+        obj[el.name] = el.type === "checkbox" ? el.checked : el.value.trim();
       });
       return obj;
     });
 
-    const month = `${yearSelect.value}-${monthSelect.value.padStart ? monthSelect.value.padStart(2, "0") : ("0" + monthSelect.value).slice(-2)}`;
-
     showLoading("저장 중...");
-
     try {
       const res = await fetch(dataSaveUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
-        body: JSON.stringify({ rows, month }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCSRFToken(),
+        },
+        body: JSON.stringify({ rows, month: selectedYM() }),
       });
-
       const data = await res.json();
-      if (data.status === "success") {
-        alertBox(data.message);
-        fetchData();
-      } else {
-        alertBox(data.message);
-      }
+      alertBox(data.message || "저장 완료");
+      if (data.status === "success") fetchData();
     } catch (err) {
       console.error(err);
       alertBox("저장 중 오류가 발생했습니다.");
@@ -178,73 +175,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  btnSaveRows?.addEventListener("click", saveRows);
+  els.btnSaveRows?.addEventListener("click", saveRows);
 
   /* =======================================================
-     📌 4. 데이터 삭제 (ajax_delete)
+     📌 4. 데이터 삭제
   ======================================================= */
   function attachDeleteHandlers() {
-    document.querySelectorAll(".btnDeleteRow").forEach((btn) => {
+    document.querySelectorAll(".btnDeleteRow").forEach((btn) =>
       btn.addEventListener("click", async () => {
         if (!confirm("이 항목을 삭제하시겠습니까?")) return;
-        const id = btn.dataset.id;
-
         showLoading("삭제 중...");
-
         try {
           const res = await fetch(dataDeleteUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
-            body: JSON.stringify({ id }),
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCSRFToken(),
+            },
+            body: JSON.stringify({ id: btn.dataset.id }),
           });
-
           const data = await res.json();
-          if (data.status === "success") {
-            alertBox("삭제 완료");
-            fetchData();
-          } else {
-            alertBox(data.message);
-          }
+          alertBox(data.message || "삭제 완료");
+          if (data.status === "success") fetchData();
         } catch (err) {
           console.error(err);
           alertBox("삭제 중 오류 발생");
         } finally {
           hideLoading();
         }
-      });
-    });
+      })
+    );
   }
 
   /* =======================================================
-     📌 5. 입력기한 설정 (ajax_set_deadline)
+     📌 5. 입력기한 설정
   ======================================================= */
-  btnSetDeadline?.addEventListener("click", async () => {
-    const branch = branchSelect?.value || "";
-    const day = deadlineSelect?.value || "";
-    const month = `${yearSelect.value}-${monthSelect.value.padStart ? monthSelect.value.padStart(2, "0") : ("0" + monthSelect.value).slice(-2)}`;
-
-    if (!branch && !day) return alertBox("부서와 기한을 선택해주세요.");
-    if (!branch) return alertBox("부서를 선택해주세요.");
-    if (!day) return alertBox("기한을 선택해주세요.");
+  els.btnDeadline?.addEventListener("click", async () => {
+    const branch = els.branch?.value || "";
+    const day = els.deadline?.value || "";
+    if (!branch || !day) return alertBox("부서와 기한을 선택해주세요.");
 
     showLoading("기한 설정 중...");
-
     try {
       const res = await fetch(setDeadlineUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() || document.querySelector('[name=csrfmiddlewaretoken]')?.value || "" },
-        body: JSON.stringify({ branch, deadline_day: day, month }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCSRFToken(),
+        },
+        body: JSON.stringify({ branch, deadline_day: day, month: selectedYM() }),
       });
-
       const data = await res.json();
       alertBox(data.message || "기한 설정 완료");
 
-      // ✅ JS 상 deadlineDay 즉시 반영
       if (data.status === "success") {
-        const newDeadline = parseInt(day);
-        window.ManageStructureBoot.deadlineDay = newDeadline;
-        console.log(`✅ 새 기한 반영됨: ${newDeadline}일`);
-        checkInputAvailability(); // 즉시 섹션 활성화 여부 갱신
+        window.ManageStructureBoot.deadlineDay = parseInt(day);
+        checkInputAvailability();
       }
     } catch (err) {
       console.error(err);
@@ -255,79 +241,52 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* =======================================================
-     📌 6. CSRF Token Helper
-  ======================================================= */
-  function getCSRFToken() {
-    const name = "csrftoken";
-    const cookieValue = document.cookie.split("; ").find((row) => row.startsWith(name + "="));
-    return cookieValue ? cookieValue.split("=")[1] : "";
-  }
-
-  /* =======================================================
-     📌 7. DataTables 초기화
-  ======================================================= */
-  if (window.jQuery && $.fn.DataTable) {
-    $(mainTable).DataTable({
-      language: { search: "검색 :", lengthMenu: "표시 _MENU_ 개" },
-      order: [],
-    });
-  }
-
-  /* =======================================================
-     📌 8. 입력 가능 여부 제어 + 기본 기한(10일) 적용 (개선버전)
+     📌 6. 입력 가능 여부 제어
   ======================================================= */
   function checkInputAvailability() {
+    const inputSection = document.getElementById("inputSection");
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
 
-    if (!yearSelect.value || !monthSelect.value) return;
-
+    // 선택 연/월
     const selectedYear = parseInt(yearSelect.value);
     const selectedMonth = parseInt(monthSelect.value);
     const deadlineDay = window.ManageStructureBoot.deadlineDay || 10;
     const effectiveDeadline = parseInt(deadlineDay);
 
-    inputSection.classList.remove("disabled-mode");
-    inputSection.querySelectorAll("input, select, button").forEach((el) => (el.disabled = false));
+    // 초기 표시
+    inputSection.removeAttribute("hidden");
 
     let reason = "";
-
     if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
-      reason = "과거월은 입력이 불가능합니다.";
+      reason = "과거월은 입력 불가";
     } else if (selectedYear === currentYear && selectedMonth === currentMonth && today.getDate() > effectiveDeadline) {
-      reason = `입력기한(${effectiveDeadline}일)이 지났습니다.`;
-    } else {
-      const futureUntil = window.ManageStructureBoot.futureUntil || "";
-      if (futureUntil) {
-        const [limitYear, limitMonth] = futureUntil.split("-").map(Number);
-        if (selectedYear > limitYear || (selectedYear === limitYear && selectedMonth > limitMonth)) {
-          reason = "미래 선택은 허용 범위를 초과했습니다.";
-        }
-      }
+      reason = `입력기한(${effectiveDeadline}일) 경과`;
     }
 
     if (reason) {
       inputSection.classList.add("disabled-mode");
-      inputSection.querySelectorAll("input, select, button").forEach((el) => (el.disabled = true));
-      let note = document.getElementById("inputDisabledNote");
-      if (!note) {
-        note = document.createElement("div");
-        note.id = "inputDisabledNote";
-        note.className = "text-muted small mt-2";
-        inputSection.parentNode.insertBefore(note, inputSection.nextSibling);
-      }
-      note.textContent = `⚠️ ${reason}`;
+      inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = true);
     } else {
-      const note = document.getElementById("inputDisabledNote");
-      if (note) note.remove();
+      inputSection.classList.remove("disabled-mode");
+      inputSection.querySelectorAll("input, select, button").forEach(el => el.disabled = false);
     }
-
-    console.log(`입력 가능 상태: ${!reason}, 사유: ${reason || "정상"}`);
   }
 
-  // ✅ 모든 드롭다운 옵션 생성이 끝난 후 실행되도록 지연
-  setTimeout(checkInputAvailability, 200);
-  yearSelect.addEventListener("change", checkInputAvailability);
-  monthSelect.addEventListener("change", checkInputAvailability);
+  /* =======================================================
+     📌 7. 초기 동작
+  ======================================================= */
+  if (window.jQuery && $.fn.DataTable) {
+    $(els.mainTable).DataTable({
+      language: { search: "검색 :", lengthMenu: "표시 _MENU_ 개" },
+      order: [],
+    });
+  }
+
+  // main_admin → 자동조회 / superuser → 대기
+  if (userGrade === "main_admin") setTimeout(fetchData, 300);
+
+  // ✅ 항상 대상자 입력 섹션 표시 (디버그용)
+  els.inputSection.removeAttribute("hidden");
 });

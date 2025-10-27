@@ -49,16 +49,21 @@ def manage_rate(request):
 # ------------------------------------------------------------
 # 📘 1. 편제변경 메인 페이지
 # ------------------------------------------------------------
+@login_required
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def manage_charts(request):
     """편제변경 메인 페이지"""
     now = datetime.now()
     month_str = f"{now.year}-{now.month:02d}"
 
-    # 현재 로그인 사용자 branch 및 기한 조회
-    user_branch = getattr(request.user, "branch", None)
+    user = request.user
+    user_branch = getattr(user, "branch", None)
     deadline_day = None
-    if user_branch:
+    selected_branch = None
+
+    # 🔸 main_admin은 본인 branch 자동 설정
+    if user.grade == "main_admin" and user_branch:
+        selected_branch = user_branch
         deadline_day = (
             StructureDeadline.objects.filter(branch=user_branch, month=month_str)
             .values_list("deadline_day", flat=True)
@@ -70,16 +75,17 @@ def manage_charts(request):
         "current_month": now.month,
         "available_periods": [f"{now.year}-{m:02d}" for m in range(1, now.month + 1)],
         "future_select_until": (
-            f"{now.year}-{now.month + 1:02d}"
-            if now.month < 12
-            else f"{now.year + 1}-01"
+            f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01"
         ),
         "branches": BRANCH_PARTS,
         "deadline_day": deadline_day,
+        "selected_branch": selected_branch,
         "data_fetch_url": "/partner/api/fetch/",
         "data_save_url": "/partner/api/save/",
         "data_delete_url": "/partner/api/delete/",
         "set_deadline_url": "/partner/api/set-deadline/",
+        # 🆕 초기 데이터 표시 여부
+        "auto_load": user.grade == "main_admin",  # main_admin만 true
     }
     return render(request, "partner/manage_charts.html", context)
 
@@ -209,14 +215,17 @@ def ajax_set_deadline(request):
 def ajax_fetch(request):
     """AJAX — 월도 기준으로 편제변경 데이터 조회"""
     month = request.GET.get("month")
+    branch = request.GET.get("branch")
     if not month:
         return JsonResponse({"status": "success", "rows": []})
 
     qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
-
-    # 권한별 필터링
     user = request.user
-    if user.grade == "main_admin":
+
+    # 🔸 superuser는 선택한 branch 필터 적용
+    if user.grade == "superuser" and branch:
+        qs = qs.filter(branch=branch)
+    elif user.grade == "main_admin":
         qs = qs.filter(branch=user.branch)
     elif user.grade == "sub_admin":
         qs = qs.filter(requester=user)
@@ -306,13 +315,16 @@ def manage_grades(request):
 @login_required
 def upload_grades_excel(request):
     """
-    엑셀 업로드를 통한 SubAdminTemp 업데이트
-    - '사번', '팀A', '팀B', '팀C', '직급' 컬럼 사용
+    ✅ 엑셀 업로드를 통한 전체설계사 명단(allUserTable) 갱신
+    - SubAdminTemp(=allUserTable 저장소)에만 반영
+    - CustomUser는 수정하지 않음
+    - 이후 중간관리자(subAdminTable)는 CustomUser.grade=sub_admin 필터로 SubAdminTemp와 매칭
     """
     if request.method == "POST" and request.FILES.get("excel_file"):
         file = request.FILES["excel_file"]
 
         try:
+            # 📘 '업로드' 시트에서 읽기
             df = pd.read_excel(file, sheet_name="업로드").fillna("")
 
             required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
@@ -320,30 +332,32 @@ def upload_grades_excel(request):
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
                     return redirect("partner:manage_grades")
-            
-            # ✅ 부서/지점은 업로드 반영 금지
-            ignore_cols = ["부서", "지점"]
+
+            # ✅ 부서/지점/등급은 무시
+            ignore_cols = ["부서", "지점", "등급"]
             for col in ignore_cols:
                 if col in df.columns:
                     df = df.drop(columns=[col])
 
-            if "등급" in df.columns:
-                df = df.drop(columns=["등급"])
+            updated, created = 0, 0
 
-            created, updated = 0, 0
             for _, row in df.iterrows():
                 user_id = str(row["사번"]).strip()
-                cu = CustomUser.objects.filter(id=user_id, grade="sub_admin").first()
+                cu = CustomUser.objects.filter(id=user_id).first()
                 if not cu:
-                    continue
+                    continue  # 존재하지 않는 사번은 스킵
 
+                # ✅ 전체사용자(allUserTable = SubAdminTemp)에 업데이트
                 obj, is_created = SubAdminTemp.objects.update_or_create(
                     user=cu,
                     defaults={
-                        "team_a": row["팀A"],
-                        "team_b": row["팀B"],
-                        "team_c": row["팀C"],
-                        "position": row["직급"],
+                        "part": cu.part or "-",
+                        "branch": cu.branch or "-",
+                        "name": cu.name or "-",
+                        "team_a": row["팀A"] or "-",
+                        "team_b": row["팀B"] or "-",
+                        "team_c": row["팀C"] or "-",
+                        "position": row["직급"] or "-",
                     },
                 )
                 if is_created:
@@ -351,10 +365,13 @@ def upload_grades_excel(request):
                 else:
                     updated += 1
 
-            messages.success(request, f"업로드 완료: 신규 {created}건, 수정 {updated}건")
+            messages.success(request, f"업로드 완료: 신규 {created}건, 수정 {updated}건 반영")
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             messages.error(request, f"엑셀 처리 중 오류 발생: {e}")
+
     else:
         messages.warning(request, "엑셀 파일을 선택하세요.")
 
@@ -387,20 +404,40 @@ def ajax_users_data(request):
     else:
         return JsonResponse({"data": data, "recordsTotal": total_count, "recordsFiltered": total_count,}, safe=False)
 
+    # ✅ 검색 조건 추가 (팀A/B/C까지 포함)
     if search:
-        qs = qs.filter(
-            Q(name__icontains=search)
-            | Q(id__icontains=search)
-            | Q(branch__icontains=search)
-            | Q(part__icontains=search)
+        # 먼저 CustomUser 기준 필터링
+        user_ids_from_custom = list(
+            qs.filter(
+                Q(name__icontains=search)
+                | Q(id__icontains=search)
+                | Q(branch__icontains=search)
+                | Q(part__icontains=search)
+            ).values_list("id", flat=True)
         )
 
-    total_count = qs.count()
+        # 그 다음 SubAdminTemp(팀/직급)에서 검색되는 user_id 추출
+        user_ids_from_subadmin = list(
+            SubAdminTemp.objects.filter(
+                Q(team_a__icontains=search)
+                | Q(team_b__icontains=search)
+                | Q(team_c__icontains=search)
+                | Q(position__icontains=search)
+            ).values_list("user_id", flat=True)
+        )
 
+        # 두 결과를 합쳐서 중복 제거
+        combined_user_ids = set(user_ids_from_custom + user_ids_from_subadmin)
+
+        qs = qs.filter(id__in=combined_user_ids)
+
+    # ✅ 페이징 처리
+    total_count = qs.count()
     paginator = Paginator(qs.only("id", "name", "branch", "part", "grade")[:2000], length)
     page_number = start // length + 1
     page = paginator.get_page(page_number)
 
+    # ✅ SubAdminTemp 매핑 (팀A/B/C/직급 정보 포함)
     subadmin_map = {
         str(sa.user_id): {
             "position": sa.position or "",
@@ -411,6 +448,7 @@ def ajax_users_data(request):
         for sa in SubAdminTemp.objects.filter(user_id__in=[u.id for u in page])
     }
 
+    # ✅ DataTables JSON 변환
     data = []
     for u in page:
         sa_info = subadmin_map.get(str(u.id), {})
