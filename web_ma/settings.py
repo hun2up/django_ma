@@ -233,3 +233,6 @@ logging.getLogger("django.server").setLevel(logging.ERROR)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# 업로드 시 필드 수 제한 해제 또는 확장
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
