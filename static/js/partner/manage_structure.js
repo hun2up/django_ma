@@ -115,6 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ✅ 테이블 렌더링 */
   function renderMainTable(rows) {
     const canEditProcessDate = ["superuser", "main_admin"].includes(userGrade);
+    const canDelete = ["superuser", "main_admin"].includes(userGrade);
     const updateUrl = root.dataset.updateProcessDateUrl;
     const tbody = els.mainTable.querySelector("tbody");
     tbody.innerHTML = "";
@@ -149,7 +150,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 : `${r.process_date || "-"}`
             }
           </td>
-          <td><button class="btn btn-outline-danger btn-sm btnDeleteRow" data-id="${r.id}">삭제</button></td>
+          <td>
+            ${
+              canDelete
+                ? `<button class="btn btn-outline-danger btn-sm btnDeleteRow" data-id="${r.id}">삭제</button>`
+                : `<button class="btn btn-outline-secondary btn-sm" disabled>삭제</button>`
+            }
+          </td>
         </tr>`
       );
     });
@@ -458,7 +465,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* =======================================================
-     📌 7. 초기 동작
+    📌 7. 초기 동작
   ======================================================= */
   if (window.jQuery && $.fn.DataTable) {
     $(els.mainTable).DataTable({
@@ -467,11 +474,38 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // main_admin → 자동조회 / superuser → 대기
-  if (userGrade === "main_admin") setTimeout(fetchData, 300);
+  // ✅ main_admin / sub_admin 모두 자동조회
+  if (["main_admin", "sub_admin"].includes(userGrade)) {
+    const year = els.year.value;
+    const month = els.month.value;
+    const branch = els.branch?.value || "";
+    setTimeout(() => fetchData(`${year}-${month}`, branch), 300);
+  }
 
   // ✅ 항상 대상자 입력 섹션 표시 (디버그용)
   els.inputSection.removeAttribute("hidden");
+
+  /* =======================================================
+     📌 공통 모달에서 선택된 사용자 이벤트 수신
+  ======================================================= */
+  document.addEventListener("userSelected", (e) => {
+    const { id, name, branch, part, rank, regist } = e.detail;
+    const targetRow = document.querySelector("#inputTable tbody tr:last-child");
+    if (!targetRow) return alert("입력 행이 존재하지 않습니다.");
+
+    // 대상자 정보 채우기
+    targetRow.querySelector("input[name='tg_id']").value = id;
+    targetRow.querySelector("input[name='tg_name']").value = name;
+    targetRow.querySelector("input[name='tg_branch']").value = `${part} ${branch}`;
+    targetRow.querySelector("input[name='tg_rank']").value = rank || "";
+    if (targetRow.querySelector("input[name='tg_regist']"))
+      targetRow.querySelector("input[name='tg_regist']").value = regist || "";
+
+    // 요청자 정보도 자동 입력
+    targetRow.querySelector("input[name='rq_name']").value = window.currentUser?.name || "";
+    targetRow.querySelector("input[name='rq_id']").value = window.currentUser?.id || "";
+    targetRow.querySelector("input[name='rq_branch']").value = window.currentUser?.branch || "";
+  });
 
   /* =======================================================
     📌 대상자 검색 모달 — 기본 submit 차단 + 검색 로직
@@ -501,12 +535,21 @@ document.addEventListener("DOMContentLoaded", () => {
               (u) => `
                 <div class="border rounded p-2 mb-1 d-flex justify-content-between align-items-center">
                   <div>
-                    <strong>${u.name}</strong> (${u.id})<br>
-                    <small class="text-muted">${u.branch || ""} / ${u.part || ""}</small>
+                    <strong>${u.name}</strong> (${u.id})
+                    ${u.regist ? ` <span class="text-muted">(${u.regist})</span>` : ""}<br>
+                    <small class="text-muted">
+                      ${u.part || ""}${u.branch ? " " + u.branch : ""}
+                    </small>
                   </div>
                   <button type="button" class="btn btn-sm btn-outline-primary selectUserBtn"
-                          data-id="${u.id}" data-name="${u.name}" data-branch="${u.branch || ""}"
-                          data-rank="${u.rank || ""}">선택</button>
+                          data-id="${u.id}" 
+                          data-name="${u.name}" 
+                          data-branch="${u.branch || ""}"
+                          data-part="${u.part || ""}"
+                          data-rank="${u.rank || ""}"
+                          data-regist="${u.regist || ""}">
+                    선택
+                  </button>
                 </div>`
             )
             .join("");
@@ -524,35 +567,34 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", (e) => {
     if (!e.target.classList.contains("selectUserBtn")) return;
 
-    // ✅ 선택된 사용자 데이터 가져오기
     const btn = e.target;
     const userId = btn.dataset.id;
     const userName = btn.dataset.name;
     const userBranch = btn.dataset.branch || "";
+    const userPart = btn.dataset.part || "";
     const userRank = btn.dataset.rank || "";
+    const userRegist = btn.dataset.regist || "";
 
-    // ✅ 현재 열려 있는 입력행 중 '대상자' 정보 입력
-    // - 기준: 현재 활성화된 input-row (마지막 추가된 행)
     const targetRow = document.querySelector("#inputTable tbody tr:last-child");
     if (!targetRow) return alert("입력 행이 존재하지 않습니다.");
 
     targetRow.querySelector("input[name='tg_id']").value = userId;
     targetRow.querySelector("input[name='tg_name']").value = userName;
-    targetRow.querySelector("input[name='tg_branch']").value = userBranch;
+    targetRow.querySelector("input[name='tg_branch']").value = `${userPart} ${userBranch}`;
     targetRow.querySelector("input[name='tg_rank']").value = userRank;
+    if (targetRow.querySelector("input[name='tg_regist']"))
+      targetRow.querySelector("input[name='tg_regist']").value = userRegist;
 
-    // ✅ 요청자 정보도 자동 입력 (로그인 사용자 기준)
+    // 요청자 정보 자동입력
     targetRow.querySelector("input[name='rq_name']").value = window.currentUser?.name || "";
     targetRow.querySelector("input[name='rq_id']").value = window.currentUser?.id || "";
     targetRow.querySelector("input[name='rq_branch']").value = window.currentUser?.branch || "";
 
-    // ✅ 모달 닫기 (Bootstrap 5 API)
+    // 모달 닫기
     const modal = bootstrap.Modal.getInstance(document.getElementById("searchUserModal"));
     if (modal) modal.hide();
 
-    // ✅ 검색결과 영역 초기화
     document.getElementById("searchResults").innerHTML = "";
     document.getElementById("searchKeyword").value = "";
   });
-
 });

@@ -315,13 +315,18 @@ def search_user(request):
         return JsonResponse({"results": []})
 
     qs = CustomUser.objects.all()
+
+    # 🔹 슈퍼유저가 아닐 경우 자신의 지점(branch)만 검색 가능
     if request.user.grade != "superuser":
         qs = qs.filter(branch=request.user.branch)
 
-    users = qs.filter(
-        Q(name__icontains=keyword) | Q(regist__icontains=keyword)
-    ).values("id", "name", "regist", "branch", "enter", "quit")[:20]
+    # 🔹 검색 조건: 이름(name) 또는 사번(id)
+    users = (
+        qs.filter(Q(name__icontains=keyword) | Q(id__icontains=keyword))
+        .values("id", "name", "regist", "branch", "enter", "quit")[:20]
+    )
 
+    # 🔹 regist는 검색 조건엔 포함되지 않지만 결과에 포함됨
     return JsonResponse({"results": list(users)})
 
 

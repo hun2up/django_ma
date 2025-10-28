@@ -4,6 +4,12 @@
 
 {% block content %}
 <div class="container text-center mt-5">
+
+  <!-- ✅ 권한 안내 (뷰 데코레이터에서 차단되더라도 UX 차원 메시지) -->
+  {% if user.grade not in 'superuser main_admin sub_admin' %}
+    <div class="alert alert-danger">접근 권한이 없습니다.</div>
+  {% endif %}
+  
   <h2 class="fw-bold" style="color:#003f7d;">요율관리 페이지</h2>
   <p class="text-muted mt-3">🚧 제작중입니다 🚧</p>
 </div>

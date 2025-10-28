@@ -91,10 +91,7 @@ def manage_charts(request):
 
 
 # ------------------------------------------------------------
-# 📘 2. 편제변경 — 데이터 저장
-# ------------------------------------------------------------
-# ------------------------------------------------------------
-# 📘 2. 편제변경 — 데이터 저장 (수정 버전)
+# 📘 2. 편제변경 — 데이터 저장 (완전 안정화 버전)
 # ------------------------------------------------------------
 @require_POST
 @grade_required(["superuser", "main_admin", "sub_admin"])
@@ -104,11 +101,18 @@ def ajax_save(request):
     try:
         payload = json.loads(request.body)
         items = payload.get("rows", [])
-        month = payload.get("month")
+        month = (payload.get("month") or "").strip()
 
-        # ✅ superuser → 선택한 part / main_admin → 본인 branch / sub_admin → 본인
-        part = payload.get("part") or getattr(request.user, "part", "")
-        branch = payload.get("branch") or getattr(request.user, "branch", "")
+        # ✅ month 형식 보정 ("YYYY-M" → "YYYY-MM")
+        if month:
+            parts = month.split("-")
+            if len(parts) == 2:
+                y, m = parts
+                month = f"{y}-{int(m):02d}"
+
+        user = request.user
+        part = payload.get("part") or getattr(user, "part", "") or "-"
+        branch = payload.get("branch") or getattr(user, "branch", "") or "-"
 
         created_count = 0
         for row in items:
@@ -117,26 +121,22 @@ def ajax_save(request):
                 continue
 
             StructureChange.objects.create(
-                requester=request.user,
+                requester=user,
                 target=target,
-                part=part,  # ✅ 부서 저장 (superuser 조회용)
+                part=part,
                 branch=branch,
-                target_branch=getattr(target, "branch", ""),
-                chg_branch=row.get("chg_branch"),
+                target_branch=getattr(target, "branch", "") or "-",
+                chg_branch=row.get("chg_branch") or "-",
                 or_flag=row.get("or_flag", False),
-                rank=row.get("tg_rank"),
-                chg_rank=row.get("chg_rank"),
-                table_name=row.get("tg_table"),
-                chg_table=row.get("chg_table"),
-                rate=row.get("tg_rate") or None,
-                chg_rate=row.get("chg_rate") or None,
-                memo=row.get("memo"),
+                rank=row.get("tg_rank") or "-",
+                chg_rank=row.get("chg_rank") or "-",
+                memo=row.get("memo") or "",
                 month=month,
             )
             created_count += 1
 
         PartnerChangeLog.objects.create(
-            user=request.user,
+            user=user,
             action="save",
             detail=f"{created_count}건 저장 (월도: {month}, 부서: {part}, 지점: {branch})",
         )
@@ -147,9 +147,9 @@ def ajax_save(request):
             "message": f"{created_count}건 저장 완료"
         })
 
-    except Exception:
+    except Exception as e:
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": "저장 처리 중 오류 발생"}, status=400)
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 # ------------------------------------------------------------
@@ -222,92 +222,109 @@ def ajax_update_process_date(request):
 
 
 # ------------------------------------------------------------
-# 📘 5. 편제변경 — 데이터 조회 (자동 기한 기본값 추가)
+# 📘 5. 편제변경 — 데이터 조회 (sub_admin 새로고침 문제 완전 해결)
 # ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    month = request.GET.get("month")
-    part = (request.GET.get("branch", "") or "").strip()
-    user = request.user
+    """AJAX — 편제변경 데이터 조회 (권한·레벨 기반 필터링 포함)"""
+    try:
+        # ✅ 월도 형식 보정
+        month = (request.GET.get("month") or "").strip()
+        if month:
+            parts = month.split("-")
+            if len(parts) == 2:
+                y, m = parts
+                month = f"{y}-{int(m):02d}"
 
-    if not month:
-        return JsonResponse({"status": "success", "rows": []})
+        part = (request.GET.get("branch") or "").strip()
+        user = request.user
 
-    qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
+        if not month:
+            return JsonResponse({"status": "success", "rows": []})
 
-    # 권한별 필터
-    if user.grade == "superuser":
-        if part:
-            qs = qs.filter(part=part)
-    elif user.grade == "main_admin":
-        qs = qs.filter(branch=user.branch)
-    elif user.grade == "sub_admin":
-        qs = qs.filter(requester=user)
+        qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
 
-    def safe(v):
-        if isinstance(v, Decimal):
-            return str(v)
-        if hasattr(v, "strftime"):
-            try:
-                return v.strftime("%Y-%m-%d")
-            except Exception:
+        # =======================================================
+        # 🔐 권한별 데이터 접근 제한
+        # =======================================================
+        if user.grade == "superuser":
+            # 전체 조회 가능
+            if part:
+                qs = qs.filter(branch=part)
+
+        elif user.grade == "main_admin":
+            # 본인 branch 내 데이터만
+            qs = qs.filter(branch=user.branch)
+
+        elif user.grade == "sub_admin":
+            # ✅ SubAdminTemp 정보 조회
+            sub_info = SubAdminTemp.objects.filter(user=user).first()
+
+            if sub_info:
+                level = (sub_info.level or "").strip()
+                team_a = (sub_info.team_a or "").strip()
+                team_b = (sub_info.team_b or "").strip()
+                team_c = (sub_info.team_c or "").strip()
+
+                # ------------------------------
+                # 🟢 레벨별 필터링
+                # ------------------------------
+                if level == "A레벨" and team_a:
+                    qs = qs.filter(requester__subadmin_detail__team_a=team_a)
+                elif level == "B레벨" and team_b:
+                    qs = qs.filter(requester__subadmin_detail__team_b=team_b)
+                elif level == "C레벨" and team_c:
+                    qs = qs.filter(requester__subadmin_detail__team_c=team_c)
+                else:
+                    # 레벨/팀 데이터 없으면 branch 기준으로 제한
+                    qs = qs.filter(branch=user.branch)
+            else:
+                qs = qs.filter(branch=user.branch)
+
+        # =======================================================
+        # 🔧 유틸: 안전한 값 변환
+        # =======================================================
+        def safe(v):
+            if isinstance(v, Decimal):
                 return str(v)
-        return v or ""
+            if hasattr(v, "strftime"):
+                try:
+                    return v.strftime("%Y-%m-%d")
+                except Exception:
+                    return str(v)
+            return v or ""
 
-    rows = []
-    for sc in qs:
-        rows.append({
-            "id": sc.id,
-            "requester_id": getattr(sc.requester, "id", ""),
-            "requester_name": getattr(sc.requester, "name", ""),
-            "branch": sc.branch or "",
-            "target_id": getattr(sc.target, "id", ""),
-            "target_name": getattr(sc.target, "name", ""),
-            "target_branch": getattr(sc.target, "branch", ""),
-            "chg_branch": safe(sc.chg_branch),
-            "rank": safe(sc.rank),
-            "chg_rank": safe(sc.chg_rank),
-            "memo": safe(sc.memo),
-            "request_date": safe(sc.request_date),
-            "process_date": safe(sc.process_date),
-            "rate": safe(sc.rate),
-            "chg_rate": safe(sc.chg_rate),
-        })
+        # =======================================================
+        # 📦 데이터 직렬화
+        # =======================================================
+        rows = [
+            {
+                "id": sc.id,
+                "requester_id": getattr(sc.requester, "id", ""),
+                "requester_name": getattr(sc.requester, "name", ""),
+                "branch": sc.branch or "",
+                "target_id": getattr(sc.target, "id", ""),
+                "target_name": getattr(sc.target, "name", ""),
+                "target_branch": getattr(sc.target, "branch", ""),
+                "chg_branch": safe(sc.chg_branch),
+                "or_flag": bool(sc.or_flag),
+                "rank": safe(sc.rank),
+                "chg_rank": safe(sc.chg_rank),
+                "memo": safe(sc.memo),
+                "request_date": safe(sc.request_date),
+                "process_date": safe(sc.process_date),
+                "rate": safe(sc.rate),
+                "chg_rate": safe(sc.chg_rate),
+            }
+            for sc in qs.order_by("-id")
+        ]
 
-    def safe(v):
-        if isinstance(v, Decimal):
-            return str(v)
-        if hasattr(v, "strftime"):
-            try:
-                return v.strftime("%Y-%m-%d")
-            except Exception:
-                return str(v)
-        return v or ""
+        return JsonResponse({"status": "success", "rows": rows})
 
-    rows = []
-    for sc in qs:
-        rows.append({
-            "id": sc.id,
-            "requester_id": getattr(sc.requester, "id", ""),
-            "requester_name": getattr(sc.requester, "name", ""),
-            "branch": sc.branch or "",
-            "target_id": getattr(sc.target, "id", ""),
-            "target_name": getattr(sc.target, "name", ""),
-            "target_branch": getattr(sc.target, "branch", ""),
-            "chg_branch": safe(sc.chg_branch),
-            "or_flag": bool(sc.or_flag),   # ✅ 추가 (boolean)
-            "rank": safe(sc.rank),
-            "chg_rank": safe(sc.chg_rank),
-            "memo": safe(sc.memo),
-            "request_date": safe(sc.request_date),
-            "process_date": safe(sc.process_date),
-            "rate": safe(sc.rate),
-            "chg_rate": safe(sc.chg_rate),
-        })
-
-    return JsonResponse({"status": "success", "rows": rows})
-
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 # ------------------------------------------------------------

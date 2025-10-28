@@ -302,3 +302,75 @@ input[name^="premium_"] {
   pointer-events: none;
   filter: grayscale(0.8);
 }
+
+/* =======================================================
+   ✅ 편제변경 페이지 카드 전체 폭 확장
+   ======================================================= */
+#manage-structure {
+  width: 86vw !important;
+  max-width: none !important;
+  margin-left: calc(-43vw + 50%) !important;
+  border-radius: 14px;
+}
+
+/* 카드 전체를 화면 폭에 맞게 확장 */
+#manage-structure .card {
+  width: 100%;
+  max-width: none;   /* ✅ 1600px 제한 제거 */
+  margin: 0 auto 1.5rem auto;
+  border-radius: 14px;
+}
+
+/* 내부 테이블이 카드 폭을 꽉 채우도록 */
+#manage-structure .table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible; /* ✅ 스크롤 강제 방지 */
+}
+
+/* 테이블 셀 폰트 균형 */
+#manage-structure table th,
+#manage-structure table td {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* =============================
+   📘 조직관리 - 테이블 스타일
+   ============================= */
+/* 🎯 대상자 입력 테이블 */
+#inputTable th {
+  font-size: 12px;       /* 헤더 폰트 */
+  font-weight: 600;
+}
+
+#inputTable td, 
+#inputTable input, 
+#inputTable select {
+  font-size: 12px;       /* 데이터 폰트 */
+}
+
+/* 🎯 메인시트 테이블 */
+#mainTable th {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#mainTable td {
+  font-size: 12px;
+}
+
+table {
+  table-layout: fixed; /* 고정 폭 기반 레이아웃 */
+  width: 100%;         /* 부모 컨테이너에 맞춤 */
+}
+
+.text-blue {
+  color: #005BAC !important;
+  font-weight: 600;
+}
+
+#inputTable th {
+  text-align: center !important;
+  vertical-align: middle !important;  /* 세로 중앙 정렬 */
+}
