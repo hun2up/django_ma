@@ -82,12 +82,12 @@
           <col style="width: 8%"> <!-- 소속(요청자) -->
           <col style="width: 5%"> <!-- 성명(대상자) -->
           <col style="width: 6%"> <!-- 사번(대상자) -->
-          <col style="width: 8%"> <!-- 소속(변경전) -->
-          <col style="width: 15%"> <!-- 소속(변경후) -->          
+          <col style="width: 14%"> <!-- 소속(변경전) -->
+          <col style="width: 11%"> <!-- 소속(변경후) -->          
           <col style="width: 7%"> <!-- 직급(변경전) -->          
           <col style="width: 7%"> <!-- 직급(변경후) -->
           <col style="width: 4%"> <!-- OR -->
-          <col style="width: 20%"> <!-- 비고 -->
+          <col style="width: 18%"> <!-- 비고 -->
           <col style="width: 4%"> <!-- 검색 --> 
           <col style="width: 4%"> <!-- 삭제 -->
         </colgroup>
@@ -158,12 +158,12 @@
           <col style="width: 7%"> <!-- 소속(요청자) -->
           <col style="width: 5%"> <!-- 성명(대상자) -->
           <col style="width: 5%"> <!-- 사번(대상자) -->
-          <col style="width: 7%"> <!-- 소속(변경전) -->
+          <col style="width: 10%"> <!-- 소속(변경전) -->
           <col style="width: 9%"> <!-- 소속(변경후) -->          
           <col style="width: 7%"> <!-- 직급(변경전) -->
           <col style="width: 9%"> <!-- 직급(변경후) -->
           <col style="width: 4%"> <!-- OR -->
-          <col style="width: 17%"> <!-- 비고 -->
+          <col style="width: 14%"> <!-- 비고 -->
           <col style="width: 6%"> <!-- 요청일자 --> 
           <col style="width: 8%"> <!-- 처리일자 -->
           <col style="width: 5%"> <!-- 삭제 -->
@@ -223,8 +223,13 @@
   window.currentUser = {
     id: "{{ user.id|escapejs }}",
     name: "{{ user.name|escapejs }}",
+    part: "{{ user.part|escapejs }}",
     branch: "{{ user.branch|escapejs }}",
-    grade: "{{ user.grade|escapejs }}"
+    grade: "{{ user.grade|escapejs }}",
+    level: "{{ subadmin_info.level|default:''|escapejs }}",
+    team_a: "{{ subadmin_info.team_a|default:''|escapejs }}",
+    team_b: "{{ subadmin_info.team_b|default:''|escapejs }}",
+    team_c: "{{ subadmin_info.team_c|default:''|escapejs }}"
   };
 </script>
 

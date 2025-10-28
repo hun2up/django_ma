@@ -54,6 +54,43 @@ document.addEventListener("DOMContentLoaded", () => {
   const pad2 = (n) => (String(n).length === 1 ? "0" + n : String(n));
   const selectedYM = () => `${els.year.value}-${pad2(els.month.value)}`;
 
+  /* ------------------------------
+     📌 요청자 소속 표시 규칙
+  ------------------------------ */
+  function formatRequesterBranch(user) {
+    const grade = user.grade || "";
+    const level = (user.level || "").toUpperCase();
+    const branch = user.branch || "";
+    const teamA = user.team_a || "";
+    const teamB = user.team_b || "";
+    const teamC = user.team_c || "";
+    const part = user.part || "";
+
+    if (grade === "superuser") return part || "-";
+    if (grade === "main_admin") return branch || "-";
+    if (grade === "sub_admin") {
+      if (level === "A") return [teamA].filter(Boolean).join(" + ");
+      if (level === "B") return [teamA, teamB].filter(Boolean).join(" + ");
+      if (level === "C") return [teamA, teamB, teamC].filter(Boolean).join(" + ");
+    }
+    return branch || part || "-";
+  }
+
+  window.formatRequesterBranch = formatRequesterBranch;
+
+  /* ------------------------------
+     📌 대상자 소속 표시 규칙 (기존 유지)
+  ------------------------------ */
+  function formatTargetBranch(user) {
+    const teamA = user.team_a || "";
+    const teamB = user.team_b || "";
+    const teamC = user.team_c || "";
+    if (teamC) return teamC;
+    if (teamB) return [teamB, teamC].filter(Boolean).join(" + ");
+    if (teamA) return [teamA, teamB, teamC].filter(Boolean).join(" + ");
+    return user.branch || "-";
+  }
+
   /* =======================================================
      📌 1. 기본 Select 옵션 세팅
   ======================================================= */
@@ -191,8 +228,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
     }
-    
-    
   }
 
   /* ✅ 검색 버튼 클릭 시 fetchData 실행 */
@@ -502,9 +537,10 @@ document.addEventListener("DOMContentLoaded", () => {
       targetRow.querySelector("input[name='tg_regist']").value = regist || "";
 
     // 요청자 정보도 자동 입력
+    const rqBranch = formatRequesterBranch(window.currentUser);
     targetRow.querySelector("input[name='rq_name']").value = window.currentUser?.name || "";
     targetRow.querySelector("input[name='rq_id']").value = window.currentUser?.id || "";
-    targetRow.querySelector("input[name='rq_branch']").value = window.currentUser?.branch || "";
+    targetRow.querySelector("input[name='rq_branch']").value = rqBranch;
   });
 
   /* =======================================================

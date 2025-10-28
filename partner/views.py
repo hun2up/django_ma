@@ -60,6 +60,13 @@ def manage_charts(request):
     user_branch = getattr(user, "branch", None)
     deadline_day = None
     selected_branch = None
+    subadmin_info = None
+
+    # ✅ SubAdminTemp 데이터 있으면 병합
+    try:
+        subadmin_info = SubAdminTemp.objects.get(user=user)
+    except SubAdminTemp.DoesNotExist:
+        pass
 
     # 🔸 main_admin은 본인 branch 자동 설정
     if user.grade == "main_admin" and user_branch:
@@ -86,6 +93,7 @@ def manage_charts(request):
         "set_deadline_url": "/partner/api/set-deadline/",
         # 🆕 초기 데이터 표시 여부
         "auto_load": user.grade == "main_admin",  # main_admin만 true
+        "subadmin_info": subadmin_info,
     }
     return render(request, "partner/manage_charts.html", context)
 
