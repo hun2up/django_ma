@@ -79,36 +79,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* =======================================================
-     📌 2. 데이터 조회
+    📌 2. 데이터 조회 (개선버전)
   ======================================================= */
-  async function fetchData() {
-    const y = els.year.value;
-    const m = els.month.value;
-    const b = els.branch?.value || "";
-    const ym = `${y}-${pad2(m)}`;
-
-    if (userGrade === "superuser" && !b) return alertBox("부서를 선택해주세요.");
+  async function fetchData(ym = null, branchValue = null) {
+    const y = ym ? ym.split("-")[0] : els.year.value;
+    const m = ym ? ym.split("-")[1] : els.month.value;
+    const b = branchValue !== null ? branchValue : els.branch?.value || "";
+    const ymValue = `${y}-${pad2(m)}`;
 
     showLoading("데이터 불러오는 중...");
+
+    if (userGrade === "superuser" && !b) {
+      alertBox("부서를 선택해주세요.");
+      hideLoading();
+      return;
+    }
+
     try {
-      const res = await fetch(`${dataFetchUrl}?month=${ym}&branch=${b}`);
+      // ✅ 실제 fetch 호출
+      const res = await fetch(`${dataFetchUrl}?month=${ymValue}&branch=${b}`);
       if (!res.ok) throw new Error("조회 실패");
+
       const data = await res.json();
+      console.log("✅ fetchData 응답:", data);
+
       renderMainTable(data.rows || []);
     } catch (err) {
-      console.error(err);
+      console.error("❌ fetchData 오류:", err);
       alertBox("데이터를 불러오지 못했습니다.");
     } finally {
       hideLoading();
     }
   }
 
+  /* ✅ 테이블 렌더링 */
   function renderMainTable(rows) {
     const tbody = els.mainTable.querySelector("tbody");
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="16" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="17" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
       return;
     }
 
@@ -140,21 +150,45 @@ document.addEventListener("DOMContentLoaded", () => {
     attachDeleteHandlers();
   }
 
-  els.btnSearch?.addEventListener("click", fetchData);
+  /* ✅ 검색 버튼 클릭 시 fetchData 실행 */
+  els.btnSearch?.addEventListener("click", () => fetchData());
+
 
   /* =======================================================
-     📌 3. 데이터 저장
+    📌 3. 데이터 저장
   ======================================================= */
   async function saveRows() {
-    const rows = Array.from(els.inputTable.querySelectorAll("tbody tr")).map((tr) => {
-      const obj = {};
-      tr.querySelectorAll("input, select").forEach((el) => {
-        obj[el.name] = el.type === "checkbox" ? el.checked : el.value.trim();
-      });
-      return obj;
-    });
+    const rows = Array.from(document.querySelectorAll("#inputTable tbody tr"));
+    const payload = [];
+
+    for (const row of rows) {
+      const rq_id = row.querySelector("[name='rq_id']").value.trim();
+      const tg_id = row.querySelector("[name='tg_id']").value.trim();
+
+      // ✅ 1️⃣ 대상자 미선택 검증
+      if (!tg_id) {
+        alertBox("대상자를 선택해주세요.");
+        return;
+      }
+
+      const data = {
+        requester_id: rq_id,
+        target_id: tg_id,
+        chg_branch: row.querySelector("[name='chg_branch']").value.trim(),
+        or_flag: row.querySelector("[name='or_flag']").checked,
+        chg_rank: row.querySelector("[name='chg_rank']").value.trim(),
+        memo: row.querySelector("[name='memo']").value.trim(),
+      };
+      payload.push(data);
+    }
+
+    if (!payload.length) {
+      alertBox("저장할 데이터가 없습니다.");
+      return;
+    }
 
     showLoading("저장 중...");
+
     try {
       const res = await fetch(dataSaveUrl, {
         method: "POST",
@@ -162,20 +196,118 @@ document.addEventListener("DOMContentLoaded", () => {
           "Content-Type": "application/json",
           "X-CSRFToken": getCSRFToken(),
         },
-        body: JSON.stringify({ rows, month: selectedYM() }),
+        body: JSON.stringify({
+          rows: payload,
+          month: selectedYM(),
+          part: els.branch?.value || window.currentUser?.part || "",
+          branch: els.branch?.value || window.currentUser?.branch || "",
+        }),
       });
-      const data = await res.json();
-      alertBox(data.message || "저장 완료");
-      if (data.status === "success") fetchData();
+
+      if (!res.ok) throw new Error("저장 실패");
+
+      const result = await res.json();
+      if (result.status === "success") {
+        alertBox(`${result.saved_count}건 저장 완료`);
+        resetInputSection(); 
+
+        // ✅ 2️⃣ 저장 후 다시 조회 (branch 값 유지)
+        const year = els.year.value;
+        const month = els.month.value;
+        const branch = els.branch?.value || "";
+        await fetchData(`${year}-${month}`, branch);
+
+      } else {
+        alertBox("저장 중 오류가 발생했습니다.");
+      }
     } catch (err) {
-      console.error(err);
+      console.error("❌ saveRows 오류:", err);
       alertBox("저장 중 오류가 발생했습니다.");
     } finally {
       hideLoading();
     }
   }
 
+  /* =======================================================
+    📌 이벤트 연결
+  ======================================================= */
   els.btnSaveRows?.addEventListener("click", saveRows);
+
+
+  /* =======================================================
+    📌 입력영역 초기화 함수
+  ======================================================= */
+  function resetInputSection() {
+    const tbody = els.inputTable.querySelector("tbody");
+    const rows = tbody.querySelectorAll(".input-row");
+
+    // 첫 행만 남기고 나머지는 삭제
+    rows.forEach((r, idx) => {
+      if (idx > 0) r.remove();
+    });
+
+    // 첫 행 input 값 초기화
+    const firstRow = tbody.querySelector(".input-row");
+    if (firstRow) {
+      firstRow.querySelectorAll("input").forEach((el) => {
+        if (el.type === "checkbox") el.checked = false;
+        else el.value = "";
+      });
+    }
+  }
+
+
+  /* =======================================================
+    📌 대상자 입력행 제어 (추가 / 초기화)
+  ======================================================= */
+
+  // ✅ 행 추가
+  els.btnAddRow?.addEventListener("click", () => {
+    const tbody = els.inputTable.querySelector("tbody");
+    const rows = tbody.querySelectorAll(".input-row");
+
+    // 최대 10개 제한
+    if (rows.length >= 10) {
+      alertBox("대상자는 한 번에 10명까지 입력 가능합니다.");
+      return;
+    }
+
+    // 첫 번째 행 복제
+    const newRow = rows[0].cloneNode(true);
+
+    // 복제한 행의 input 초기화
+    newRow.querySelectorAll("input").forEach((el) => {
+      if (el.type === "checkbox") {
+        el.checked = false;
+      } else {
+        el.value = "";
+      }
+    });
+
+    tbody.appendChild(newRow);
+  });
+
+  // ✅ 초기화 버튼
+  els.btnResetRows?.addEventListener("click", () => {
+    if (!confirm("입력 내용을 모두 초기화하시겠습니까?")) return;
+    const tbody = els.inputTable.querySelector("tbody");
+    const rows = tbody.querySelectorAll(".input-row");
+
+    // 첫 행만 남기고 모두 삭제
+    rows.forEach((r, idx) => {
+      if (idx > 0) r.remove();
+    });
+
+    // 첫 행 input 초기화
+    const firstRow = tbody.querySelector(".input-row");
+    if (firstRow) {
+      firstRow.querySelectorAll("input").forEach((el) => {
+        if (el.type === "checkbox") el.checked = false;
+        else el.value = "";
+      });
+    }
+  });
+
 
   /* =======================================================
      📌 4. 데이터 삭제
@@ -188,6 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
           const res = await fetch(dataDeleteUrl, {
             method: "POST",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
               "X-CSRFToken": getCSRFToken(),
@@ -217,14 +350,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     showLoading("기한 설정 중...");
     try {
-      const res = await fetch(setDeadlineUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCSRFToken(),
-        },
-        body: JSON.stringify({ branch, deadline_day: day, month: selectedYM() }),
-      });
       const data = await res.json();
       alertBox(data.message || "기한 설정 완료");
 
@@ -289,4 +414,87 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ✅ 항상 대상자 입력 섹션 표시 (디버그용)
   els.inputSection.removeAttribute("hidden");
+
+  /* =======================================================
+    📌 대상자 검색 모달 — 기본 submit 차단 + 검색 로직
+  ======================================================= */
+  const searchForm = document.getElementById("searchUserForm");
+  if (searchForm) {
+    searchForm.addEventListener("submit", async (e) => {
+      e.preventDefault(); // ✅ 폼 제출 기본 동작 차단 (모달 닫힘 방지)
+
+      const keyword = document.getElementById("searchKeyword").value.trim();
+      if (!keyword) return alert("검색어를 입력하세요.");
+
+      // ✅ Ajax 요청 (기존 /board/search-user/ 재사용)
+      const url = root.dataset.searchUserUrl || "/board/search-user/";
+      try {
+        const res = await fetch(`${url}?q=${encodeURIComponent(keyword)}`);
+        if (!res.ok) throw new Error("검색 실패");
+        const data = await res.json();
+
+        // ✅ 검색 결과 표시
+        const results = document.getElementById("searchResults");
+        if (!data.results?.length) {
+          results.innerHTML = `<div class="text-muted small mt-2">검색 결과가 없습니다.</div>`;
+        } else {
+          results.innerHTML = data.results
+            .map(
+              (u) => `
+                <div class="border rounded p-2 mb-1 d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>${u.name}</strong> (${u.id})<br>
+                    <small class="text-muted">${u.branch || ""} / ${u.part || ""}</small>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-primary selectUserBtn"
+                          data-id="${u.id}" data-name="${u.name}" data-branch="${u.branch || ""}"
+                          data-rank="${u.rank || ""}">선택</button>
+                </div>`
+            )
+            .join("");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("검색 중 오류가 발생했습니다.");
+      }
+    });
+  }
+
+  /* =======================================================
+    📌 검색결과 선택 버튼 처리
+  ======================================================= */
+  document.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("selectUserBtn")) return;
+
+    // ✅ 선택된 사용자 데이터 가져오기
+    const btn = e.target;
+    const userId = btn.dataset.id;
+    const userName = btn.dataset.name;
+    const userBranch = btn.dataset.branch || "";
+    const userRank = btn.dataset.rank || "";
+
+    // ✅ 현재 열려 있는 입력행 중 '대상자' 정보 입력
+    // - 기준: 현재 활성화된 input-row (마지막 추가된 행)
+    const targetRow = document.querySelector("#inputTable tbody tr:last-child");
+    if (!targetRow) return alert("입력 행이 존재하지 않습니다.");
+
+    targetRow.querySelector("input[name='tg_id']").value = userId;
+    targetRow.querySelector("input[name='tg_name']").value = userName;
+    targetRow.querySelector("input[name='tg_branch']").value = userBranch;
+    targetRow.querySelector("input[name='tg_rank']").value = userRank;
+
+    // ✅ 요청자 정보도 자동 입력 (로그인 사용자 기준)
+    targetRow.querySelector("input[name='rq_name']").value = window.currentUser?.name || "";
+    targetRow.querySelector("input[name='rq_id']").value = window.currentUser?.id || "";
+    targetRow.querySelector("input[name='rq_branch']").value = window.currentUser?.branch || "";
+
+    // ✅ 모달 닫기 (Bootstrap 5 API)
+    const modal = bootstrap.Modal.getInstance(document.getElementById("searchUserModal"));
+    if (modal) modal.hide();
+
+    // ✅ 검색결과 영역 초기화
+    document.getElementById("searchResults").innerHTML = "";
+    document.getElementById("searchKeyword").value = "";
+  });
+
 });

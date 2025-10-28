@@ -29,6 +29,7 @@ class StructureChange(models.Model):
     )
 
     # 🔹 소속 정보
+    part = models.CharField(max_length=50, blank=True, null=True, verbose_name="부서")
     branch = models.CharField(max_length=50, blank=True, null=True, help_text="요청자 소속")
     target_branch = models.CharField(max_length=50, blank=True, null=True, help_text="대상자 기존 소속")
     chg_branch = models.CharField(max_length=50, blank=True, null=True, help_text="변경 후 소속")
