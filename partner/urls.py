@@ -19,4 +19,5 @@ urlpatterns = [
     path("api/fetch/", views.ajax_fetch, name="ajax_fetch"),
     path("api/users-data/", views.ajax_users_data, name="ajax_users_data"),
     path("api/update-level/", views.ajax_update_level, name="ajax_update_level"),
+    path("api/update-process-date/", views.ajax_update_process_date, name="ajax_update_process_date"),
 ]
