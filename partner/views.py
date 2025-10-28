@@ -2,6 +2,7 @@
 import json
 import traceback
 from datetime import datetime
+from decimal import Decimal
 
 import pandas as pd
 from django.core.paginator import Paginator
@@ -151,8 +152,6 @@ def ajax_save(request):
         return JsonResponse({"status": "error", "message": "저장 처리 중 오류 발생"}, status=400)
 
 
-
-
 # ------------------------------------------------------------
 # 📘 3. 편제변경 — 데이터 삭제
 # ------------------------------------------------------------
@@ -186,14 +185,50 @@ def ajax_delete(request):
 
 
 # ------------------------------------------------------------
+# 📘 4. 편제변경 — 처리일자 수정
+# ------------------------------------------------------------
+@require_POST
+@grade_required(["superuser", "main_admin"])
+@transaction.atomic
+def ajax_update_process_date(request):
+    """AJAX — 메인시트 처리일자 수정"""
+    try:
+        payload = json.loads(request.body)
+        record_id = payload.get("id")
+        new_date = payload.get("process_date")
+
+        record = get_object_or_404(StructureChange, id=record_id)
+
+        # YYYY-MM-DD 형식 검증
+        try:
+            parsed_date = datetime.strptime(new_date, "%Y-%m-%d").date()
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)"}, status=400)
+
+        record.process_date = parsed_date
+        record.save(update_fields=["process_date"])
+
+        PartnerChangeLog.objects.create(
+            user=request.user,
+            action="update_process_date",
+            detail=f"ID {record_id} 처리일자 수정 → {new_date}",
+        )
+
+        return JsonResponse({"status": "success", "message": f"처리일자 {new_date}로 변경 완료"})
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+# ------------------------------------------------------------
 # 📘 5. 편제변경 — 데이터 조회 (자동 기한 기본값 추가)
 # ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """편제변경 관리 데이터 조회"""
     month = request.GET.get("month")
-    part = (request.GET.get("branch", "") or "").strip()  # superuser 부서 선택값
+    part = (request.GET.get("branch", "") or "").strip()
     user = request.user
 
     if not month:
@@ -201,7 +236,7 @@ def ajax_fetch(request):
 
     qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
 
-    # ✅ 권한별 조회 조건
+    # 권한별 필터
     if user.grade == "superuser":
         if part:
             qs = qs.filter(part=part)
@@ -209,6 +244,16 @@ def ajax_fetch(request):
         qs = qs.filter(branch=user.branch)
     elif user.grade == "sub_admin":
         qs = qs.filter(requester=user)
+
+    def safe(v):
+        if isinstance(v, Decimal):
+            return str(v)
+        if hasattr(v, "strftime"):
+            try:
+                return v.strftime("%Y-%m-%d")
+            except Exception:
+                return str(v)
+        return v or ""
 
     rows = []
     for sc in qs:
@@ -220,20 +265,48 @@ def ajax_fetch(request):
             "target_id": getattr(sc.target, "id", ""),
             "target_name": getattr(sc.target, "name", ""),
             "target_branch": getattr(sc.target, "branch", ""),
-            "chg_branch": sc.chg_branch or "",
-            "rank": sc.rank or "",
-            "chg_rank": sc.chg_rank or "",
-            "table_name": sc.table_name or "",
-            "chg_table": sc.chg_table or "",
-            "rate": sc.rate or "",
-            "chg_rate": sc.chg_rate or "",
-            "memo": sc.memo or "",
-            "request_date": sc.request_date.strftime("%Y-%m-%d") if sc.request_date else "",
-            "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
+            "chg_branch": safe(sc.chg_branch),
+            "rank": safe(sc.rank),
+            "chg_rank": safe(sc.chg_rank),
+            "memo": safe(sc.memo),
+            "request_date": safe(sc.request_date),
+            "process_date": safe(sc.process_date),
+            "rate": safe(sc.rate),
+            "chg_rate": safe(sc.chg_rate),
+        })
+
+    def safe(v):
+        if isinstance(v, Decimal):
+            return str(v)
+        if hasattr(v, "strftime"):
+            try:
+                return v.strftime("%Y-%m-%d")
+            except Exception:
+                return str(v)
+        return v or ""
+
+    rows = []
+    for sc in qs:
+        rows.append({
+            "id": sc.id,
+            "requester_id": getattr(sc.requester, "id", ""),
+            "requester_name": getattr(sc.requester, "name", ""),
+            "branch": sc.branch or "",
+            "target_id": getattr(sc.target, "id", ""),
+            "target_name": getattr(sc.target, "name", ""),
+            "target_branch": getattr(sc.target, "branch", ""),
+            "chg_branch": safe(sc.chg_branch),
+            "or_flag": bool(sc.or_flag),   # ✅ 추가 (boolean)
+            "rank": safe(sc.rank),
+            "chg_rank": safe(sc.chg_rank),
+            "memo": safe(sc.memo),
+            "request_date": safe(sc.request_date),
+            "process_date": safe(sc.process_date),
+            "rate": safe(sc.rate),
+            "chg_rate": safe(sc.chg_rate),
         })
 
     return JsonResponse({"status": "success", "rows": rows})
-
 
 
 

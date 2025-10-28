@@ -359,3 +359,18 @@ input[name^="premium_"] {
 #mainTable td {
   font-size: 12px;
 }
+
+table {
+  table-layout: fixed; /* 고정 폭 기반 레이아웃 */
+  width: 100%;         /* 부모 컨테이너에 맞춤 */
+}
+
+.text-blue {
+  color: #005BAC !important;
+  font-weight: 600;
+}
+
+#inputTable th {
+  text-align: center !important;
+  vertical-align: middle !important;  /* 세로 중앙 정렬 */
+}

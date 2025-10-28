@@ -114,6 +114,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ✅ 테이블 렌더링 */
   function renderMainTable(rows) {
+    const canEditProcessDate = ["superuser", "main_admin"].includes(userGrade);
+    const updateUrl = root.dataset.updateProcessDateUrl;
     const tbody = els.mainTable.querySelector("tbody");
     tbody.innerHTML = "";
 
@@ -130,24 +132,60 @@ document.addEventListener("DOMContentLoaded", () => {
           <td>${r.requester_name || "-"}</td>
           <td>${r.requester_id || "-"}</td>
           <td>${r.branch || "-"}</td>
-          <td>${r.target_name || "-"}</td>
+          <td class="text-blue">${r.target_name || "-"}</td>
           <td>${r.target_id || "-"}</td>
           <td>${r.target_branch || "-"}</td>
-          <td>${r.chg_branch || "-"}</td>
+          <td class="text-blue">${r.chg_branch || "-"}</td>          
           <td>${r.rank || "-"}</td>
-          <td>${r.chg_rank || "-"}</td>
-          <td>${r.table_name || "-"}</td>
-          <td>${r.rate || "-"}</td>
-          <td>${r.chg_table || "-"}</td>
-          <td>${r.chg_rate || "-"}</td>
+          <td class="text-blue">${r.chg_rank || "-"}</td>
+          <td class="text-center">${r.or_flag ? "✅" : "❌"}</td>
           <td>${r.memo || "-"}</td>
           <td>${r.request_date || "-"}</td>
-          <td>${r.process_date || "-"}</td>
+          <td class="text-blue">
+            ${
+              canEditProcessDate
+                ? `<input type="date" class="form-control form-control-sm process-date-input" 
+                          value="${r.process_date || ""}" data-id="${r.id}">`
+                : `${r.process_date || "-"}`
+            }
+          </td>
           <td><button class="btn btn-outline-danger btn-sm btnDeleteRow" data-id="${r.id}">삭제</button></td>
         </tr>`
       );
     });
     attachDeleteHandlers();
+    
+    // ✅ 처리일자 변경 이벤트
+    if (canEditProcessDate) {
+      tbody.querySelectorAll(".process-date-input").forEach((input) => {
+        input.addEventListener("change", async (e) => {
+          const id = e.target.dataset.id;
+          const newDate = e.target.value;
+          if (!newDate) return alert("날짜를 선택하세요.");
+
+          showLoading("처리일자 변경 중...");
+          try {
+            const res = await fetch(updateUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCSRFToken(),
+              },
+              body: JSON.stringify({ id, process_date: newDate }),
+            });
+            const data = await res.json();
+            alert(data.message || "변경 완료");
+          } catch (err) {
+            console.error(err);
+            alert("처리일자 변경 중 오류가 발생했습니다.");
+          } finally {
+            hideLoading();
+          }
+        });
+      });
+    }
+    
+    
   }
 
   /* ✅ 검색 버튼 클릭 시 fetchData 실행 */
@@ -306,6 +344,26 @@ document.addEventListener("DOMContentLoaded", () => {
         else el.value = "";
       });
     }
+  });
+
+
+  /* =======================================================
+    📌 입력행 삭제 기능
+    ======================================================= */
+  document.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("btnRemoveRow")) return;
+
+    const tbody = document.querySelector("#inputTable tbody");
+    const rows = tbody.querySelectorAll(".input-row");
+
+    // ✅ 행이 하나밖에 없으면 삭제 금지
+    if (rows.length <= 1) {
+      alert("행이 하나뿐이라 삭제할 수 없습니다.");
+      return;
+    }
+
+    // ✅ 클릭된 버튼이 속한 행 삭제
+    e.target.closest(".input-row").remove();
   });
 
 
