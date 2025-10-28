@@ -11,13 +11,12 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp
-
 
 # ------------------------------------------------------------
 # 공용 상수
@@ -93,6 +92,9 @@ def manage_charts(request):
 # ------------------------------------------------------------
 # 📘 2. 편제변경 — 데이터 저장
 # ------------------------------------------------------------
+# ------------------------------------------------------------
+# 📘 2. 편제변경 — 데이터 저장 (수정 버전)
+# ------------------------------------------------------------
 @require_POST
 @grade_required(["superuser", "main_admin", "sub_admin"])
 @transaction.atomic
@@ -103,13 +105,21 @@ def ajax_save(request):
         items = payload.get("rows", [])
         month = payload.get("month")
 
+        # ✅ superuser → 선택한 part / main_admin → 본인 branch / sub_admin → 본인
+        part = payload.get("part") or getattr(request.user, "part", "")
+        branch = payload.get("branch") or getattr(request.user, "branch", "")
+
         created_count = 0
         for row in items:
-            target = CustomUser.objects.filter(id=row.get("tg_id")).first()
+            target = CustomUser.objects.filter(id=row.get("target_id")).first()
+            if not target:
+                continue
+
             StructureChange.objects.create(
                 requester=request.user,
                 target=target,
-                branch=request.user.branch,
+                part=part,  # ✅ 부서 저장 (superuser 조회용)
+                branch=branch,
                 target_branch=getattr(target, "branch", ""),
                 chg_branch=row.get("chg_branch"),
                 or_flag=row.get("or_flag", False),
@@ -127,14 +137,20 @@ def ajax_save(request):
         PartnerChangeLog.objects.create(
             user=request.user,
             action="save",
-            detail=f"{created_count}건 저장 (월도: {month})",
+            detail=f"{created_count}건 저장 (월도: {month}, 부서: {part}, 지점: {branch})",
         )
 
-        return JsonResponse({"status": "success", "message": f"{created_count}건 저장 완료"})
+        return JsonResponse({
+            "status": "success",
+            "saved_count": created_count,
+            "message": f"{created_count}건 저장 완료"
+        })
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        return JsonResponse({"status": "error", "message": "저장 처리 중 오류 발생"}, status=400)
+
+
 
 
 # ------------------------------------------------------------
@@ -170,89 +186,55 @@ def ajax_delete(request):
 
 
 # ------------------------------------------------------------
-# 📘 4. 편제변경 — 마감일 설정
+# 📘 5. 편제변경 — 데이터 조회 (자동 기한 기본값 추가)
 # ------------------------------------------------------------
-@require_POST
-@grade_required(["superuser"])
-@transaction.atomic
-def ajax_set_deadline(request):
-    """AJAX — 입력기한 설정 및 저장"""
-    try:
-        payload = json.loads(request.body)
-        branch = payload.get("branch")
-        month = payload.get("month")
-        deadline_day = payload.get("deadline_day")
-
-        if not all([branch, month, deadline_day]):
-            return JsonResponse({"status": "error", "message": "필수값 누락"}, status=400)
-
-        obj, created = StructureDeadline.objects.update_or_create(
-            branch=branch,
-            month=month,
-            defaults={"deadline_day": int(deadline_day)},
-        )
-
-        PartnerChangeLog.objects.create(
-            user=request.user,
-            action="set_deadline",
-            detail=f"[{branch}] {month}월 기한 {deadline_day}일 {'등록' if created else '갱신'}",
-        )
-
-        return JsonResponse({
-            "status": "success",
-            "message": f"{branch} {month}월 기한 {deadline_day}일 {'등록' if created else '갱신'} 완료",
-        })
-
-    except Exception as e:
-        traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
-# ------------------------------------------------------------
-# 📘 5. 편제변경 — 데이터 조회
-# ------------------------------------------------------------
+@require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """AJAX — 월도 기준으로 편제변경 데이터 조회"""
+    """편제변경 관리 데이터 조회"""
     month = request.GET.get("month")
-    branch = request.GET.get("branch")
+    part = (request.GET.get("branch", "") or "").strip()  # superuser 부서 선택값
+    user = request.user
+
     if not month:
         return JsonResponse({"status": "success", "rows": []})
 
     qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
-    user = request.user
 
-    # 🔸 superuser는 선택한 branch 필터 적용
-    if user.grade == "superuser" and branch:
-        qs = qs.filter(branch=branch)
+    # ✅ 권한별 조회 조건
+    if user.grade == "superuser":
+        if part:
+            qs = qs.filter(part=part)
     elif user.grade == "main_admin":
         qs = qs.filter(branch=user.branch)
     elif user.grade == "sub_admin":
         qs = qs.filter(requester=user)
 
-    rows = [
-        {
-            "id": obj.id,
-            "requester_id": getattr(obj.requester, "id", ""),
-            "requester_name": getattr(obj.requester, "name", ""),
-            "branch": obj.branch,
-            "target_id": getattr(obj.target, "id", ""),
-            "target_name": getattr(obj.target, "name", ""),
-            "target_branch": obj.target_branch,
-            "chg_branch": obj.chg_branch,
-            "rank": obj.rank,
-            "chg_rank": obj.chg_rank,
-            "table_name": obj.table_name,
-            "chg_table": obj.chg_table,
-            "rate": obj.rate,
-            "chg_rate": obj.chg_rate,
-            "memo": obj.memo,
-            "request_date": obj.request_date.strftime("%Y-%m-%d") if obj.request_date else "",
-            "process_date": obj.process_date.strftime("%Y-%m-%d") if obj.process_date else "",
-        }
-        for obj in qs
-    ]
+    rows = []
+    for sc in qs:
+        rows.append({
+            "id": sc.id,
+            "requester_id": getattr(sc.requester, "id", ""),
+            "requester_name": getattr(sc.requester, "name", ""),
+            "branch": sc.branch or "",
+            "target_id": getattr(sc.target, "id", ""),
+            "target_name": getattr(sc.target, "name", ""),
+            "target_branch": getattr(sc.target, "branch", ""),
+            "chg_branch": sc.chg_branch or "",
+            "rank": sc.rank or "",
+            "chg_rank": sc.chg_rank or "",
+            "table_name": sc.table_name or "",
+            "chg_table": sc.chg_table or "",
+            "rate": sc.rate or "",
+            "chg_rate": sc.chg_rate or "",
+            "memo": sc.memo or "",
+            "request_date": sc.request_date.strftime("%Y-%m-%d") if sc.request_date else "",
+            "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
+        })
+
     return JsonResponse({"status": "success", "rows": rows})
+
+
 
 
 # ------------------------------------------------------------
