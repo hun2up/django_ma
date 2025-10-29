@@ -75,6 +75,9 @@
               {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
                 <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
               {% endif %}
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+                <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
+              {% endif %}
             </ul>
           </li>
         {% endif %}

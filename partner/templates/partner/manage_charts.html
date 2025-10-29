@@ -23,7 +23,7 @@
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
   {% endif %}
 
-  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">편제변경 관리</h3>
+  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">편제변경 요청 페이지</h3>
 
   <!-- ✅ 상단 컨트롤 바 -->
   <div class="card shadow p-3 border-0 rounded-4 mb-3">
@@ -41,13 +41,17 @@
       </div>
 
       {% if user.grade == 'superuser' %}
-      <div class="col-6 col-md-1">
+      <!-- ✅ 부서 / 지점 선택 (superuser 전용) -->
+      <div class="col-6 col-md-2">
         <label class="form-label mb-1">부서</label>
-        <select id="branchSelect" name="branch" class="form-select">
-          <option value="">선택</option>
-          {% for b in branches %}
-            <option value="{{ b }}" {% if selected_branch == b %}selected{% endif %}>{{ b }}</option>
-          {% endfor %}
+        <select id="partSelect" class="form-select form-select-sm">
+          <option value="">불러오는 중...</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">지점</label>
+        <select id="branchSelect" class="form-select form-select-sm" disabled>
+          <option value="">부서를 먼저 선택하세요</option>
         </select>
       </div>
       {% endif %}
@@ -239,7 +243,13 @@
 
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
 
-<script src="{% static 'js/partner/manage_structure.js' %}"></script>
+<script type="module" src="{% static 'js/partner/manage_structure/index.js' %}"></script>
 <script src="{% static 'js/common/search_user_modal.js' %}?v={{ now|date:'U' }}"></script>
+<script src="{% static 'js/common/part_branch_selector.js' %}"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    window.loadPartsAndBranches("manage-structure");  // 또는 "manage-tables"
+  });
+</script>
 {% endblock %}
 

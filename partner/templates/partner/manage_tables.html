@@ -1,0 +1,134 @@
+<!-- django_ma/partner/templates/partner/manage_tables.html -->
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}테이블 관리{% endblock %}
+
+{% block content %}
+<div class="container mt-5" id="manage-tables"
+     data-fetch-parts-url="{% url 'partner:ajax_fetch_parts' %}"
+     data-fetch-branches-url="{% url 'partner:ajax_fetch_branches' %}">
+
+    <!-- ✅ 접근 제한 안내 -->
+    {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+        <div class="alert alert-danger text-center">접근 권한이 없습니다.</div>
+    {% endif %}
+
+    <h2 class="fw-bold text-center mb-4" style="color:#003f7d;">테이블 관리 페이지</h2>
+
+    <!-- ✅ Superuser 전용 -->
+    {% if user.grade == 'superuser' %}
+        <div class="card shadow p-3 border-0 rounded-4 mb-3">
+            <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
+                <!-- 부서 선택 -->
+                <div style="flex: 0 0 220px;">
+                <label for="partSelect" class="form-label fw-semibold">부서</label>
+                <select id="partSelect" class="form-select form-select-sm">
+                    <option value="">불러오는 중...</option>
+                </select>
+                </div>
+
+                <!-- 지점 선택 -->
+                <div style="flex: 0 0 300px;">
+                <label for="branchSelect" class="form-label fw-semibold">지점</label>
+                <select id="branchSelect" class="form-select form-select-sm" disabled>
+                    <option value="">부서를 먼저 선택하세요</option>
+                </select>
+                </div>
+
+                <!-- 버튼 -->
+                <div>
+                <button type="button" id="btnSelect" class="btn btn-primary btn-sm px-4" disabled>
+                    선택
+                </button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
+
+    <div class="text-center mt-5">
+        <p class="text-muted">🚧 제작중입니다 🚧</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const root = document.getElementById("manage-tables");
+  if (!root) return;
+
+  const partSelect = document.getElementById("partSelect");
+  const branchSelect = document.getElementById("branchSelect");
+  const btnSelect = document.getElementById("btnSelect");
+
+  const fetchPartsUrl = root.dataset.fetchPartsUrl;
+  const fetchBranchesUrl = root.dataset.fetchBranchesUrl;
+
+  /** -------------------------
+   * ✅ 부서 목록 불러오기
+   * ------------------------- */
+  async function loadParts() {
+    try {
+      const res = await fetch(fetchPartsUrl);
+      const data = await res.json();
+
+      partSelect.innerHTML = `<option value="">선택</option>`;
+      data.parts.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p;
+        opt.textContent = p;
+        partSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("부서 목록 불러오기 실패:", err);
+      partSelect.innerHTML = `<option value="">불러오기 실패</option>`;
+    }
+  }
+
+  /** -------------------------
+   * ✅ 선택된 부서의 지점 목록 불러오기
+   * ------------------------- */
+  async function loadBranches(part) {
+    try {
+      const res = await fetch(`${fetchBranchesUrl}?part=${encodeURIComponent(part)}`);
+      const data = await res.json();
+
+      branchSelect.innerHTML = `<option value="">지점을 선택하세요</option>`;
+      data.branches.forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b;
+        opt.textContent = b;
+        branchSelect.appendChild(opt);
+      });
+
+      branchSelect.disabled = false;
+      btnSelect.disabled = true;
+    } catch (err) {
+      console.error("지점 목록 불러오기 실패:", err);
+      branchSelect.innerHTML = `<option value="">불러오기 실패</option>`;
+      branchSelect.disabled = true;
+    }
+  }
+
+  /** -------------------------
+   * ✅ 이벤트 핸들링
+   * ------------------------- */
+  partSelect.addEventListener("change", () => {
+    const selectedPart = partSelect.value;
+    branchSelect.innerHTML = `<option value="">불러오는 중...</option>`;
+    branchSelect.disabled = true;
+    btnSelect.disabled = true;
+    if (selectedPart) loadBranches(selectedPart);
+  });
+
+  branchSelect.addEventListener("change", () => {
+    btnSelect.disabled = !branchSelect.value;
+  });
+
+  btnSelect.addEventListener("click", () => {
+    alert(`선택된 부서: ${partSelect.value}\n선택된 지점: ${branchSelect.value}`);
+  });
+
+  // 초기 로드 시 부서 목록 자동 불러오기
+  await loadParts();
+});
+</script>
+{% endblock %}

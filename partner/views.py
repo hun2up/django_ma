@@ -35,16 +35,23 @@ def redirect_to_calculate(request):
 
 
 @login_required
+@grade_required(['superuser', 'main_admin', 'sub_admin'])
 def manage_calculate(request):
     """지점효율 (제작중)"""
     return render(request, "partner/manage_calculate.html")
 
 
 @login_required
+@grade_required(['superuser', 'main_admin', 'sub_admin'])
 def manage_rate(request):
     """요율관리 (제작중)"""
     return render(request, "partner/manage_rate.html")
 
+@login_required
+@grade_required(['superuser', 'main_admin'])
+def manage_tables(request):
+    """테이블관리 (제작중)"""
+    return render(request, "partner/manage_tables.html")
 
 # ------------------------------------------------------------
 # 📘 1. 편제변경 메인 페이지
@@ -237,102 +244,104 @@ def ajax_update_process_date(request):
 def ajax_fetch(request):
     """AJAX — 편제변경 데이터 조회 (권한·레벨 기반 필터링 포함)"""
     try:
-        # ✅ 월도 형식 보정
+        user = request.user
         month = (request.GET.get("month") or "").strip()
+        selected_branch = (request.GET.get("branch") or "").strip()
+
+        # ✅ 월도 형식 보정 ("2025-10" → "2025-10")
         if month:
             parts = month.split("-")
             if len(parts) == 2:
                 y, m = parts
                 month = f"{y}-{int(m):02d}"
 
-        part = (request.GET.get("branch") or "").strip()
-        user = request.user
-
         if not month:
             return JsonResponse({"status": "success", "rows": []})
 
-        qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
+        # 기본 쿼리셋
+        qs = (
+            StructureChange.objects
+            .filter(month=month)
+            .select_related("requester", "target")
+            .order_by("-id")
+        )
 
         # =======================================================
-        # 🔐 권한별 데이터 접근 제한
+        # 🔐 권한별 필터링
         # =======================================================
         if user.grade == "superuser":
-            # 전체 조회 가능
-            if part:
-                qs = qs.filter(branch=part)
+            # ✅ superuser: 전체 조회 가능, 선택 branch만 제한 적용
+            if selected_branch:
+                qs = qs.filter(branch=selected_branch)
 
         elif user.grade == "main_admin":
-            # 본인 branch 내 데이터만
+            # ✅ main_admin: 본인 branch만
             qs = qs.filter(branch=user.branch)
 
         elif user.grade == "sub_admin":
-            # ✅ SubAdminTemp 정보 조회
+            # ✅ sub_admin: SubAdminTemp 기준 팀별 필터링
             sub_info = SubAdminTemp.objects.filter(user=user).first()
-
             if sub_info:
                 level = (sub_info.level or "").strip()
-                team_a = (sub_info.team_a or "").strip()
-                team_b = (sub_info.team_b or "").strip()
-                team_c = (sub_info.team_c or "").strip()
-
-                # ------------------------------
-                # 🟢 레벨별 필터링
-                # ------------------------------
-                if level == "A레벨" and team_a:
-                    qs = qs.filter(requester__subadmin_detail__team_a=team_a)
-                elif level == "B레벨" and team_b:
-                    qs = qs.filter(requester__subadmin_detail__team_b=team_b)
-                elif level == "C레벨" and team_c:
-                    qs = qs.filter(requester__subadmin_detail__team_c=team_c)
+                filters = Q()
+                if level == "A레벨" and sub_info.team_a:
+                    filters = Q(requester__subadmin_detail__team_a=sub_info.team_a)
+                elif level == "B레벨" and sub_info.team_b:
+                    filters = Q(requester__subadmin_detail__team_b=sub_info.team_b)
+                elif level == "C레벨" and sub_info.team_c:
+                    filters = Q(requester__subadmin_detail__team_c=sub_info.team_c)
                 else:
-                    # 레벨/팀 데이터 없으면 branch 기준으로 제한
-                    qs = qs.filter(branch=user.branch)
+                    filters = Q(branch=user.branch)
+                qs = qs.filter(filters)
             else:
                 qs = qs.filter(branch=user.branch)
 
         # =======================================================
-        # 🔧 유틸: 안전한 값 변환
+        # 🧩 안전 변환 유틸
         # =======================================================
-        def safe(v):
-            if isinstance(v, Decimal):
-                return str(v)
-            if hasattr(v, "strftime"):
+        def safe(value):
+            """Decimal, date, None 타입 안전 변환"""
+            if isinstance(value, Decimal):
+                return str(value)
+            if hasattr(value, "strftime"):
                 try:
-                    return v.strftime("%Y-%m-%d")
+                    return value.strftime("%Y-%m-%d")
                 except Exception:
-                    return str(v)
-            return v or ""
+                    pass
+            return value or ""
 
         # =======================================================
-        # 📦 데이터 직렬화
+        # 📦 직렬화
         # =======================================================
-        rows = [
-            {
+        rows = []
+        for sc in qs:
+            rows.append({
                 "id": sc.id,
+                "branch": sc.branch or "",
+                "chg_branch": safe(sc.chg_branch),
+                "chg_rank": safe(sc.chg_rank),
+                "chg_rate": safe(sc.chg_rate),
+                "rate": safe(sc.rate),
+                "rank": safe(sc.rank),
+                "memo": safe(sc.memo),
+                "or_flag": bool(sc.or_flag),
+                "request_date": safe(sc.request_date),
+                "process_date": safe(sc.process_date),
+
                 "requester_id": getattr(sc.requester, "id", ""),
                 "requester_name": getattr(sc.requester, "name", ""),
-                "branch": sc.branch or "",
                 "target_id": getattr(sc.target, "id", ""),
                 "target_name": getattr(sc.target, "name", ""),
                 "target_branch": getattr(sc.target, "branch", ""),
-                "chg_branch": safe(sc.chg_branch),
-                "or_flag": bool(sc.or_flag),
-                "rank": safe(sc.rank),
-                "chg_rank": safe(sc.chg_rank),
-                "memo": safe(sc.memo),
-                "request_date": safe(sc.request_date),
-                "process_date": safe(sc.process_date),
-                "rate": safe(sc.rate),
-                "chg_rate": safe(sc.chg_rate),
-            }
-            for sc in qs.order_by("-id")
-        ]
+            })
 
         return JsonResponse({"status": "success", "rows": rows})
 
     except Exception as e:
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": str(e)}, status=400
+        )
 
 
 # ------------------------------------------------------------
@@ -569,4 +578,51 @@ def ajax_update_level(request):
         return JsonResponse({"success": False, "error": "User not found"})
 
 
+# ------------------------------------------------------------
+# 📘 부서 목록 불러오기
+# ------------------------------------------------------------
+@login_required
+@grade_required(['superuser'])
+def ajax_fetch_parts(request):
+    """
+    등록된 모든 부서(part) 목록 반환
+    """
 
+    # 제외할 부서명 리스트 (정확히 일치)
+    exclude_list = ["1인GA사업부", "MA사업0부"]
+
+    parts = (
+        CustomUser.objects.exclude(part__isnull=True)
+        .exclude(part__exact="")
+        .exclude(part__in=exclude_list)  # 🚫 특정 부서 제외
+        .values_list("part", flat=True)
+        .distinct()
+        .order_by("part")
+    )
+    return JsonResponse({"parts": list(parts)})
+
+
+# ------------------------------------------------------------
+# 📘 지점 목록 불러오기
+# ------------------------------------------------------------
+@login_required
+@grade_required(['superuser'])
+def ajax_fetch_branches(request):
+    """
+    선택된 부서(part)에 해당하는 모든 지점(branch) 목록 반환
+    """
+    part = request.GET.get("part")
+    if not part:
+        return JsonResponse({"branches": []})
+
+    # part와 정확히 일치하는 사용자만 필터링 (공백/NULL 제거)
+    branches = (
+        CustomUser.objects.filter(part__iexact=part)
+        .exclude(branch__isnull=True)
+        .exclude(branch__exact="")
+        .values_list("branch", flat=True)
+        .distinct()
+        .order_by("branch")
+    )
+
+    return JsonResponse({"branches": list(branches)})
