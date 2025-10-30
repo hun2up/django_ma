@@ -52,72 +52,19 @@ document.addEventListener("DOMContentLoaded", () => {
   /** -------------------------------
    * 🔍 대상자 검색
    * ------------------------------- */
-  let currentRow = null;
-
-  document.querySelectorAll('.readonly-field').forEach(input => {
-    input.addEventListener('focus', e => {
-      e.target.blur(); // 포커스 즉시 해제 (커서 깜박임 방지)
-      alert("검색 버튼을 통해서만 입력할 수 있습니다.");
-    });
-  });
-
-  // ① 검색버튼 클릭 시 현재 행 기억
   document.querySelectorAll('.btn-open-search').forEach(btn => {
     btn.addEventListener('click', () => (currentRow = btn.dataset.row));
   });
 
-  // ② 검색 실행
-  document.getElementById("searchUserForm").addEventListener("submit", e => {
-    e.preventDefault();
-    const query = document.getElementById("searchKeyword").value.trim();
-    const resultsBox = document.getElementById("searchResults");
-    resultsBox.innerHTML = '<p class="text-muted small text-center">검색 중...</p>';
-
-    fetch(`/board/search-user/?q=${encodeURIComponent(query)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.results.length) {
-          resultsBox.innerHTML = '<p class="text-muted small text-center">검색 결과가 없습니다.</p>';
-          return;
-        }
-
-        resultsBox.innerHTML = data.results.map(user => `
-          <button type="button" class="list-group-item list-group-item-action search-result"
-            data-id="${user.id}" data-name="${user.name}" data-branch="${user.branch}"
-            data-enter="${user.enter || ''}" data-quit="${user.quit || '재직중'}">
-            <div class="d-flex justify-content-between">
-              <span><strong>${user.name}</strong> (${user.id}) (${user.regist})</span>
-              <small class="text-muted">${user.branch}</small>
-            </div>
-            <small class="text-muted">입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}</small>
-          </button>
-        `).join("");
-      })
-      .catch(() => (resultsBox.innerHTML = '<p class="text-danger small text-center">검색 중 오류 발생</p>'));
-  });
-
-  // ③ 검색 결과 클릭 시 input 자동 채우기 (이벤트 위임)
-  document.addEventListener("click", e => {
-    const item = e.target.closest(".search-result");
-    if (!item) return;
+  // ✅ 공통 모달에서 userSelected 이벤트 수신
+  document.addEventListener("userSelected", (e) => {
+    const u = e.detail;
     if (!currentRow) return;
-
-    document.querySelector(`input[name="target_name_${currentRow}"]`).value = item.dataset.name;
-    document.querySelector(`input[name="target_code_${currentRow}"]`).value = item.dataset.id;
-    document.querySelector(`input[name="target_join_${currentRow}"]`).value = item.dataset.enter;
-    document.querySelector(`input[name="target_leave_${currentRow}"]`).value = item.dataset.quit;
-
-    bootstrap.Modal.getInstance(document.getElementById("searchUserModal")).hide();
+    document.querySelector(`input[name="target_name_${currentRow}"]`).value = u.name;
+    document.querySelector(`input[name="target_code_${currentRow}"]`).value = u.id;
+    document.querySelector(`input[name="target_join_${currentRow}"]`).value = u.enter;
+    document.querySelector(`input[name="target_leave_${currentRow}"]`).value = u.quit;
   });
-
-   // 🔁 모달 닫힐 때 검색 내용 초기화
-  const searchModal = document.getElementById("searchUserModal");
-  if (searchModal) {
-    searchModal.addEventListener("hidden.bs.modal", () => {
-      document.getElementById("searchKeyword").value = "";
-      document.getElementById("searchResults").innerHTML = "";
-    });
-  }
 
   /** -------------------------------
    * 💰 보험료 입력칸 숫자만 허용 + 1,000단위 콤마
@@ -177,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
       a.download = "업무요청서.pdf";
       a.click();
       URL.revokeObjectURL(url);
+      
     } catch (err) {
       alert("PDF 생성 중 오류가 발생했습니다.");
       console.error("❌ 오류:", err);
