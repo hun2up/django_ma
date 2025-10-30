@@ -43,7 +43,7 @@
       {% if user.grade == 'superuser' %}
       <div class="col-6 col-md-1">
         <label class="form-label mb-1">부서</label>
-        <select id="branchSelect" name="branch" class="form-select">
+        <select id="partSelect" name="part" class="form-select">
           <option value="">선택</option>
           {% for b in branches %}
             <option value="{{ b }}" {% if selected_branch == b %}selected{% endif %}>{{ b }}</option>

@@ -87,6 +87,8 @@ def manage_charts(request):
     context = {
         "current_year": now.year,
         "current_month": now.month,
+        "selected_year": now.year,
+        "selected_month": now.month,
         "available_periods": [f"{now.year}-{m:02d}" for m in range(1, now.month + 1)],
         "future_select_until": (
             f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01"
@@ -99,7 +101,7 @@ def manage_charts(request):
         "data_delete_url": "/partner/api/delete/",
         "set_deadline_url": "/partner/api/set-deadline/",
         # 🆕 초기 데이터 표시 여부
-        "auto_load": user.grade == "main_admin",  # main_admin만 true
+        "auto_load": user.grade in ["main_admin", "sub_admin"],
         "subadmin_info": subadmin_info,
     }
     return render(request, "partner/manage_charts.html", context)
@@ -237,18 +239,21 @@ def ajax_update_process_date(request):
 
 
 # ------------------------------------------------------------
-# 📘 5. 편제변경 — 데이터 조회 (sub_admin 새로고침 문제 완전 해결)
+# 📘 편제변경 — 데이터 조회 (sub_admin 새로고침 문제 완전 해결)
 # ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """AJAX — 편제변경 데이터 조회 (권한·레벨 기반 필터링 포함)"""
+    """AJAX — 편제변경 데이터 조회"""
     try:
         user = request.user
         month = (request.GET.get("month") or "").strip()
         selected_branch = (request.GET.get("branch") or "").strip()
+        print("📩 [ajax_fetch] 호출됨:", user.grade, month, selected_branch)
 
-        # ✅ 월도 형식 보정 ("2025-10" → "2025-10")
+        # =======================================================
+        # 🔐 월도 보정
+        # =======================================================
         if month:
             parts = month.split("-")
             if len(parts) == 2:
@@ -256,9 +261,9 @@ def ajax_fetch(request):
                 month = f"{y}-{int(m):02d}"
 
         if not month:
+            print("⚠️ month 누락 → 빈 결과 반환")
             return JsonResponse({"status": "success", "rows": []})
 
-        # 기본 쿼리셋
         qs = (
             StructureChange.objects
             .filter(month=month)
@@ -270,16 +275,15 @@ def ajax_fetch(request):
         # 🔐 권한별 필터링
         # =======================================================
         if user.grade == "superuser":
-            # ✅ superuser: 전체 조회 가능, 선택 branch만 제한 적용
             if selected_branch:
                 qs = qs.filter(branch=selected_branch)
+            print(f"🧩 superuser 조회 / branch={selected_branch} / count={qs.count()}")
 
         elif user.grade == "main_admin":
-            # ✅ main_admin: 본인 branch만
             qs = qs.filter(branch=user.branch)
+            print(f"🧩 main_admin 조회 / branch={user.branch} / count={qs.count()}")
 
         elif user.grade == "sub_admin":
-            # ✅ sub_admin: SubAdminTemp 기준 팀별 필터링
             sub_info = SubAdminTemp.objects.filter(user=user).first()
             if sub_info:
                 level = (sub_info.level or "").strip()
@@ -295,53 +299,32 @@ def ajax_fetch(request):
                 qs = qs.filter(filters)
             else:
                 qs = qs.filter(branch=user.branch)
+            print(f"🧩 sub_admin 조회 / branch={user.branch} / count={qs.count()}")
 
-        # =======================================================
-        # 🧩 안전 변환 유틸
-        # =======================================================
-        def safe(value):
-            """Decimal, date, None 타입 안전 변환"""
-            if isinstance(value, Decimal):
-                return str(value)
-            if hasattr(value, "strftime"):
-                try:
-                    return value.strftime("%Y-%m-%d")
-                except Exception:
-                    pass
-            return value or ""
-
-        # =======================================================
-        # 📦 직렬화
-        # =======================================================
-        rows = []
-        for sc in qs:
-            rows.append({
+        rows = [
+            {
                 "id": sc.id,
                 "branch": sc.branch or "",
-                "chg_branch": safe(sc.chg_branch),
-                "chg_rank": safe(sc.chg_rank),
-                "chg_rate": safe(sc.chg_rate),
-                "rate": safe(sc.rate),
-                "rank": safe(sc.rank),
-                "memo": safe(sc.memo),
-                "or_flag": bool(sc.or_flag),
-                "request_date": safe(sc.request_date),
-                "process_date": safe(sc.process_date),
-
-                "requester_id": getattr(sc.requester, "id", ""),
+                "chg_branch": sc.chg_branch or "",
+                "chg_rank": sc.chg_rank or "",
+                "rank": sc.rank or "",
+                "memo": sc.memo or "",
+                "or_flag": sc.or_flag,
                 "requester_name": getattr(sc.requester, "name", ""),
-                "target_id": getattr(sc.target, "id", ""),
                 "target_name": getattr(sc.target, "name", ""),
-                "target_branch": getattr(sc.target, "branch", ""),
-            })
+                "request_date": sc.request_date.strftime("%Y-%m-%d") if sc.request_date else "",
+            }
+            for sc in qs
+        ]
+        print(f"✅ 반환 rows={len(rows)}")
 
         return JsonResponse({"status": "success", "rows": rows})
 
     except Exception as e:
+        import traceback
         traceback.print_exc()
-        return JsonResponse(
-            {"status": "error", "message": str(e)}, status=400
-        )
+        print("❌ ajax_fetch 오류:", e)
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 # ------------------------------------------------------------

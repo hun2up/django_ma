@@ -24,27 +24,36 @@ export function initSelectOptions() {
   const thisY = now.getFullYear();
   const thisM = now.getMonth() + 1;
 
-  if (els.year && !els.year.options.length) {
+  const selectedY = parseInt(window.ManageStructureBoot?.selectedYear ?? thisY, 10);
+  const selectedM = parseInt(window.ManageStructureBoot?.selectedMonth ?? thisM, 10);
+
+  // ✅ 연도 목록 채우기
+  if (els.year) {
+    els.year.innerHTML = ""; // 혹시 기존 값 초기화
     for (let y = thisY - 2; y <= thisY + 1; y++) {
-      els.year.insertAdjacentHTML(
-        "beforeend",
-        `<option value="${y}" ${y === thisY ? "selected" : ""}>${y}년</option>`
-      );
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = `${y}년`;
+      if (y === selectedY) opt.selected = true;
+      els.year.appendChild(opt);
     }
   }
 
-  if (els.month && !els.month.options.length) {
+  // ✅ 월도 목록 채우기
+  if (els.month) {
+    els.month.innerHTML = ""; // 혹시 기존 값 초기화
     for (let m = 1; m <= 12; m++) {
-      els.month.insertAdjacentHTML(
-        "beforeend",
-        `<option value="${m}" ${m === thisM ? "selected" : ""}>${m}월</option>`
-      );
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = `${m}월`;
+      if (m === selectedM) opt.selected = true;
+      els.month.appendChild(opt);
     }
   }
 
-  if (els.deadline && !els.deadline.options.length) {
-    for (let d = 1; d <= 31; d++) {
-      els.deadline.insertAdjacentHTML("beforeend", `<option value="${d}">${d}일</option>`);
-    }
-  }
+  // ✅ 확인용 로그 (테스트 끝나면 제거 가능)
+  console.log("[initSelectOptions] selected year/month 적용 완료:", selectedY, selectedM);
+  console.log("[initSelectOptions] year select value:", els.year.value);
+  console.log("[initSelectOptions] month select value:", els.month.value);
 }
+

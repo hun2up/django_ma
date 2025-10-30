@@ -37,7 +37,7 @@ window.loadPartsAndBranches = async function(rootElementId = null) {
    * ------------------------------- */
   async function loadParts() {
     try {
-      const res = await fetch(fetchPartsUrl);
+      const res = await fetch(fetchPartsUrl, { credentials: 'same-origin' });
       const data = await res.json();
       partSelect.innerHTML = `<option value="">선택</option>`;
       data.parts.forEach(p => {
@@ -57,7 +57,7 @@ window.loadPartsAndBranches = async function(rootElementId = null) {
    * ------------------------------- */
   async function loadBranches(part) {
     try {
-      const res = await fetch(`${fetchBranchesUrl}?part=${encodeURIComponent(part)}`);
+      const res = await fetch(`${fetchBranchesUrl}?part=${encodeURIComponent(part)}`, { credentials: 'same-origin' });
       const data = await res.json();
       branchSelect.innerHTML = `<option value="">지점을 선택하세요</option>`;
       data.branches.forEach(b => {
