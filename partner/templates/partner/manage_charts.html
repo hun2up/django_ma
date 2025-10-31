@@ -69,15 +69,16 @@
     </div>
   </div>
 
+  {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+    <div class="alert alert-info w-100 py-2 mb-3 text-start">
+      편제변경 기능 사용 전 반드시 중간관리자별 권한관리를 설정해야 합니다.
+    </div>
+  {% endif %}
+
   <!-- ✅ 입력 섹션 -->
   <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
-      {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
-        <div class="alert alert-info py-2 mb-3">
-          편제변경 기능 사용 전 반드시 중간관리자별 권한관리를 설정해야 합니다.
-        </div>
-      {% endif %}
+      <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>      
       <div class="d-flex gap-2">
         <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
         <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
@@ -149,17 +150,16 @@
     <div class="small text-muted">※ 대상자는 한 번에 최대 10명까지 추가할 수 있습니다.</div>
   </div>
 
-
+  <div class="alert alert-info py-2 mb-3">
+    입력 후 수정이 불가합니다. 수정이 필요한 경우 최상위관리자에게 문의 바랍니다.
+  </div>
 
   <!-- ✅ 메인시트 -->
   <div class="card shadow p-3 border-0 rounded-4" id="mainSheet" hidden>
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
       <div class="small text-muted" id="sheetNotice"></div>
-    </div>
-    <div class="alert alert-info py-2 mb-3">
-      입력 후 수정이 불가합니다. 수정이 필요한 경우 최상위관리자에게 문의 바랍니다.
-    </div>
+    </div>    
     <div class="table-responsive">
       <table class="table table-striped align-middle" id="mainTable">
         <colgroup>
