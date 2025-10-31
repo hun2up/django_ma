@@ -1,4 +1,6 @@
 // static/js/partner/manage_structure/availability.js
+
+/*
 import { els } from "./dom_refs.js";
 
 export function checkInputAvailability() {
@@ -30,3 +32,4 @@ export function checkInputAvailability() {
   if (disabled) inputSection.classList.add("disabled-mode");
   else inputSection.classList.remove("disabled-mode");
 }
+*/

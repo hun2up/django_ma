@@ -1,5 +1,5 @@
-// static/js/partner/manage_structure/index.js
 import { fetchData } from "./fetch.js";
+import { initInputRowEvents } from "./input_rows.js";
 
 /**
  * 📘 Manage Structure (편제변경 페이지)
@@ -14,9 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
     branch: document.getElementById("branchSelect"),
     btnSearch: document.getElementById("btnSearchPeriod"),
     root: document.getElementById("manage-structure"),
+    inputSection: document.getElementById("inputSection"),
+    mainSheet: document.getElementById("mainSheet"),
+    mainTable: document.getElementById("mainTable"),
+    inputTable: document.getElementById("inputTable"),
   };
 
-  // ✅ 안전 체크
+  // ✅ 필수 요소 검사
   if (!els.year || !els.month || !els.root) {
     console.error("⚠️ 필수 요소 누락 (year/month/root)");
     return;
@@ -53,6 +57,14 @@ document.addEventListener("DOMContentLoaded", () => {
     autoLoad: boot.autoLoad,
   });
 
+    /* ============================================================
+     2️⃣ 요청자 자동입력 초기화
+  ============================================================ */
+  if (els.inputTable) {
+    initInputRowEvents();  // ✅ 반드시 여기에 있어야 자동입력됨
+    console.log("✅ 요청자 정보 자동입력 초기화 완료");
+  }
+
   /* ============================================================
      2️⃣ Superuser의 부서/지점 목록 로드
   ============================================================ */
@@ -87,29 +99,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const year = els.year.value;
     const month = els.month.value;
     const ym = `${year}-${String(month).padStart(2, "0")}`;
-    const branch =
-      els.branch?.value?.trim() ||
-      user.branch?.trim() ||
-      "";
+    const branch = els.branch?.value?.trim() || user.branch?.trim() || "";
 
     console.log("🔍 검색 버튼 클릭 → fetchData 호출", { ym, branch });
-    fetchData(ym, branch);
+
+    // ✅ 검색 시 카드 표시 보장
+    requestAnimationFrame(() => {
+      els.inputSection?.removeAttribute("hidden");
+      els.mainSheet?.removeAttribute("hidden");
+      fetchData(ym, branch);
+    });
   });
 
   /* ============================================================
      4️⃣ main_admin / sub_admin 자동조회
   ============================================================ */
-  if (boot.autoLoad) {
-    console.log("🟢 autoLoad 활성화됨 (main_admin/sub_admin)");
+  if (boot.autoLoad && ["main_admin", "sub_admin"].includes(user.grade)) {
     const year = els.year.value;
     const month = els.month.value;
     const ym = `${year}-${String(month).padStart(2, "0")}`;
     const branch = user.branch?.trim() || "";
 
-    // 약간의 딜레이 후 fetchData 실행 (초기 렌더 안정화)
+    console.log("🟢 autoLoad → 현재월 기준 자동조회", { ym, branch });
+
+    // 렌더 완료 후 안전하게 실행
     setTimeout(() => {
-      console.log("🔄 autoLoad → fetchData 실행", { ym, branch });
-      fetchData(ym, branch);
-    }, 800);
+      requestAnimationFrame(() => {
+        els.inputSection?.removeAttribute("hidden");
+        els.mainSheet?.removeAttribute("hidden");
+
+        // Bootstrap 렌더 사이클 이후 fetch (레이아웃 깨짐 방지)
+        setTimeout(() => fetchData(ym, branch), 200);
+      });
+    }, 700);
   }
 });

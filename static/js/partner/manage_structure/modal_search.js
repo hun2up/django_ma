@@ -1,4 +1,5 @@
-// static/js/partner/manage_structure/modal_search.js
+// django_ma/static/js/partner/manage_structure/modal_search.js
+
 import { els } from "./dom_refs.js";
 
 export function setupModalSearch() {

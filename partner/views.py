@@ -176,29 +176,59 @@ def ajax_save(request):
 @grade_required(["superuser", "main_admin", "sub_admin"])
 @transaction.atomic
 def ajax_delete(request):
-    """AJAX — 행 삭제"""
+    """
+    AJAX — 편제변경 행 삭제
+    -------------------------------------------------------
+    - superuser / main_admin : 모든 행 삭제 가능
+    - sub_admin : 본인이 요청자인 행만 삭제 가능
+    -------------------------------------------------------
+    """
     try:
-        payload = json.loads(request.body)
-        record = get_object_or_404(StructureChange, id=payload.get("id"))
+        data = json.loads(request.body or "{}")
+        record_id = data.get("id")
 
-        # 권한 체크
-        if not (
-            request.user.grade in ["superuser", "main_admin"]
-            or record.requester == request.user
-        ):
+        if not record_id:
+            return JsonResponse({"status": "error", "message": "잘못된 요청입니다. (id 누락)"}, status=400)
+
+        record = get_object_or_404(StructureChange, id=record_id)
+
+        # ✅ 권한 체크
+        user = request.user
+        can_delete = (
+            user.grade in ["superuser", "main_admin"] or
+            record.requester_id == user.id
+        )
+
+        if not can_delete:
             return JsonResponse({"status": "error", "message": "삭제 권한이 없습니다."}, status=403)
 
+        # ✅ 삭제 실행
+        deleted_id = record.id
         record.delete()
+
+        # ✅ 로그 기록
         PartnerChangeLog.objects.create(
-            user=request.user,
+            user=user,
             action="delete",
-            detail=f"{record.id}번 레코드 삭제",
+            detail=f"StructureChange #{deleted_id} 삭제 by {user.name}({user.grade})",
         )
-        return JsonResponse({"status": "success", "message": "삭제 완료"})
+
+        print(f"🗑️ [ajax_delete] {user.grade}({user.name}) → #{deleted_id} 삭제 완료")
+
+        return JsonResponse({
+            "status": "success",
+            "message": f"#{deleted_id} 행이 삭제되었습니다."
+        })
+
+    except StructureChange.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "대상을 찾을 수 없습니다."}, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "요청 데이터 형식이 올바르지 않습니다."}, status=400)
 
     except Exception as e:
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 # ------------------------------------------------------------
@@ -239,30 +269,25 @@ def ajax_update_process_date(request):
 
 
 # ------------------------------------------------------------
-# 📘 편제변경 — 데이터 조회 (sub_admin 새로고침 문제 완전 해결)
+# 📘 편제변경 — 데이터 조회
 # ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """AJAX — 편제변경 데이터 조회"""
+    """AJAX — 편제변경 데이터 조회 (소속을 팀으로 표시하되, '-' 및 공백은 무시)"""
     try:
         user = request.user
         month = (request.GET.get("month") or "").strip()
         selected_branch = (request.GET.get("branch") or "").strip()
+
         print("📩 [ajax_fetch] 호출됨:", user.grade, month, selected_branch)
 
-        # =======================================================
-        # 🔐 월도 보정
-        # =======================================================
+        # ✅ month 형식 보정 ("YYYY-M" → "YYYY-MM")
         if month:
             parts = month.split("-")
             if len(parts) == 2:
                 y, m = parts
                 month = f"{y}-{int(m):02d}"
-
-        if not month:
-            print("⚠️ month 누락 → 빈 결과 반환")
-            return JsonResponse({"status": "success", "rows": []})
 
         qs = (
             StructureChange.objects
@@ -276,47 +301,75 @@ def ajax_fetch(request):
         # =======================================================
         if user.grade == "superuser":
             if selected_branch:
-                qs = qs.filter(branch=selected_branch)
+                qs = qs.filter(branch__iexact=selected_branch.strip())
             print(f"🧩 superuser 조회 / branch={selected_branch} / count={qs.count()}")
 
         elif user.grade == "main_admin":
-            qs = qs.filter(branch=user.branch)
+            qs = qs.filter(branch__iexact=user.branch.strip())
             print(f"🧩 main_admin 조회 / branch={user.branch} / count={qs.count()}")
 
         elif user.grade == "sub_admin":
             sub_info = SubAdminTemp.objects.filter(user=user).first()
             if sub_info:
                 level = (sub_info.level or "").strip()
-                filters = Q()
+                print(f"🧩 sub_admin 레벨={level}")
+                team_filters = Q()
                 if level == "A레벨" and sub_info.team_a:
-                    filters = Q(requester__subadmin_detail__team_a=sub_info.team_a)
+                    team_filters = Q(requester__subadmin_detail__team_a=sub_info.team_a)
                 elif level == "B레벨" and sub_info.team_b:
-                    filters = Q(requester__subadmin_detail__team_b=sub_info.team_b)
+                    team_filters = Q(requester__subadmin_detail__team_b=sub_info.team_b)
                 elif level == "C레벨" and sub_info.team_c:
-                    filters = Q(requester__subadmin_detail__team_c=sub_info.team_c)
+                    team_filters = Q(requester__subadmin_detail__team_c=sub_info.team_c)
                 else:
-                    filters = Q(branch=user.branch)
-                qs = qs.filter(filters)
+                    team_filters = Q(branch__iexact=user.branch.strip())
+                qs = qs.filter(team_filters)
             else:
-                qs = qs.filter(branch=user.branch)
-            print(f"🧩 sub_admin 조회 / branch={user.branch} / count={qs.count()}")
+                qs = qs.filter(branch__iexact=user.branch.strip())
+            print(f"🧩 sub_admin 조회 / count={qs.count()}")
 
-        rows = [
-            {
+        # =======================================================
+        # 🧩 SubAdminTemp에서 팀 정보 매핑 (하이픈 제거 + 공란 허용)
+        # =======================================================
+        requester_ids = [sc.requester_id for sc in qs if sc.requester_id]
+        target_ids = [sc.target_id for sc in qs if sc.target_id]
+        all_user_ids = list(set(requester_ids + target_ids))
+
+        team_map = {}
+        for sa in SubAdminTemp.objects.filter(user_id__in=all_user_ids):
+            # ✅ "-", "", None 전부 무시하고 실제 팀명만 남김
+            team_list = [
+                t for t in [sa.team_a, sa.team_b, sa.team_c]
+                if t and t.strip() != "-"  # ← 핵심 부분
+            ]
+            team_str = " ".join(team_list).strip()
+            team_map[sa.user_id] = team_str  # 팀 없으면 공란
+
+        # =======================================================
+        # 🔐 반환 데이터 구성
+        # =======================================================
+        rows = []
+        for sc in qs:
+            requester_team = team_map.get(sc.requester_id, "")
+            target_team = team_map.get(sc.target_id, "")
+
+            rows.append({
                 "id": sc.id,
-                "branch": sc.branch or "",
-                "chg_branch": sc.chg_branch or "",
-                "chg_rank": sc.chg_rank or "",
-                "rank": sc.rank or "",
-                "memo": sc.memo or "",
-                "or_flag": sc.or_flag,
+                "requester_id": getattr(sc.requester, "id", ""),
                 "requester_name": getattr(sc.requester, "name", ""),
+                "requester_branch": requester_team,
+                "target_id": getattr(sc.target, "id", ""),
                 "target_name": getattr(sc.target, "name", ""),
+                "target_branch": target_team,
+                "chg_branch": sc.chg_branch or "",
+                "rank": sc.rank or "",
+                "chg_rank": sc.chg_rank or "",
+                "or_flag": sc.or_flag,
+                "memo": sc.memo or "",
                 "request_date": sc.request_date.strftime("%Y-%m-%d") if sc.request_date else "",
-            }
-            for sc in qs
-        ]
-        print(f"✅ 반환 rows={len(rows)}")
+                "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
+            })
+
+        print(f"✅ 반환 rows={len(rows)} (팀 기반 소속 / '-' 제거 완료)")
 
         return JsonResponse({"status": "success", "rows": rows})
 
@@ -325,6 +378,7 @@ def ajax_fetch(request):
         traceback.print_exc()
         print("❌ ajax_fetch 오류:", e)
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
 
 
 # ------------------------------------------------------------
