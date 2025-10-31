@@ -3,6 +3,12 @@
 {% load static %}
 {% block title %}편제변경{% endblock %}
 
+{% block extra_head %}
+  <!-- ✅ DataTables CSS/JS는 HEAD 안쪽에 포함 -->
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4" id="manage-structure"
     data-user-grade="{{ user.grade }}"
@@ -13,7 +19,7 @@
     data-future-until="{{ future_select_until|default:'' }}"
     data-data-fetch-url="{{ data_fetch_url }}"
     data-data-save-url="{{ data_save_url }}"
-    data-data-delete-url="{{ data_delete_url }}"
+    data-data-delete-url="{% url 'partner:ajax_delete' %}"
     data-set-deadline-url="{{ set_deadline_url }}"
     data-search-user-url="{{ search_user_url|default:'/board/search-user/' }}"
     data-update-process-date-url="{% url 'partner:ajax_update_process_date' %}">
@@ -67,14 +73,83 @@
   <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
+      {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+        <div class="alert alert-info py-2 mb-3">
+          편제변경 기능 사용 전 반드시 중간관리자별 권한관리를 설정해야 합니다.
+        </div>
+      {% endif %}
       <div class="d-flex gap-2">
         <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
         <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
         <button type="button" id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
       </div>
     </div>
-    {% comment %} input table 생략 {% endcomment %}
+
+    <div class="table-responsive">
+      <table class="table align-middle" id="inputTable">
+        <colgroup>
+          <col style="width: 5%"> <!-- 성명(요청자) -->
+          <col style="width: 6%"> <!-- 사번(요청자) -->
+          <col style="width: 9%"> <!-- 소속(요청자) -->
+          <col style="width: 5%"> <!-- 성명(대상자) -->
+          <col style="width: 6%"> <!-- 사번(대상자) -->
+          <col style="width: 14%"> <!-- 소속(변경전) -->
+          <col style="width: 11%"> <!-- 소속(변경후) -->          
+          <col style="width: 7%"> <!-- 직급(변경전) -->          
+          <col style="width: 7%"> <!-- 직급(변경후) -->
+          <col style="width: 4%"> <!-- OR -->
+          <col style="width: 18%"> <!-- 비고 -->
+          <col style="width: 4%"> <!-- 검색 --> 
+          <col style="width: 4%"> <!-- 삭제 -->
+        </colgroup>
+        <thead class="table-light">
+          <tr>
+            <th>성명<br>(요청자)</th>
+            <th>사번<br>(요청자)</th>
+            <th>소속<br>(요청자)</th>
+            <th>성명<br>(대상자)</th>
+            <th>사번<br>(대상자)</th>
+            <th>소속<br>(변경전)</th>
+            <th>소속<br>(변경후)<span class="text-danger">*</span></th>
+            <th>직급<br>(변경전)</th>
+            <th>직급<br>(변경후)<span class="text-danger">*</span></th>
+            <th>OR<span class="text-danger">*</span></th>            
+            <th>비고<span class="text-danger">*</span></th>
+            <th>검색</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# 최초 1행 템플릿 — JS로 복제/최대 10개까지 #}
+          <tr class="input-row">
+            <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="rq_branch" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_name" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_id" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="tg_branch" readonly></td>
+            <td><input type="text" name="chg_branch" class="form-control"></td>   
+            <td><input type="text" class="form-control readonly-field" name="tg_rank" readonly></td>
+            <td><input type="text" name="chg_rank" class="form-control"></td>
+            <td class="text-center">
+              <input type="checkbox" name="or_flag" class="form-check-input">
+            </td>
+            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>
+            <td>
+              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+            </td>
+            <td>
+              <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="small text-muted">※ 대상자는 한 번에 최대 10명까지 추가할 수 있습니다.</div>
   </div>
+
+
 
   <!-- ✅ 메인시트 -->
   <div class="card shadow p-3 border-0 rounded-4" id="mainSheet" hidden>
@@ -87,17 +162,34 @@
     </div>
     <div class="table-responsive">
       <table class="table table-striped align-middle" id="mainTable">
+        <colgroup>
+          <col style="width: 4%"> <!-- 성명(요청자) -->
+          <col style="width: 5%"> <!-- 사번(요청자) -->
+          <col style="width: 10%"> <!-- 소속(요청자) -->
+          <col style="width: 4%"> <!-- 성명(대상자) -->
+          <col style="width: 5%"> <!-- 사번(대상자) -->
+          <col style="width: 12%"> <!-- 소속(변경전) -->
+          <col style="width: 12%"> <!-- 소속(변경후) -->
+          <col style="width: 6%"> <!-- 직급(변경전) -->          
+          <col style="width: 6%"> <!-- 직급(변경후) -->
+          <col style="width: 4%"> <!-- OR -->
+          <col style="width: 18%"> <!-- 비고 -->
+          <col style="width: 5%"> <!-- 요청일자 -->
+          <col style="width: 5%"> <!-- 처리일자 -->
+          <col style="width: 4%"> <!-- 삭제 -->
+
+        </colgroup>
         <thead class="table-light">
           <tr>
-            <th>성명(요청자)</th>
-            <th>사번(요청자)</th>
-            <th>소속(요청자)</th>
-            <th>성명(대상자)</th>
-            <th>사번(대상자)</th>
-            <th>소속(변경전)</th>
-            <th>소속(변경후)</th>
-            <th>직급(변경전)</th>
-            <th>직급(변경후)</th>
+            <th>성명<br>(요청자)</th>
+            <th>사번<br>(요청자)</th>
+            <th>소속<br>(요청자)</th>
+            <th>성명<br>(대상자)</th>
+            <th>사번<br>(대상자)</th>
+            <th>소속<br>(변경전)</th>
+            <th>소속<br>(변경후)</th>
+            <th>직급<br>(변경전)</th>
+            <th>직급<br>(변경후)</th>
             <th>OR</th>
             <th>비고</th>
             <th>요청일자</th>
@@ -162,5 +254,4 @@
 </script>
 
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
-
 {% endblock %}

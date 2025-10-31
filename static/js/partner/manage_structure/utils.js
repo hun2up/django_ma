@@ -1,4 +1,4 @@
-// static/js/partner/manage_structure/utils.js
+// django_ma/static/js/partner/manage_structure/utils.js
 
 export function showLoading(msg = "처리 중...") {
   const overlay = document.getElementById("loadingOverlay");

@@ -95,12 +95,6 @@ def export_users_as_excel(queryset, filename):
 # ✅ 사용자 업로드 처리 로직
 # ============================================================
 def upload_users_from_excel_view(request):
-    """
-    Excel 파일을 업로드하여 사용자 정보를 등록/갱신.
-    개선사항:
-      ✅ 헤더 기반 매핑 (열 순서와 무관)
-      ✅ 결과 리포트 색상 표시 (신규=초록 / 업데이트=회색 / 오류=빨강)
-    """
     if request.method != "POST":
         return render(request, "admin/accounts/customuser/upload_excel.html", {"form": ExcelUploadForm()})
 
@@ -130,16 +124,27 @@ def upload_users_from_excel_view(request):
             row_data = dict(zip(headers, row))
             user_id = str(row_data.get("사번") or "").strip()
             name = str(row_data.get("성명") or "").strip()
+
             if not user_id or not name:
                 results.append([idx, user_id, name, "❌ ID 또는 이름 누락"])
                 error_count += 1
                 continue
 
+            # 등급, 상태, 권한 설정
             grade_val = GRADE_MAP.get(str(row_data.get("등급") or "").lower(), "basic")
             status_val = str(row_data.get("상태") or "재직").strip()
             is_superuser = grade_val == "superuser"
             is_staff = grade_val in ["superuser", "main_admin", "sub_admin"]
-            is_active = status_val == "재직"
+
+            # ✅ IS_ACTIVE 값 엑셀에서 직접 인식
+            is_active_raw = str(row_data.get("IS_ACTIVE") or row_data.get("is_active") or "").strip().lower()
+            if is_active_raw in ["true", "1", "yes", "y", "t"]:
+                is_active = True
+            elif is_active_raw in ["false", "0", "no", "n", "f"]:
+                is_active = False
+            else:
+                # 값이 없거나 인식 불가하면 True로 기본 처리
+                is_active = True
 
             defaults = dict(
                 name=name,
@@ -185,7 +190,6 @@ def upload_users_from_excel_view(request):
         ws_result.append(["Row", "ID", "Name", "Result"])
 
         from openpyxl.styles import PatternFill
-
         fill_new = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")   # 연녹색
         fill_update = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid") # 연회색
         fill_error = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 연분홍

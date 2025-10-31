@@ -1,4 +1,6 @@
-// static/js/partner/manage_structure/deadline.js
+// django_ma/static/js/partner/manage_structure/deadline.js
+
+/*
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
 import { checkInputAvailability } from "./availability.js";
@@ -36,3 +38,4 @@ export function setupDeadlineButton() {
     }
   });
 }
+*/
