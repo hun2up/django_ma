@@ -1,5 +1,8 @@
+// django_ma/static/js/partner/manage_structure/index.js
 import { fetchData } from "./fetch.js";
 import { initInputRowEvents } from "./input_rows.js";
+import { initManageBoot } from "../../common/manage_boot.js";
+const { root, boot, user } = initManageBoot("structure");
 
 /**
  * 📘 Manage Structure (편제변경 페이지)
@@ -68,6 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ============================================================
      2️⃣ Superuser의 부서/지점 목록 로드
   ============================================================ */
+  /*
   if (user.grade === "superuser") {
     const loadPartsSafely = async (retryCount = 0) => {
       if (typeof window.loadPartsAndBranches !== "function") {
@@ -91,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 0.5초 지연 후 시도 (DOM 안정화 보장)
     setTimeout(() => loadPartsSafely(0), 500);
   }
+    */
 
   /* ============================================================
      3️⃣ 검색 버튼 이벤트

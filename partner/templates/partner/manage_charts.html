@@ -211,14 +211,14 @@
   </div>
 </div>
 
-<!-- ✅ superuser용 부서/지점 로더 (먼저 로드해야 함) -->
+<!-- ✅ 공통 부서/지점 로더 -->
 <script src="{% static 'js/common/part_branch_selector.js' %}?v={{ now|date:'U' }}"></script>
 
-<!-- ✅ 메인 로직 (나중에 로드해야 함) -->
-<script type="module" src="{% static 'js/partner/manage_structure/index.js' %}?v={{ now|date:'U' }}"></script>
+<!-- ✅ 공통 부트 로더 -->
+<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={{ now|date:'U' }}"></script>
 
-<!-- ✅ 공통 모달 스크립트 -->
-<script src="{% static 'js/common/search_user_modal.js' %}?v={{ now|date:'U' }}"></script>
+<!-- ✅ 페이지별 메인 스크립트 -->
+<script type="module" src="{% static 'js/partner/manage_rate/index.js' %}?v={{ now|date:'U' }}"></script>
 
 <!-- ===================================================== -->
 <!-- Boot 데이터 전달 -->
