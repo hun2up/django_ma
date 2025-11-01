@@ -1,4 +1,6 @@
 // django_ma/static/js/common/manage_boot.js
+import { fetchData as fetchStructure } from "../partner/manage_structure/fetch.js";
+import { fetchData as fetchRate } from "../partner/manage_rate/fetch.js";
 
 /**
  * ✅ 공통 부트 로더 (Manage Structure / Rate 등 페이지 공용)
@@ -6,10 +8,9 @@
  * - DOM 요소 초기화
  * - Boot 데이터(window.ManageStructureBoot / window.ManageRateBoot)
  * - superuser 부서/지점 자동 로드
- * - autoLoad 모드 자동 실행
+ * - autoLoad 모드 자동 실행 (fetchData 자동 호출 포함)
  * ----------------------------------------------------------
  */
-
 export function initManageBoot(contextName) {
   const isStructure = contextName === "structure";
   const isRate = contextName === "rate";
@@ -26,10 +27,9 @@ export function initManageBoot(contextName) {
   const boot = window.ManageStructureBoot || window.ManageRateBoot || {};
   const user = window.currentUser || {};
 
-  console.log(`🔧 [ManageBoot] 초기화 (${contextName})`, {
-    boot,
-    userGrade: user.grade,
-  });
+  console.group(`🔧 [ManageBoot] 초기화 (${contextName})`);
+  console.log("BOOT DATA:", boot);
+  console.log("USER:", user);
 
   /* ============================================================
      🔹 Superuser용 부서/지점 로드 (공통)
@@ -47,30 +47,53 @@ export function initManageBoot(contextName) {
 
       try {
         console.log("➡️ 부서/지점 목록 로드 시도");
-        await window.loadPartsAndBranches(isStructure ? "manage-structure" : "manage-rate");
+        await window.loadPartsAndBranches(rootId);
         console.log("✅ 부서 목록 로드 완료");
       } catch (err) {
         console.error("❌ 부서 목록 로드 실패:", err);
       }
     };
 
-    // manage_boot.js (수정)
+    // DOM 안정화 이후 실행
     window.addEventListener("DOMContentLoaded", () => {
-        setTimeout(() => loadPartsSafely(0), 600);
+      setTimeout(() => loadPartsSafely(0), 600);
     });
   }
 
   /* ============================================================
      🔹 AutoLoad 모드 (main_admin / sub_admin 공용)
+     → fetchData() 자동 실행 포함
   ============================================================ */
-  if (boot.autoLoad && ["main_admin", "sub_admin"].includes(user.grade)) {
+  window.addEventListener("DOMContentLoaded", () => {
+    if (!boot.autoLoad || !["main_admin", "sub_admin"].includes(user.grade))
+      return;
+
     const year = document.getElementById("yearSelect")?.value;
     const month = document.getElementById("monthSelect")?.value;
     const ym = `${year}-${String(month).padStart(2, "0")}`;
     const branch = user.branch?.trim() || "";
-    console.log(`🟢 autoLoad 실행 (${contextName})`, { ym, branch });
-  }
 
-  console.log(`✅ [ManageBoot] ${contextName} 초기화 완료`);
+    console.log(`🟢 autoLoad 실행 (${contextName})`, { ym, branch });
+
+    setTimeout(() => {
+      const inputSection = document.getElementById("inputSection");
+      const mainTable =
+        document.getElementById("mainTable") ||
+        document.getElementById("mainSheet");
+
+      inputSection?.removeAttribute("hidden");
+      mainTable?.removeAttribute("hidden");
+
+      if (isStructure) {
+        fetchStructure(ym, branch, user);
+      } else if (isRate) {
+        fetchRate(ym, branch, user);
+      }
+
+      console.log("✅ autoLoad → fetchData() 실행 완료");
+    }, 800);
+  });
+
+  console.groupEnd();
   return { root, boot, user };
 }

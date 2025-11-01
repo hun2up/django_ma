@@ -130,6 +130,8 @@ def ajax_save(request):
         user = request.user
         part = payload.get("part") or getattr(user, "part", "") or "-"
         branch = payload.get("branch") or getattr(user, "branch", "") or "-"
+        if user.grade in ["main_admin", "sub_admin"]:
+            branch = getattr(user, "branch", "") or branch
 
         created_count = 0
         for row in items:
@@ -274,20 +276,18 @@ def ajax_update_process_date(request):
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """AJAX — 편제변경 데이터 조회 (소속을 팀으로 표시하되, '-' 및 공백은 무시)"""
+    """AJAX — 편제변경 데이터 조회 (안전형)"""
     try:
         user = request.user
         month = (request.GET.get("month") or "").strip()
         selected_branch = (request.GET.get("branch") or "").strip()
 
-        print("📩 [ajax_fetch] 호출됨:", user.grade, month, selected_branch)
+        print(f"📩 [ajax_fetch] 호출됨: {user.grade} {month} {selected_branch}")
 
-        # ✅ month 형식 보정 ("YYYY-M" → "YYYY-MM")
-        if month:
-            parts = month.split("-")
-            if len(parts) == 2:
-                y, m = parts
-                month = f"{y}-{int(m):02d}"
+        # 🔹 month 형식 보정
+        if month and "-" in month:
+            y, m = month.split("-")
+            month = f"{y}-{int(m):02d}"
 
         qs = (
             StructureChange.objects
@@ -296,70 +296,50 @@ def ajax_fetch(request):
             .order_by("-id")
         )
 
-        # =======================================================
-        # 🔐 권한별 필터링
-        # =======================================================
+        # 🔹 권한 필터링
         if user.grade == "superuser":
             if selected_branch:
                 qs = qs.filter(branch__iexact=selected_branch.strip())
-            print(f"🧩 superuser 조회 / branch={selected_branch} / count={qs.count()}")
-
         elif user.grade == "main_admin":
             qs = qs.filter(branch__iexact=user.branch.strip())
-            print(f"🧩 main_admin 조회 / branch={user.branch} / count={qs.count()}")
-
         elif user.grade == "sub_admin":
             sub_info = SubAdminTemp.objects.filter(user=user).first()
             if sub_info:
                 level = (sub_info.level or "").strip()
-                print(f"🧩 sub_admin 레벨={level}")
-                team_filters = Q()
+                q = Q(branch__icontains=user.branch.strip())
                 if level == "A레벨" and sub_info.team_a:
-                    team_filters = Q(requester__subadmin_detail__team_a=sub_info.team_a)
+                    q = Q(requester__subadmin_detail__team_a=sub_info.team_a)
                 elif level == "B레벨" and sub_info.team_b:
-                    team_filters = Q(requester__subadmin_detail__team_b=sub_info.team_b)
+                    q = Q(requester__subadmin_detail__team_b=sub_info.team_b)
                 elif level == "C레벨" and sub_info.team_c:
-                    team_filters = Q(requester__subadmin_detail__team_c=sub_info.team_c)
-                else:
-                    team_filters = Q(branch__iexact=user.branch.strip())
-                qs = qs.filter(team_filters)
+                    q = Q(requester__subadmin_detail__team_c=sub_info.team_c)
+                qs = qs.filter(q)
             else:
                 qs = qs.filter(branch__iexact=user.branch.strip())
-            print(f"🧩 sub_admin 조회 / count={qs.count()}")
 
-        # =======================================================
-        # 🧩 SubAdminTemp에서 팀 정보 매핑 (하이픈 제거 + 공란 허용)
-        # =======================================================
+        # 🔹 팀 매핑
         requester_ids = [sc.requester_id for sc in qs if sc.requester_id]
         target_ids = [sc.target_id for sc in qs if sc.target_id]
-        all_user_ids = list(set(requester_ids + target_ids))
+        all_ids = list(set(requester_ids + target_ids))
 
         team_map = {}
-        for sa in SubAdminTemp.objects.filter(user_id__in=all_user_ids):
-            # ✅ "-", "", None 전부 무시하고 실제 팀명만 남김
-            team_list = [
+        for sa in SubAdminTemp.objects.filter(user_id__in=all_ids):
+            teams = [
                 t for t in [sa.team_a, sa.team_b, sa.team_c]
-                if t and t.strip() != "-"  # ← 핵심 부분
+                if t and t.strip() != "-"
             ]
-            team_str = " ".join(team_list).strip()
-            team_map[sa.user_id] = team_str  # 팀 없으면 공란
+            team_map[sa.user_id] = " ".join(teams).strip()
 
-        # =======================================================
-        # 🔐 반환 데이터 구성
-        # =======================================================
         rows = []
         for sc in qs:
-            requester_team = team_map.get(sc.requester_id, "")
-            target_team = team_map.get(sc.target_id, "")
-
             rows.append({
                 "id": sc.id,
                 "requester_id": getattr(sc.requester, "id", ""),
                 "requester_name": getattr(sc.requester, "name", ""),
-                "requester_branch": requester_team,
+                "requester_branch": team_map.get(sc.requester_id, ""),
                 "target_id": getattr(sc.target, "id", ""),
                 "target_name": getattr(sc.target, "name", ""),
-                "target_branch": target_team,
+                "target_branch": team_map.get(sc.target_id, ""),
                 "chg_branch": sc.chg_branch or "",
                 "rank": sc.rank or "",
                 "chg_rank": sc.chg_rank or "",
@@ -369,16 +349,17 @@ def ajax_fetch(request):
                 "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
             })
 
-        print(f"✅ 반환 rows={len(rows)} (팀 기반 소속 / '-' 제거 완료)")
+        print(f"✅ [ajax_fetch] 반환 rows={len(rows)}")
 
         return JsonResponse({"status": "success", "rows": rows})
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print("❌ ajax_fetch 오류:", e)
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
+        return JsonResponse(
+            {"status": "error", "message": f"조회 중 오류: {str(e)}"},
+            status=500,
+        )
 
 
 # ------------------------------------------------------------
