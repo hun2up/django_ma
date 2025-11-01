@@ -1,7 +1,8 @@
-document.addEventListener("DOMContentLoaded", async () => {
+// django_ma/static/js/common/part_branch_selector.js
+window.loadPartsAndBranches = async function (rootId = "manage-structure") {
   const root =
-    document.getElementById("manage-structure") ||
-    document.getElementById("manage-rate"); // ✅ 요율변경도 지원
+    document.getElementById(rootId) ||
+    document.getElementById("manage-rate"); // 요율변경도 지원
 
   if (!root) return;
 
@@ -15,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const data = await res.json();
 
     partSelect.innerHTML = "";
-    if (data.status === "success" && data.parts?.length) {
+    if (data.parts?.length) {
       for (const part of data.parts) {
         const opt = document.createElement("option");
         opt.value = part;
@@ -37,7 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data2 = await res2.json();
 
       branchSelect.innerHTML = "";
-      if (data2.status === "success" && data2.branches?.length) {
+      if (data2.branches?.length) {
         for (const br of data2.branches) {
           const opt = document.createElement("option");
           opt.value = br;
@@ -54,4 +55,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("❌ 부서/지점 목록 로드 오류:", err);
     partSelect.innerHTML = `<option value="">로드 실패</option>`;
   }
-});
+};
