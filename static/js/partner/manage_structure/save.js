@@ -5,10 +5,14 @@ import { showLoading, hideLoading, alertBox, getCSRFToken, selectedYM } from "./
 import { fetchData } from "./fetch.js";
 import { resetInputSection } from "./input_rows.js";
 
+/**
+ * ✅ 편제변경 저장 (안전형)
+ */
 export async function saveRows() {
   const rows = Array.from(els.inputTable.querySelectorAll("tbody tr.input-row"));
   const payload = [];
 
+  // 🔹 데이터 수집 및 검증
   for (const row of rows) {
     const rq_id = row.querySelector("[name='rq_id']")?.value.trim() || "";
     const tg_id = row.querySelector("[name='tg_id']")?.value.trim() || "";
@@ -34,6 +38,7 @@ export async function saveRows() {
   }
 
   showLoading("저장 중...");
+
   try {
     const res = await fetch(els.root.dataset.dataSaveUrl, {
       method: "POST",
@@ -49,18 +54,41 @@ export async function saveRows() {
       }),
     });
 
-    if (!res.ok) throw new Error("저장 실패");
-    const result = await res.json();
+    const text = await res.text();
+    console.log("📦 [saveRows] Raw Response:", text);
+
+    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
+
+    let result = {};
+    try {
+      result = JSON.parse(text);
+    } catch {
+      throw new Error("서버 응답 파싱 실패");
+    }
 
     if (result.status === "success") {
-      alertBox(`${result.saved_count ?? payload.length}건 저장 완료`);
+      const count = result.saved_count ?? payload.length;
+      alertBox(`✅ ${count}건 저장 완료`);
+
+      // 🔹 입력 폼 리셋
       resetInputSection();
-      await fetchData(`${els.year.value}-${els.month.value}`, els.branch?.value || "");
+
+      // 🔹 재조회 (안전 실행)
+      try {
+        const ym = `${els.year.value}-${els.month.value}`;
+        const branch = els.branch?.value || window.currentUser?.branch || "";
+        await fetchData(ym, branch);
+      } catch (reErr) {
+        console.warn("⚠️ 저장 후 재조회 중 오류:", reErr);
+        alertBox("저장은 완료되었지만, 테이블 새로고침 중 오류가 발생했습니다.");
+      }
+
     } else {
       alertBox(result.message || "저장 중 오류가 발생했습니다.");
     }
+
   } catch (err) {
-    console.error("saveRows error:", err);
+    console.error("❌ saveRows error:", err);
     alertBox("저장 중 오류가 발생했습니다.");
   } finally {
     hideLoading();
