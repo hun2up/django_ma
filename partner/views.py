@@ -351,13 +351,17 @@ def ajax_fetch(request):
 
         print(f"✅ [ajax_fetch] 반환 rows={len(rows)}")
 
-        return JsonResponse({"status": "success", "rows": rows})
+        # ✅ 항상 리스트 보장
+        return JsonResponse({
+            "status": "success",
+            "rows": rows if rows is not None else []
+        })
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JsonResponse(
-            {"status": "error", "message": f"조회 중 오류: {str(e)}"},
+            {"status": "error", "message": f"조회 중 오류: {str(e)}", "rows": []},
             status=500,
         )
 
