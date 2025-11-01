@@ -1,134 +1,237 @@
+// django_ma/static/js/partner/manage_rate/fetch.js
+
 import { els } from "./dom_refs.js";
-import { showLoading, hideLoading, alertBox, pad2 } from "./utils.js";
-import { attachDeleteHandlers } from "./delete.js";
+import { showLoading, hideLoading } from "./utils.js";
+
+let mainDT = null;
 
 /**
- * ✅ 데이터 조회 및 렌더링
+ * ✅ DataTables 초기화 (1회)
  */
-export async function fetchData(ym = null, branchValue = null, meta = {}) {
-  const y = ym ? ym.split("-")[0] : els.year?.value;
-  const m = ym ? ym.split("-")[1] : els.month?.value;
-  const b = branchValue ?? els.branch?.value ?? "";
-  const ymValue = `${y}-${pad2(m)}`;
+function ensureMainDT() {
+  if (!els.mainTable) return null;
+  if (!window.jQuery || !window.jQuery.fn?.DataTable) return null;
+  if (mainDT) return mainDT;
 
-  const { grade, level, team_a, team_b, team_c } = meta || {};
-
-  console.log("🚀 fetchData() 실행:", {
-    ymValue,
-    branch: b,
-    grade,
-    level,
-    team_a,
-    team_b,
-    team_c,
+  mainDT = window.jQuery(els.mainTable).DataTable({
+    paging: false,
+    searching: false,
+    info: false,
+    ordering: false,
+    destroy: true,
+    language: { emptyTable: "데이터가 없습니다." },
   });
+  return mainDT;
+}
 
-  showLoading("데이터 불러오는 중...");
+/**
+ * ✅ 서버에서 데이터 받아오기
+ * payload = { ym, branch, grade, level, team_a, team_b, team_c }
+ */
+export async function fetchData(payload = {}) {
+  if (!els.root) return;
+
+  const baseUrl = els.root.dataset.dataFetchUrl;
+  if (!baseUrl) {
+    console.warn("[rate/fetch] data-fetch-url 이 없습니다.");
+    return;
+  }
+
+  // 🔹 month 파라미터 안전 보정 (YYYY-MM)
+  let ym = (payload.ym || "").trim();
+  if (ym && !/^\d{4}-\d{2}$/.test(ym)) {
+    const y = ym.slice(0, 4);
+    const m = ym.slice(-2);
+    ym = `${y}-${m}`;
+  }
+
+  // 🔹 URL 생성
+  const url = new URL(baseUrl, window.location.origin);
+  url.searchParams.set("month", ym);
+  url.searchParams.set("branch", payload.branch || "");
+  url.searchParams.set("grade", payload.grade || "");
+  url.searchParams.set("level", payload.level || "");
+  url.searchParams.set("team_a", payload.team_a || "");
+  url.searchParams.set("team_b", payload.team_b || "");
+  url.searchParams.set("team_c", payload.team_c || "");
+
+  console.log("➡️ [rate/fetch] FETCH 호출:", url.toString());
+
+  showLoading("데이터를 불러오는 중입니다...");
 
   try {
-    const params = new URLSearchParams({
-      month: ymValue,
-      branch: b,
-      grade: grade || "",
-      level: level || "",
-      team_a: team_a || "",
-      team_b: team_b || "",
-      team_c: team_c || "",
+    const res = await fetch(url.toString(), {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
     });
+    const data = await res.json();
 
-    const url = `${els.root.dataset.dataFetchUrl}?${params.toString()}`;
-    console.log("📡 Fetch 요청 URL:", url);
+    if (!data || data.status !== "success") {
+      console.warn("[rate/fetch] success 아님, 빈 상태로 렌더");
+      renderInputSection([]);
+      renderMainSheet([]);
+      return;
+    }
 
-    const res = await fetch(url);
-    const text = await res.text();
-    console.log("📦 Raw Response:", text);
-
-    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
-
-    const data = JSON.parse(text);
-    if (data.status !== "success") throw new Error(data.message || "조회 실패");
-
-    renderMainTable(data.rows || []);
-    console.log(`✅ 데이터 로드 완료: ${data.rows?.length || 0}건`);
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    renderInputSection(rows);
+    renderMainSheet(rows);
   } catch (err) {
-    console.error("❌ fetchData 에러:", err);
-    alertBox("데이터를 불러오지 못했습니다.");
+    console.error("[rate/fetch] 에러 발생", err);
+    renderInputSection([]);
+    renderMainSheet([]);
   } finally {
     hideLoading();
   }
 }
 
-/* ============================================================
-   ✅ 테이블 렌더링
-   ============================================================ */
-export function renderMainTable(rows) {
-  const tbody = els.mainTable.querySelector("tbody");
+/**
+ * ✅ 내용입력 카드 렌더링
+ */
+function renderInputSection(rows) {
+  if (!els.inputTable) return;
+  const tbody = els.inputTable.querySelector("tbody");
   if (!tbody) return;
 
-  // 기존 DataTable 완전 제거
-  if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable("#mainTable")) {
-    $("#mainTable").DataTable().clear().destroy();
-  }
-
-  // 내용 렌더링
   tbody.innerHTML = "";
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="14" class="text-center text-muted py-3">데이터가 없습니다.</td></tr>`;
-  } else {
-    for (const r of rows) {
-      tbody.insertAdjacentHTML(
-        "beforeend",
-        `
-        <tr data-id="${r.id}">
-          <td>${r.requester_name || ""}</td>
-          <td>${r.requester_id || ""}</td>
-          <td>${r.requester_branch || ""}</td>
-          <td>${r.target_name || ""}</td>
-          <td>${r.target_id || ""}</td>
-          <td>${r.target_branch || ""}</td>
-          <td>${r.chg_branch || ""}</td>
-          <td>${r.rank || ""}</td>
-          <td>${r.chg_rank || ""}</td>
-          <td>${r.or_flag ? "✅" : ""}</td>
-          <td>${r.memo || ""}</td>
-          <td>${r.request_date || ""}</td>
-          <td>${r.process_date || ""}</td>
-          <td>
-            ${
-              ["superuser", "main_admin"].includes(window.currentUser.grade)
-                ? `<button class="btn btn-sm btn-outline-danger btnDeleteRow" data-id="${r.id}">삭제</button>`
-                : ""
-            }
-          </td>
-        </tr>
-        `
-      );
-    }
+    tbody.appendChild(createEmptyInputRow());
+    return;
   }
-
-  // DataTables 재초기화
-  initDataTable();
-  attachDeleteHandlers();
-  console.log("✅ 메인시트 렌더링 및 DataTable 재초기화 완료");
+  rows.forEach((row) => tbody.appendChild(createInputRowFromData(row)));
 }
 
-/* ============================================================
-   ✅ DataTables 초기화
-   ============================================================ */
-function initDataTable() {
-  if (!window.jQuery || !window.jQuery.fn.DataTable) return;
+/**
+ * ✅ 메인 시트 렌더링
+ */
+function renderMainSheet(rows) {
+  const dt = ensureMainDT();
+  if (dt) {
+    dt.clear();
+    if (rows.length) {
+      const mapped = rows.map(normalizeRateRow).map((r) => [
+        r.requester_name,
+        r.requester_id,
+        r.requester_branch,
+        r.target_name,
+        r.target_id,
+        r.table_before,
+        r.table_after,
+        r.rate_before,
+        r.rate_after,
+        r.memo,
+        r.process_date,
+        buildActionButtons(r),
+      ]);
+      dt.rows.add(mapped).draw();
+    } else {
+      dt.draw();
+    }
+    return;
+  }
 
-  $("#mainTable").DataTable({
-    language: {
-      emptyTable: "데이터가 없습니다.",
-      search: "검색:",
-      lengthMenu: "_MENU_개씩 보기",
-      info: "_TOTAL_건 중 _START_–_END_ 표시",
-      infoEmpty: "0건",
-      paginate: { previous: "이전", next: "다음" },
-    },
-    order: [],
-    autoWidth: false,
-    pageLength: 10,
+  // 백업 모드
+  if (!els.mainTable) return;
+  const tbody = els.mainTable.querySelector("tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.textContent = "데이터가 없습니다.";
+    td.colSpan = 12;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  rows.map(normalizeRateRow).forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.requester_name}</td>
+      <td>${r.requester_id}</td>
+      <td>${r.requester_branch}</td>
+      <td>${r.target_name}</td>
+      <td>${r.target_id}</td>
+      <td>${r.table_before}</td>
+      <td>${r.table_after}</td>
+      <td>${r.rate_before}</td>
+      <td>${r.rate_after}</td>
+      <td>${r.memo}</td>
+      <td>${r.process_date}</td>
+      <td>${buildActionButtons(r)}</td>
+    `;
+    tbody.appendChild(tr);
   });
+}
+
+/**
+ * ✅ 서버 응답 → 표준형 필드 정규화
+ */
+function normalizeRateRow(row = {}) {
+  return {
+    id: row.id || row.pk || "",
+    requester_name: row.requester_name || row.req_name || row.rq_name || "",
+    requester_id: row.requester_id || row.req_empno || row.rq_id || "",
+    requester_branch: row.requester_branch || row.req_branch || row.rq_branch || "",
+    target_name: row.target_name || row.tg_name || "",
+    target_id: row.target_id || row.tg_id || "",
+    table_before: row.table_before || row.before_table || row.before_branch || "",
+    table_after: row.table_after || row.after_table || row.after_branch || "",
+    rate_before: row.rate_before || row.before_rate || row.before_rank || "",
+    rate_after: row.rate_after || row.after_rate || row.after_rank || "",
+    memo: row.memo || "",
+    process_date: row.process_date || row.proc_date || "",
+  };
+}
+
+/**
+ * ✅ 빈 입력 행
+ */
+function createEmptyInputRow() {
+  const tr = document.createElement("tr");
+  tr.classList.add("input-row");
+  tr.innerHTML = `
+    <td><input type="text" name="rq_name" class="form-control form-control-sm" placeholder="요청자"></td>
+    <td><input type="text" name="rq_id" class="form-control form-control-sm" placeholder="사번"></td>
+    <td><input type="text" name="rq_branch" class="form-control form-control-sm" placeholder="소속"></td>
+    <td><input type="text" name="tg_name" class="form-control form-control-sm" placeholder="대상자"></td>
+    <td><input type="text" name="tg_id" class="form-control form-control-sm" placeholder="사번"></td>
+    <td><input type="text" name="table_before" class="form-control form-control-sm" placeholder="변경전 테이블"></td>
+    <td><input type="text" name="table_after" class="form-control form-control-sm" placeholder="변경후 테이블"></td>
+    <td><input type="text" name="rate_before" class="form-control form-control-sm" placeholder="변경전 요율"></td>
+    <td><input type="text" name="rate_after" class="form-control form-control-sm" placeholder="변경후 요율"></td>
+    <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="메모"></td>
+  `;
+  return tr;
+}
+
+function createInputRowFromData(row) {
+  const r = normalizeRateRow(row);
+  const tr = document.createElement("tr");
+  tr.classList.add("input-row");
+  tr.innerHTML = `
+    <td><input type="text" name="rq_name" class="form-control form-control-sm" value="${r.requester_name || ""}"></td>
+    <td><input type="text" name="rq_id" class="form-control form-control-sm" value="${r.requester_id || ""}"></td>
+    <td><input type="text" name="rq_branch" class="form-control form-control-sm" value="${r.requester_branch || ""}"></td>
+    <td><input type="text" name="tg_name" class="form-control form-control-sm" value="${r.target_name || ""}"></td>
+    <td><input type="text" name="tg_id" class="form-control form-control-sm" value="${r.target_id || ""}"></td>
+    <td><input type="text" name="table_before" class="form-control form-control-sm" value="${r.table_before || ""}"></td>
+    <td><input type="text" name="table_after" class="form-control form-control-sm" value="${r.table_after || ""}"></td>
+    <td><input type="text" name="rate_before" class="form-control form-control-sm" value="${r.rate_before || ""}"></td>
+    <td><input type="text" name="rate_after" class="form-control form-control-sm" value="${r.rate_after || ""}"></td>
+    <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}"></td>
+  `;
+  return tr;
+}
+
+/**
+ * ✅ 액션 버튼 생성
+ */
+function buildActionButtons(row) {
+  return `
+    <button type="button" class="btn btn-sm btn-outline-danger btnDeleteRow" data-id="${row.id || ""}">
+      삭제
+    </button>
+  `;
 }
