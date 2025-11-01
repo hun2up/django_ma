@@ -1,51 +1,22 @@
 // django_ma/static/js/partner/manage_rate/dom_refs.js
 
-export const els = {};  // 빈 객체로 시작
+export const els = {
+  // rate 전용 루트 (없으면 구조 재사용 위해 structure도 한 번 더 탐색)
+  root:
+    document.getElementById("manage-rate") ||
+    document.getElementById("manage-structure"),
 
-// ✅ DOM이 완전히 로드된 뒤 요소 연결
-export function initDOMRefs() {
-  els.root = document.getElementById("manage-rate");
-  els.year = document.getElementById("yearSelect");
-  els.month = document.getElementById("monthSelect");
-  els.branch = document.getElementById("branchSelect");
-  els.btnSearch = document.getElementById("btnSearchPeriod");
-  els.inputSection = document.getElementById("inputSection");
-  els.inputTable = document.getElementById("inputTable");
-  els.mainTable = document.getElementById("mainTable");
-  els.loading = document.getElementById("loadingOverlay");
+  // 상단 컨트롤 박스
+  yearSelect: document.getElementById("yearSelect"),
+  monthSelect: document.getElementById("monthSelect"),
+  partSelect: document.getElementById("partSelect"),
+  branchSelect: document.getElementById("branchSelect"),
+  btnSearch: document.getElementById("btnSearchPeriod"),
 
-  console.log("🔗 DOM refs initialized:", els.root ? "OK" : "FAIL");
-}
+  // 카드 안 테이블
+  inputTable: document.getElementById("inputTable"),
+  mainTable: document.getElementById("mainTable"),
 
-export function initSelectOptions() {
-  const now = new Date();
-  const thisY = now.getFullYear();
-  const thisM = now.getMonth() + 1;
-
-  const selectedY = parseInt(window.ManageRateBoot?.selectedYear ?? thisY, 10);
-  const selectedM = parseInt(window.ManageRateBoot?.selectedMonth ?? thisM, 10);
-
-  if (els.year) {
-    els.year.innerHTML = "";
-    for (let y = thisY - 2; y <= thisY + 1; y++) {
-      const opt = document.createElement("option");
-      opt.value = y;
-      opt.textContent = `${y}년`;
-      if (y === selectedY) opt.selected = true;
-      els.year.appendChild(opt);
-    }
-  }
-
-  if (els.month) {
-    els.month.innerHTML = "";
-    for (let m = 1; m <= 12; m++) {
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = `${m}월`;
-      if (m === selectedM) opt.selected = true;
-      els.month.appendChild(opt);
-    }
-  }
-
-  console.log("[initSelectOptions] selected year/month 적용 완료:", selectedY, selectedM);
-}
+  // 공용 로딩 오버레이
+  loadingOverlay: document.getElementById("loadingOverlay"),
+};
