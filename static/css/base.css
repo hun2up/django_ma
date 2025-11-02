@@ -335,6 +335,38 @@ input[name^="premium_"] {
   white-space: nowrap;
 }
 
+/* =======================================================
+   ✅ 요율변경 페이지 카드 전체 폭 확장
+   ======================================================= */
+#manage-rate {
+  width: 86vw !important;
+  max-width: none !important;
+  margin-left: calc(-43vw + 50%) !important;
+  border-radius: 14px;
+}
+
+/* 카드 전체를 화면 폭에 맞게 확장 */
+#manage-rate .card {
+  width: 100%;
+  max-width: none;   /* ✅ 1600px 제한 제거 */
+  margin: 0 auto 1.5rem auto;
+  border-radius: 14px;
+}
+
+/* 내부 테이블이 카드 폭을 꽉 채우도록 */
+#manage-rate .table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible; /* ✅ 스크롤 강제 방지 */
+}
+
+/* 테이블 셀 폰트 균형 */
+#manage-rate table th,
+#manage-rate table td {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* =============================
    📘 조직관리 - 테이블 스타일
    ============================= */

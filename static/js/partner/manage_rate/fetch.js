@@ -200,41 +200,58 @@ function normalizeRateRow(row = {}) {
 }
 
 /* ============================================================
-   ✅ 입력행 생성
+   ✅ 입력행 생성 (검색/삭제 버튼 추가 + readonly 정책 반영)
 ============================================================ */
 function createEmptyInputRow() {
   const tr = document.createElement("tr");
   tr.classList.add("input-row");
   tr.innerHTML = `
-    <td><input type="text" name="rq_name" class="form-control form-control-sm" placeholder="요청자"></td>
-    <td><input type="text" name="rq_id" class="form-control form-control-sm" placeholder="사번"></td>
-    <td><input type="text" name="rq_branch" class="form-control form-control-sm" placeholder="소속"></td>
-    <td><input type="text" name="tg_name" class="form-control form-control-sm" placeholder="대상자"></td>
-    <td><input type="text" name="tg_id" class="form-control form-control-sm" placeholder="사번"></td>
-    <td><input type="text" name="table_before" class="form-control form-control-sm" placeholder="변경전 테이블"></td>
-    <td><input type="text" name="table_after" class="form-control form-control-sm" placeholder="변경후 테이블"></td>
-    <td><input type="text" name="rate_before" class="form-control form-control-sm" placeholder="변경전 요율"></td>
-    <td><input type="text" name="rate_after" class="form-control form-control-sm" placeholder="변경후 요율"></td>
-    <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="메모"></td>
+    <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="rq_branch" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="table_before" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="rate_before" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="table_after" class="form-control form-control-sm"></td>
+    <td><input type="text" name="rate_after" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="상세하게 기재"></td>
+    <td>
+      <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
+              data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+    </td>
+    <td>
+      <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
+    </td>
   `;
   return tr;
 }
 
+/* ============================================================
+   ✅ 데이터 기반 입력행 생성 (검색/삭제 버튼 포함)
+============================================================ */
 function createInputRowFromData(row) {
   const r = normalizeRateRow(row);
   const tr = document.createElement("tr");
   tr.classList.add("input-row");
   tr.innerHTML = `
-    <td><input type="text" name="rq_name" class="form-control form-control-sm" value="${r.requester_name || ""}"></td>
-    <td><input type="text" name="rq_id" class="form-control form-control-sm" value="${r.requester_id || ""}"></td>
-    <td><input type="text" name="rq_branch" class="form-control form-control-sm" value="${r.requester_branch || ""}"></td>
-    <td><input type="text" name="tg_name" class="form-control form-control-sm" value="${r.target_name || ""}"></td>
-    <td><input type="text" name="tg_id" class="form-control form-control-sm" value="${r.target_id || ""}"></td>
-    <td><input type="text" name="table_before" class="form-control form-control-sm" value="${r.table_before || ""}"></td>
+    <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" value="${r.requester_name || ""}" readonly></td>
+    <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" value="${r.requester_id || ""}" readonly></td>
+    <td><input type="text" name="rq_branch" class="form-control form-control-sm readonly-field" value="${r.requester_branch || ""}" readonly></td>
+    <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" value="${r.target_name || ""}" readonly></td>
+    <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" value="${r.target_id || ""}" readonly></td>
+    <td><input type="text" name="table_before" class="form-control form-control-sm readonly-field" value="${r.table_before || ""}" readonly></td>
+    <td><input type="text" name="rate_before" class="form-control form-control-sm readonly-field" value="${r.rate_before || ""}" readonly></td>
     <td><input type="text" name="table_after" class="form-control form-control-sm" value="${r.table_after || ""}"></td>
-    <td><input type="text" name="rate_before" class="form-control form-control-sm" value="${r.rate_before || ""}"></td>
-    <td><input type="text" name="rate_after" class="form-control form-control-sm" value="${r.rate_after || ""}"></td>
-    <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}"></td>
+    <td><input type="text" name="rate_after" class="form-control form-control-sm readonly-field" value="${r.rate_after || ""}" readonly></td>
+    <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}" placeholder="상세하게 기재"></td>
+    <td>
+      <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
+              data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+    </td>
+    <td>
+      <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
+    </td>
   `;
   return tr;
 }

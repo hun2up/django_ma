@@ -69,7 +69,11 @@
 
   {% if user.grade in 'superuser main_admin' %}
   <div class="alert alert-info py-2 mb-3">
-    요율변경 기능 사용 전 반드시 수수료 테이블을 설정해야 합니다.
+    요율변경 기능 사용 전 반드시 
+    <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
+    과 
+    <a href="{% url 'partner:manage_tables' %}" class="fw-bold text-decoration-underline text-primary">수수료 테이블</a>
+    을 설정해야 합니다.
   </div>
   {% endif %}
 

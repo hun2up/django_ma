@@ -71,7 +71,9 @@
 
   {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
     <div class="alert alert-info w-100 py-2 mb-3 text-start">
-      편제변경 기능 사용 전 반드시 중간관리자별 권한관리를 설정해야 합니다.
+      편제변경 기능 사용 전 반드시 
+      <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
+      를 설정해야 합니다.
     </div>
   {% endif %}
 
