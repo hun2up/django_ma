@@ -27,4 +27,5 @@ urlpatterns = [
     # ✅ 테이블관리 전용 AJAX
     path("api/table/fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
     path("api/table/save/", views.ajax_table_save, name="ajax_table_save"),
+    path("ajax/table-fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
 ]

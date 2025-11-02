@@ -82,6 +82,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
       <div class="d-flex gap-2">
+        <button type="button" id="btnCheckTable" class="btn btn-outline-info btn-sm">테이블 확인</button>
         <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
         <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
         <button type="button" id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
@@ -176,6 +177,26 @@
         </thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ✅ 테이블 확인 모달 -->
+  <div class="modal fade" id="tableCheckModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">지점별 테이블 확인</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+        <div class="modal-body">
+          <div id="tableCheckBody" class="table-responsive text-center">
+            <div class="py-4 text-muted">불러오는 중...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
     </div>
   </div>
 

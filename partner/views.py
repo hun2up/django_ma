@@ -582,24 +582,31 @@ def ajax_fetch_branches(request):
 # ------------------------------------------------------------
 @require_GET
 @login_required
-@grade_required(['superuser', 'main_admin'])
+@grade_required(['superuser', 'main_admin', 'sub_admin'])
 def ajax_table_fetch(request):
     """
-    특정 branch의 테이블 관리 데이터 조회
+    ✅ 지점(branch)별 테이블 관리 데이터 조회
+    - superuser는 모든 지점 조회 가능
+    - main_admin, sub_admin, basic은 자신의 지점만 조회 가능
     - order 순서대로 정렬하여 반환
     """
-    from django.http import JsonResponse
-    from .models import TableSetting
 
-    branch = request.GET.get("branch")
+    branch = request.GET.get("branch", "").strip()
+    user = request.user
+
+    # 🔹 branch 검증
     if not branch:
         return JsonResponse({"status": "error", "message": "지점(branch) 정보가 없습니다."})
+
+    # 🔹 권한별 branch 접근 제한
+    if user.grade != "superuser" and branch != user.branch:
+        return JsonResponse({"status": "error", "message": "다른 지점의 테이블에는 접근할 수 없습니다."})
 
     try:
         rows = (
             TableSetting.objects.filter(branch=branch)
             .order_by("order")
-            .values("order", "branch", "table_name", "rate")
+            .values("order", "branch", "table_name", "rate", "created_at", "updated_at")
         )
 
         data = [
@@ -608,6 +615,8 @@ def ajax_table_fetch(request):
                 "branch": r["branch"],
                 "table": r["table_name"],
                 "rate": r["rate"],
+                "created_at": r["created_at"].strftime("%Y-%m-%d") if r["created_at"] else "-",
+                "updated_at": r["updated_at"].strftime("%Y-%m-%d") if r["updated_at"] else "-",
             }
             for r in rows
         ]
@@ -617,7 +626,7 @@ def ajax_table_fetch(request):
     except Exception as e:
         import traceback
         print("❌ ajax_table_fetch 오류:", traceback.format_exc())
-        return JsonResponse({"status": "error", "message": str(e)})
+        return JsonResponse({"status": "error", "message": f"조회 중 오류 발생: {str(e)}"})
 
 
 # ------------------------------------------------------------
