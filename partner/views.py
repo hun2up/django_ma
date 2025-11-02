@@ -581,50 +581,95 @@ def ajax_fetch_branches(request):
 # 📘 AJAX — 테이블관리 데이터 조회
 # ------------------------------------------------------------
 @require_GET
+@login_required
 @grade_required(['superuser', 'main_admin'])
 def ajax_table_fetch(request):
+    """
+    특정 branch의 테이블 관리 데이터 조회
+    - order 순서대로 정렬하여 반환
+    """
+    from django.http import JsonResponse
+    from .models import TableSetting
+
+    branch = request.GET.get("branch")
+    if not branch:
+        return JsonResponse({"status": "error", "message": "지점(branch) 정보가 없습니다."})
+
     try:
-        user = request.user
-        branch = (request.GET.get("branch") or "").strip()
+        rows = (
+            TableSetting.objects.filter(branch=branch)
+            .order_by("order")
+            .values("order", "branch", "table_name", "rate")
+        )
 
-        if user.grade == "main_admin":
-            branch = user.branch
+        data = [
+            {
+                "order": r["order"],
+                "branch": r["branch"],
+                "table": r["table_name"],
+                "rate": r["rate"],
+            }
+            for r in rows
+        ]
 
-        qs = TableSetting.objects.filter(branch=branch).order_by("table_name")
+        return JsonResponse({"status": "success", "rows": data})
 
-        rows = [{"branch": t.branch, "table": t.table_name, "rate": t.rate} for t in qs]
-
-        return JsonResponse({"status": "success", "rows": rows})
     except Exception as e:
-        import traceback; traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        import traceback
+        print("❌ ajax_table_fetch 오류:", traceback.format_exc())
+        return JsonResponse({"status": "error", "message": str(e)})
 
 
 # ------------------------------------------------------------
 # 📘 AJAX — 테이블관리 데이터 저장
 # ------------------------------------------------------------
 @require_POST
+@login_required
 @grade_required(['superuser', 'main_admin'])
-@transaction.atomic
 def ajax_table_save(request):
+    """
+    테이블 관리 데이터 저장
+    - branch별 기존 데이터 전체 삭제 후 재삽입
+    - order(순서) 필드 포함 저장
+    """
+    import json
+    from django.db import transaction
+    from django.http import JsonResponse
+    from .models import TableSetting
+
     try:
-        payload = json.loads(request.body)
-        rows = payload.get("rows", [])
-        branch = (payload.get("branch") or "").strip()
+        data = json.loads(request.body.decode("utf-8"))
+        branch = data.get("branch")
+        rows = data.get("rows", [])
 
-        if not branch:
-            return JsonResponse({"status": "error", "message": "branch 누락"}, status=400)
+        if not branch or not isinstance(rows, list):
+            return JsonResponse({"status": "error", "message": "요청 데이터가 잘못되었습니다."})
 
-        # 기존 데이터 전체 삭제 후 새로 저장
-        TableSetting.objects.filter(branch=branch).delete()
+        with transaction.atomic():
+            # 기존 branch 데이터 전체 삭제
+            TableSetting.objects.filter(branch=branch).delete()
 
-        for r in rows:
-            table_name = (r.get("table") or "").strip()
-            rate = (r.get("rate") or "").strip()
-            if table_name:
-                TableSetting.objects.create(branch=branch, table_name=table_name, rate=rate)
+            # 새 데이터 삽입
+            objs = []
+            for r in rows:
+                order = int(r.get("order") or 0)
+                table_name = (r.get("table") or "").strip()
+                rate = (r.get("rate") or "").strip()
+                if not table_name and not rate:
+                    continue
 
-        return JsonResponse({"status": "success", "saved_count": len(rows)})
+                objs.append(TableSetting(
+                    branch=branch,
+                    table_name=table_name,
+                    rate=rate,
+                    order=order,
+                ))
+
+            TableSetting.objects.bulk_create(objs)
+
+        return JsonResponse({"status": "success", "saved_count": len(objs)})
+
     except Exception as e:
-        import traceback; traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        import traceback
+        print("❌ ajax_table_save 오류:", traceback.format_exc())
+        return JsonResponse({"status": "error", "message": str(e)})

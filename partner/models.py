@@ -157,6 +157,7 @@ class TableSetting(models.Model):
     branch = models.CharField(max_length=100)      # 지점명
     table_name = models.CharField(max_length=100)  # 테이블명
     rate = models.CharField(max_length=20, blank=True, null=True)  # 요율 (%)
+    order = models.PositiveIntegerField(default=0, help_text="표시 순서")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
