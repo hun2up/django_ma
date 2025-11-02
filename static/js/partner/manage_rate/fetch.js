@@ -184,23 +184,27 @@ function renderMainSheet(rows) {
 ============================================================ */
 function normalizeRateRow(row = {}) {
   return {
-    id: row.id || row.pk || "",
-    requester_name: row.requester_name || row.req_name || row.rq_name || "",
-    requester_id: row.requester_id || row.req_empno || row.rq_id || "",
-    requester_branch: row.requester_branch || row.req_branch || row.rq_branch || "",
+    id: row.id || "",
+    requester_name: row.requester_name || row.rq_name || "",
+    requester_id: row.requester_id || row.rq_id || "",
     target_name: row.target_name || row.tg_name || "",
     target_id: row.target_id || row.tg_id || "",
-    table_before: row.table_before || row.before_table || row.before_branch || "",
-    table_after: row.table_after || row.after_table || row.after_branch || "",
-    rate_before: row.rate_before || row.before_rate || row.before_rank || "",
-    rate_after: row.rate_after || row.after_rate || row.after_rank || "",
+    before_ftable: row.before_ftable || "",
+    before_frate: row.before_frate || "",
+    before_ltable: row.before_ltable || "",
+    before_lrate: row.before_lrate || "",
+    after_ftable: row.after_ftable || "",
+    after_frate: row.after_frate || "",
+    after_ltable: row.after_ltable || "",
+    after_lrate: row.after_lrate || "",
     memo: row.memo || "",
-    process_date: row.process_date || row.proc_date || "",
+    process_date: row.process_date || "",
   };
 }
 
+
 /* ============================================================
-   ✅ 입력행 생성 (검색/삭제 버튼 추가 + readonly 정책 반영)
+   ✅ 입력행 생성 (템플릿 구조와 완벽히 일치 — 15열)
 ============================================================ */
 function createEmptyInputRow() {
   const tr = document.createElement("tr");
@@ -208,27 +212,31 @@ function createEmptyInputRow() {
   tr.innerHTML = `
     <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" readonly></td>
     <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="rq_branch" class="form-control form-control-sm readonly-field" readonly></td>
     <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" readonly></td>
     <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="table_before" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="rate_before" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="table_after" class="form-control form-control-sm"></td>
-    <td><input type="text" name="rate_after" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
+    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>
+    <td><input type="text" name="after_ftable" class="form-control form-control-sm"></td>
+    <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
+    <td><input type="text" name="after_ltable" class="form-control form-control-sm"></td>
+    <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>
     <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="상세하게 기재"></td>
-    <td>
+    <td class="text-center">
       <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
               data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
     </td>
-    <td>
+    <td class="text-center">
       <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
     </td>
   `;
   return tr;
 }
 
+
 /* ============================================================
-   ✅ 데이터 기반 입력행 생성 (검색/삭제 버튼 포함)
+   ✅ 데이터 기반 입력행 생성 (15열 일치)
 ============================================================ */
 function createInputRowFromData(row) {
   const r = normalizeRateRow(row);
@@ -237,24 +245,28 @@ function createInputRowFromData(row) {
   tr.innerHTML = `
     <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" value="${r.requester_name || ""}" readonly></td>
     <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" value="${r.requester_id || ""}" readonly></td>
-    <td><input type="text" name="rq_branch" class="form-control form-control-sm readonly-field" value="${r.requester_branch || ""}" readonly></td>
     <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" value="${r.target_name || ""}" readonly></td>
     <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" value="${r.target_id || ""}" readonly></td>
-    <td><input type="text" name="table_before" class="form-control form-control-sm readonly-field" value="${r.table_before || ""}" readonly></td>
-    <td><input type="text" name="rate_before" class="form-control form-control-sm readonly-field" value="${r.rate_before || ""}" readonly></td>
-    <td><input type="text" name="table_after" class="form-control form-control-sm" value="${r.table_after || ""}"></td>
-    <td><input type="text" name="rate_after" class="form-control form-control-sm readonly-field" value="${r.rate_after || ""}" readonly></td>
+    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" value="${r.table_before || ""}" readonly></td>
+    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" value="${r.rate_before || ""}" readonly></td>
+    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" value="${r.before_ltable || ""}" readonly></td>
+    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.before_lrate || ""}" readonly></td>
+    <td><input type="text" name="after_ftable" class="form-control form-control-sm" value="${r.after_ftable || ""}"></td>
+    <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" value="${r.after_frate || ""}" readonly></td>
+    <td><input type="text" name="after_ltable" class="form-control form-control-sm" value="${r.after_ltable || ""}"></td>
+    <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.after_lrate || ""}" readonly></td>
     <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}" placeholder="상세하게 기재"></td>
-    <td>
+    <td class="text-center">
       <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
               data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
     </td>
-    <td>
+    <td class="text-center">
       <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
     </td>
   `;
   return tr;
 }
+
 
 /* ============================================================
    ✅ 액션 버튼

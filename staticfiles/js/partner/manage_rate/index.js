@@ -1,4 +1,5 @@
 // django_ma/static/js/partner/manage_rate/index.js
+
 import { els } from "./dom_refs.js";
 import { fetchData } from "./fetch.js";
 import { pad2 } from "./utils.js";
@@ -118,33 +119,35 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const html = `
-          <table class="table table-sm table-bordered align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>순번</th>
-                <th>테이블명</th>
-                <th>요율(%)</th>
-                <th>등록일</th>
-                <th>수정일</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.rows
-                .map(
-                  (r, i) => `
+          <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+            <table class="table table-sm table-bordered align-middle mb-0"
+                  style="font-size: 0.9rem; table-layout: fixed; width: 100%; text-align: center;">
+              <colgroup>
+                <col style="width: 70%;">  <!-- 테이블명 -->
+                <col style="width: 30%;">  <!-- 요율 -->
+              </colgroup>
+              <thead class="table-light">
                 <tr>
-                  <td>${i + 1}</td>
-                  <td>${r.table || "-"}</td>
-                  <td>${r.rate ?? "-"}</td>
-                  <td>${r.created_at || "-"}</td>
-                  <td>${r.updated_at || "-"}</td>
-                </tr>`
-                )
-                .join("")}
-            </tbody>
-          </table>
+                  <th class="text-center">테이블명</th>
+                  <th class="text-center">요율(%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.rows
+                  .map(
+                    (r) => `
+                  <tr>
+                    <td class="text-truncate" title="${r.table || "-"}">${r.table || "-"}</td>
+                    <td class="text-center">${r.rate ?? "-"}</td>
+                  </tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
         `;
         modalBody.innerHTML = html;
+
       } catch (err) {
         console.error("❌ 테이블 조회 실패:", err);
         modalBody.innerHTML = `<div class="py-4 text-danger">테이블 정보를 불러오지 못했습니다.</div>`;

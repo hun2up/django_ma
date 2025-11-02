@@ -123,8 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
             <table class="table table-sm table-bordered align-middle mb-0"
                   style="font-size: 0.9rem; table-layout: fixed; width: 100%; text-align: center;">
               <colgroup>
-                <col style="width: 50%;">
-                <col style="width: 20%;">
+                <col style="width: 70%;">  <!-- 테이블명 -->
+                <col style="width: 30%;">  <!-- 요율 -->
               </colgroup>
               <thead class="table-light">
                 <tr>
@@ -147,7 +147,6 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `;
         modalBody.innerHTML = html;
-
 
       } catch (err) {
         console.error("❌ 테이블 조회 실패:", err);
