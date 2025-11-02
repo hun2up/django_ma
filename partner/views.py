@@ -857,31 +857,78 @@ def ajax_rate_userlist_upload(request):
 # ------------------------------------------------------------
 # 📘 AJAX — 대상자 상세정보 조회 (요율변경용)
 # ------------------------------------------------------------
-@require_GET
+from django.views.decorators.http import require_GET
+from django.contrib.auth.decorators import login_required
+
 @login_required
+@require_GET
 def ajax_rate_user_detail(request):
-    """대상자 상세정보 반환 (요율변경용)"""
-    user_id = request.GET.get("user_id")
+    """
+    요율변경 페이지에서 검색된 '대상자' 한 명의
+    - 손보테이블명
+    - 생보테이블명
+    - 손보요율(%)
+    - 생보요율(%)
+    를 돌려준다.
+
+    테이블명은 RateTable 에서 가져오고,
+    요율(%)은 테이블관리(TableSetting)에서 같은 지점+테이블명으로 다시 찾는다.
+    """
+    user_id = request.GET.get("user_id", "").strip()
     if not user_id:
-        return JsonResponse({"status": "error", "message": "user_id가 없습니다."})
+      return JsonResponse({"status": "error", "message": "user_id가 없습니다."}, status=400)
 
     try:
+        # 1) 대상자
         target = CustomUser.objects.get(id=user_id)
+
+        # 2) 대상자의 '기본 손보/생보 테이블명' (rate_table)
         rate_info = RateTable.objects.filter(user=target).first()
+        non_life_table = rate_info.non_life_table if rate_info else ""
+        life_table = rate_info.life_table if rate_info else ""
+
+        # 3) 테이블관리에서 실제 요율(%) 가져오기
+        non_life_rate = ""
+        life_rate = ""
+
+        # 손보
+        if non_life_table:
+            ts = (
+                TableSetting.objects
+                .filter(branch=target.branch, table_name=non_life_table)
+                .order_by("order")
+                .first()
+            )
+            if ts:
+                # TableSetting.rate 에는 "30%" 이런 식으로 들어있다고 가정
+                non_life_rate = ts.rate or ""
+
+        # 생보
+        if life_table:
+            ts2 = (
+                TableSetting.objects
+                .filter(branch=target.branch, table_name=life_table)
+                .order_by("order")
+                .first()
+            )
+            if ts2:
+                life_rate = ts2.rate or ""
 
         data = {
             "target_name": target.name,
             "target_id": target.id,
-            "non_life_table": rate_info.non_life_table if rate_info else "",
-            "life_table": rate_info.life_table if rate_info else "",
-            "non_life_rate": rate_info.non_life_rate if rate_info else "",
-            "life_rate": rate_info.life_rate if rate_info else "",
+            "non_life_table": non_life_table,   # 손보테이블(변경전)
+            "life_table": life_table,           # 생보테이블(변경전)
+            "non_life_rate": non_life_rate,     # 손보요율(변경전)
+            "life_rate": life_rate,             # 생보요율(변경전)
+            "branch": target.branch or "",
         }
         return JsonResponse({"status": "success", "data": data})
 
     except CustomUser.DoesNotExist:
-        return JsonResponse({"status": "error", "message": "대상자를 찾을 수 없습니다."})
+        return JsonResponse({"status": "error", "message": "대상자를 찾을 수 없습니다."}, status=404)
     except Exception as e:
         import traceback
         print("ajax_rate_user_detail error:", traceback.format_exc())
-        return JsonResponse({"status": "error", "message": str(e)})
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
