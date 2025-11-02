@@ -2,13 +2,12 @@
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
-import { fetchData } from "./fetch.js";
 
 /* =======================================================
-   📘 입력 행 관련 로직 (요율변경 요청 페이지)
+   📘 입력 행 관련 초기화
    ======================================================= */
 export function initInputRowEvents() {
-  // ✅ 추가 버튼
+  // 행 추가
   els.btnAddRow?.addEventListener("click", () => {
     const tbody = els.inputTable.querySelector("tbody");
     const rows = tbody.querySelectorAll(".input-row");
@@ -21,21 +20,21 @@ export function initInputRowEvents() {
     newRow.querySelectorAll("input").forEach((el) => {
       if (el.type === "checkbox") el.checked = false;
       else el.value = "";
-      el.readOnly = true; // ✅ 기본적으로 전부 readonly
+      el.readOnly = true;
     });
 
-    fillRequesterInfo(newRow); // 요청자 정보 자동 입력
-    allowEditableFields(newRow); // 변경가능 칸만 해제
+    fillRequesterInfo(newRow);
+    allowEditableFields(newRow);
     tbody.appendChild(newRow);
   });
 
-  // ✅ 초기화 버튼
+  // 초기화
   els.btnResetRows?.addEventListener("click", () => {
     if (!confirm("입력 내용을 모두 초기화하시겠습니까?")) return;
     resetInputSection();
   });
 
-  // ✅ 삭제 버튼 (동적 위임)
+  // 삭제 (위임)
   document.addEventListener("click", (e) => {
     if (!e.target.classList.contains("btnRemoveRow")) return;
     const tbody = els.inputTable.querySelector("tbody");
@@ -47,25 +46,74 @@ export function initInputRowEvents() {
     e.target.closest(".input-row").remove();
   });
 
-  // ✅ 페이지 최초 로드시 요청자 정보 입력
+  // 행 클릭 시 active
+  document.addEventListener("click", (e) => {
+    const tr = e.target.closest(".input-row");
+    if (!tr) return;
+    els.inputTable.querySelectorAll(".input-row").forEach((r) => r.classList.remove("active"));
+    tr.classList.add("active");
+  });
+
+  // 첫 행 세팅
   const firstRow = els.inputTable.querySelector(".input-row");
   if (firstRow) {
     firstRow.querySelectorAll("input").forEach((el) => (el.readOnly = true));
     fillRequesterInfo(firstRow);
     allowEditableFields(firstRow);
+    firstRow.classList.add("active");
   }
+
+  // 공통 모달에서 선택된 사용자 받기 → 여기서 상세조회
+  document.addEventListener("userSelected", async (e) => {
+    const targetId = e.detail?.id;
+    if (!targetId) return;
+
+    const activeRow = els.inputTable.querySelector(".input-row.active");
+    if (!activeRow) {
+      alertBox("대상자를 입력할 행을 먼저 클릭하세요.");
+      return;
+    }
+
+    showLoading("대상자 정보 불러오는 중...");
+    await fillTargetInfo(activeRow, targetId);
+    hideLoading();
+  });
+
+  // (레거시) .btn-select-user 처리
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".btn-select-user");
+    if (!btn) return;
+
+    const targetId = btn.dataset.id;
+    const activeRow = els.inputTable.querySelector(".input-row.active");
+    if (!activeRow || !targetId) {
+      alertBox("대상자를 입력할 행을 먼저 클릭하세요.");
+      return;
+    }
+
+    showLoading("대상자 정보 불러오는 중...");
+    await fillTargetInfo(activeRow, targetId);
+    hideLoading();
+
+    const modalEl = document.getElementById("searchUserModal");
+    if (modalEl) {
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+  });
 }
 
 /* =======================================================
-   ✅ 요청자 정보 자동입력 (branch 포함)
+   ✅ 요청자 정보 자동입력
    ======================================================= */
 function fillRequesterInfo(row) {
   const user = window.currentUser || {};
-  row.querySelector('input[name="rq_name"]').value = user.name || "";
-  row.querySelector('input[name="rq_id"]').value = user.id || "";
-  // ✅ 요청자 소속 자동입력 (지점명만 활용)
-  const branchInput = row.querySelector('input[name="rq_branch"]');
-  if (branchInput) branchInput.value = user.branch || "";
+  const rqName = row.querySelector('input[name="rq_name"]');
+  if (rqName) rqName.value = user.name || "";
+  const rqId = row.querySelector('input[name="rq_id"]');
+  if (rqId) rqId.value = user.id || "";
+  const rqBranch = row.querySelector('input[name="rq_branch"]');
+  if (rqBranch) rqBranch.value = user.branch || "";
 }
 
 /* =======================================================
@@ -85,18 +133,36 @@ export function resetInputSection() {
     });
     fillRequesterInfo(firstRow);
     allowEditableFields(firstRow);
+    firstRow.classList.add("active");
   }
 }
 
 /* =======================================================
-   ✅ 변경 가능 필드만 수정 허용
+   ✅ 수정 가능한 칸만 풀어주기
+   (템플릿: after_ftable, after_ltable, memo)
    ======================================================= */
 function allowEditableFields(row) {
-  const editableNames = ["non_life_table_after", "life_table_after", "memo"];
-  editableNames.forEach((name) => {
+  ["after_ftable", "after_ltable", "memo"].forEach((name) => {
     const el = row.querySelector(`input[name="${name}"]`);
     if (el) el.readOnly = false;
   });
+}
+
+/* =======================================================
+   ✅ 대상자 상세 불러오기 (하이픈 → 언더스코어 fallback)
+   ======================================================= */
+async function fetchTargetDetail(targetId) {
+  // 1차: /partner/ajax/rate-user-detail/
+  const url1 = `/partner/ajax/rate-user-detail/?user_id=${encodeURIComponent(targetId)}`;
+  const res1 = await fetch(url1, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+  if (res1.ok) {
+    return res1.json();
+  }
+
+  // 2차: /partner/ajax_rate_user_detail/
+  const url2 = `/partner/ajax_rate_user_detail/?user_id=${encodeURIComponent(targetId)}`;
+  const res2 = await fetch(url2, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+  return res2.json();
 }
 
 /* =======================================================
@@ -104,64 +170,41 @@ function allowEditableFields(row) {
    ======================================================= */
 export async function fillTargetInfo(row, targetId) {
   try {
-    const res = await fetch(`/partner/ajax_rate_user_detail/?user_id=${targetId}`, {
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-    });
-    const data = await res.json();
+    const data = await fetchTargetDetail(targetId);
+
     if (data.status !== "success") {
       alertBox(data.message || "대상자 정보를 불러오지 못했습니다.");
       return;
     }
 
-    const info = data.data;
-    const user = window.currentUser || {};
-
-    // 요청자 정보 자동입력
-    row.querySelector('input[name="rq_name"]').value = user.name || "";
-    row.querySelector('input[name="rq_id"]').value = user.id || "";
+    const info = data.data || {};
 
     // 대상자 정보
-    row.querySelector('input[name="tg_name"]').value = info.target_name || "";
-    row.querySelector('input[name="tg_id"]').value = info.target_id || "";
+    const tgName = row.querySelector('input[name="tg_name"]');
+    if (tgName) tgName.value = info.target_name || "";
 
-    // ✅ 변경전 테이블명 및 요율 (테이블관리 페이지와 연동)
-    row.querySelector('input[name="before_ftable"]').value = info.non_life_table || "";
-    row.querySelector('input[name="before_frate"]').value = info.non_life_rate || "";
-    row.querySelector('input[name="before_ltable"]').value = info.life_table || "";
-    row.querySelector('input[name="before_lrate"]').value = info.life_rate || "";
+    const tgId = row.querySelector('input[name="tg_id"]');
+    if (tgId) tgId.value = info.target_id || "";
 
-    // 전체 필드 readonly 처리 후 변경후 칸만 수정 가능
+    // ✅ 테이블관리에서 가져온 '변경전' 값들
+    const beforeFTable = row.querySelector('input[name="before_ftable"]');
+    if (beforeFTable) beforeFTable.value = info.non_life_table || "";
+
+    const beforeFRate = row.querySelector('input[name="before_frate"]');
+    if (beforeFRate) beforeFRate.value = info.non_life_rate || "";
+
+    const beforeLTable = row.querySelector('input[name="before_ltable"]');
+    if (beforeLTable) beforeLTable.value = info.life_table || "";
+
+    const beforeLRate = row.querySelector('input[name="before_lrate"]');
+    if (beforeLRate) beforeLRate.value = info.life_rate || "";
+
+    // 전체는 다시 잠금
     row.querySelectorAll("input").forEach((el) => (el.readOnly = true));
+    // 변경후 칸만 다시 열기
     allowEditableFields(row);
   } catch (err) {
     console.error("❌ 대상자 정보 로드 실패:", err);
     alertBox("대상자 정보를 불러오는 중 오류가 발생했습니다.");
   }
 }
-
-
-/* =======================================================
-   ✅ 검색 모달에서 선택 시 자동 채움
-   ======================================================= */
-document.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".btn-select-user");
-  if (!btn) return;
-
-  const targetId = btn.dataset.id;
-  const activeRow = els.inputTable.querySelector(".input-row.active");
-  if (!activeRow || !targetId) {
-    alertBox("대상자를 입력할 행을 먼저 클릭하세요.");
-    return;
-  }
-
-  showLoading("대상자 정보 불러오는 중...");
-  await fillTargetInfo(activeRow, targetId);
-  hideLoading();
-
-  // ✅ 모달 닫기
-  const modalEl = document.getElementById("searchUserModal");
-  if (modalEl) {
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-  }
-});
