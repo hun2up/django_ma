@@ -1,9 +1,11 @@
+// django_ma/static/js/partner/manage_rate/input_rows.js
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
 import { fetchData } from "./fetch.js";
 
 /* =======================================================
-   📘 입력 행 관련 로직
+   📘 입력 행 관련 로직 (요율변경 요청 페이지)
    ======================================================= */
 export function initInputRowEvents() {
   // ✅ 추가 버튼
@@ -14,12 +16,16 @@ export function initInputRowEvents() {
       alertBox("대상자는 한 번에 10명까지 입력 가능합니다.");
       return;
     }
+
     const newRow = rows[0].cloneNode(true);
     newRow.querySelectorAll("input").forEach((el) => {
       if (el.type === "checkbox") el.checked = false;
       else el.value = "";
+      el.readOnly = true; // ✅ 기본적으로 전부 readonly
     });
-    fillRequesterInfo(newRow);
+
+    fillRequesterInfo(newRow); // 요청자 정보 자동 입력
+    allowEditableFields(newRow); // 변경가능 칸만 해제
     tbody.appendChild(newRow);
   });
 
@@ -41,24 +47,25 @@ export function initInputRowEvents() {
     e.target.closest(".input-row").remove();
   });
 
-  // ✅ 저장 버튼
-  els.btnSaveRows?.addEventListener("click", async () => {
-    await saveRowsToServer();
-  });
-
   // ✅ 페이지 최초 로드시 요청자 정보 입력
   const firstRow = els.inputTable.querySelector(".input-row");
-  if (firstRow) fillRequesterInfo(firstRow);
+  if (firstRow) {
+    firstRow.querySelectorAll("input").forEach((el) => (el.readOnly = true));
+    fillRequesterInfo(firstRow);
+    allowEditableFields(firstRow);
+  }
 }
 
 /* =======================================================
-   ✅ 요청자 정보 자동입력
+   ✅ 요청자 정보 자동입력 (branch 포함)
    ======================================================= */
 function fillRequesterInfo(row) {
   const user = window.currentUser || {};
   row.querySelector('input[name="rq_name"]').value = user.name || "";
   row.querySelector('input[name="rq_id"]').value = user.id || "";
-  row.querySelector('input[name="rq_branch"]').value = user.branch || "";
+  // ✅ 요청자 소속 자동입력 (지점명만 활용)
+  const branchInput = row.querySelector('input[name="rq_branch"]');
+  if (branchInput) branchInput.value = user.branch || "";
 }
 
 /* =======================================================
@@ -74,97 +81,87 @@ export function resetInputSection() {
     firstRow.querySelectorAll("input").forEach((el) => {
       if (el.type === "checkbox") el.checked = false;
       else el.value = "";
+      el.readOnly = true;
     });
     fillRequesterInfo(firstRow);
+    allowEditableFields(firstRow);
   }
 }
 
 /* =======================================================
-   ✅ 저장 버튼 클릭 → 서버로 전송 + 메인시트 갱신
+   ✅ 변경 가능 필드만 수정 허용
    ======================================================= */
-async function saveRowsToServer() {
-  const tbody = els.inputTable.querySelector("tbody");
-  const rows = tbody.querySelectorAll(".input-row");
-  const validRows = [];
-
-  rows.forEach((row) => {
-    const tg_id = row.querySelector('input[name="tg_id"]').value.trim();
-    const tg_name = row.querySelector('input[name="tg_name"]').value.trim();
-    if (!tg_id || !tg_name) return; // ❌ 대상자 누락 시 제외
-
-    validRows.push({
-      target_id: tg_id,
-      target_name: tg_name,
-      tg_branch: row.querySelector('input[name="tg_branch"]').value.trim(),
-      tg_rank: row.querySelector('input[name="tg_rank"]').value.trim(),
-      chg_branch: row.querySelector('input[name="chg_branch"]').value.trim(),
-      chg_rank: row.querySelector('input[name="chg_rank"]').value.trim(),
-      memo: row.querySelector('input[name="memo"]').value.trim(),
-      or_flag: row.querySelector('input[name="or_flag"]').checked,
-    });
+function allowEditableFields(row) {
+  const editableNames = ["non_life_table_after", "life_table_after", "memo"];
+  editableNames.forEach((name) => {
+    const el = row.querySelector(`input[name="${name}"]`);
+    if (el) el.readOnly = false;
   });
+}
 
-  if (validRows.length === 0) {
-    alertBox("대상자 정보가 입력된 행이 없습니다.");
+/* =======================================================
+   ✅ 대상자 선택 후 자동입력
+   ======================================================= */
+export async function fillTargetInfo(row, targetId) {
+  try {
+    const res = await fetch(`/partner/ajax_rate_user_detail/?user_id=${targetId}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    const data = await res.json();
+    if (data.status !== "success") {
+      alertBox(data.message || "대상자 정보를 불러오지 못했습니다.");
+      return;
+    }
+
+    const info = data.data;
+    const user = window.currentUser || {};
+
+    // 요청자 정보 자동입력
+    row.querySelector('input[name="rq_name"]').value = user.name || "";
+    row.querySelector('input[name="rq_id"]').value = user.id || "";
+
+    // 대상자 정보
+    row.querySelector('input[name="tg_name"]').value = info.target_name || "";
+    row.querySelector('input[name="tg_id"]').value = info.target_id || "";
+
+    // ✅ 변경전 테이블명 및 요율 (테이블관리 페이지와 연동)
+    row.querySelector('input[name="before_ftable"]').value = info.non_life_table || "";
+    row.querySelector('input[name="before_frate"]').value = info.non_life_rate || "";
+    row.querySelector('input[name="before_ltable"]').value = info.life_table || "";
+    row.querySelector('input[name="before_lrate"]').value = info.life_rate || "";
+
+    // 전체 필드 readonly 처리 후 변경후 칸만 수정 가능
+    row.querySelectorAll("input").forEach((el) => (el.readOnly = true));
+    allowEditableFields(row);
+  } catch (err) {
+    console.error("❌ 대상자 정보 로드 실패:", err);
+    alertBox("대상자 정보를 불러오는 중 오류가 발생했습니다.");
+  }
+}
+
+
+/* =======================================================
+   ✅ 검색 모달에서 선택 시 자동 채움
+   ======================================================= */
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".btn-select-user");
+  if (!btn) return;
+
+  const targetId = btn.dataset.id;
+  const activeRow = els.inputTable.querySelector(".input-row.active");
+  if (!activeRow || !targetId) {
+    alertBox("대상자를 입력할 행을 먼저 클릭하세요.");
     return;
   }
 
-  const user = window.currentUser || {};
-  const boot = window.ManageStructureBoot || {};
-  const year = document.getElementById("yearSelect")?.value;
-  const month = document.getElementById("monthSelect")?.value;
-  const ym = `${year}-${String(month).padStart(2, "0")}`;
+  showLoading("대상자 정보 불러오는 중...");
+  await fillTargetInfo(activeRow, targetId);
+  hideLoading();
 
-  const branch =
-    user.grade === "superuser"
-      ? document.getElementById("branchSelect")?.value?.trim() || "-"
-      : user.branch || "-";
-
-  const payload = {
-    month: ym,
-    rows: validRows,
-    part: user.part || "-",
-    branch: branch,
-  };
-
-  console.log("💾 서버로 저장 요청:", payload);
-
-  showLoading("저장 중입니다...");
-
-  try {
-    const res = await fetch(boot.dataSaveUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": window.csrfToken,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.status === "success") {
-      alertBox(data.message || "저장 완료!");
-
-      // ✅ 저장 후 입력초기화
-      resetInputSection();
-
-      // ✅ 저장 후 메인시트 즉시 갱신
-      const meta = {
-        grade: user.grade,
-        level: user.level,
-        team_a: user.team_a,
-        team_b: user.team_b,
-        team_c: user.team_c,
-      };
-      await fetchData(ym, branch, meta);
-    } else {
-      alertBox(data.message || "저장 중 오류가 발생했습니다.");
-    }
-  } catch (err) {
-    console.error("❌ 저장 실패:", err);
-    hideLoading();
-    alertBox("저장 중 오류가 발생했습니다.");
+  // ✅ 모달 닫기
+  const modalEl = document.getElementById("searchUserModal");
+  if (modalEl) {
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
   }
-}
+});

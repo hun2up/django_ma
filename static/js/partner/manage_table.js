@@ -1,12 +1,12 @@
 /**
- * ✅ 테이블 관리 페이지 (v4.3)
+ * ✅ 테이블 관리 페이지 (v4.5)
  * ------------------------------------------------------------
  * - DataTables 완전 차단 (다른 페이지 영향 없음)
  * - 드래그앤드롭 제거 → ▲ / ▼ 버튼으로 순서 조정
- * - ↓ 버튼 정상 작동 (아래로 이동)
  * - 요율 입력: 정수만 (0~100), 자동 %
  * - 빈칸은 저장 제외
- * - ✅ 요율현황 : superuser는 검색 버튼 클릭 시, main_admin은 자동조회
+ * - ✅ 요율현황 : superuser는 검색 클릭 시 / main_admin은 자동조회
+ * - ✅ 엑셀 다운로드 + 엑셀 업로드 기능 완전 통합
  * ------------------------------------------------------------
  */
 
@@ -24,11 +24,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // 자동 초기화 차단
     $.fn.dataTable.ext.errMode = "none";
     const originalDT = $.fn.DataTable;
     $.fn.DataTable = function (...args) {
-      if (this.attr("id") === "mainTable") return this; // 이 페이지의 메인 테이블은 차단
+      if (this.attr("id") === "mainTable") return this;
       return originalDT.apply(this, args);
     };
   }
@@ -44,6 +43,9 @@ document.addEventListener("DOMContentLoaded", () => {
     btnSave: document.getElementById("btnSave"),
     btnReset: document.getElementById("btnReset"),
     btnToggleEdit: document.getElementById("btnToggleEdit"),
+    btnDownloadExcel: document.getElementById("btnDownloadExcel"),
+    btnUploadExcel: document.getElementById("btnUploadExcel"),
+    inputExcel: document.getElementById("rateExcelInput"),
     tableBody: document.getElementById("tableBody"),
     overlay: document.getElementById("loadingOverlay"),
   };
@@ -71,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
   init();
 
   function init() {
-    // ✅ main_admin은 페이지 진입 시 자동 조회 (테이블 + 요율현황)
+    // ✅ main_admin은 자동 조회
     if (userGrade === "main_admin" && userBranch) {
       setTimeout(() => {
         fetchData(userBranch);
@@ -86,6 +88,70 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!branch) return alertBox("지점을 선택해주세요.");
         fetchData(branch);
         loadRateUserTable(branch);
+      });
+    }
+
+    // ✅ 엑셀 다운로드 버튼
+    if (els.btnDownloadExcel) {
+      els.btnDownloadExcel.addEventListener("click", () => {
+        const branch =
+          userGrade === "superuser"
+            ? els.branch.value?.trim()
+            : userBranch?.trim();
+        if (!branch) return alertBox("지점을 먼저 선택해주세요.");
+        const url = `/partner/ajax/rate-userlist-excel/?branch=${encodeURIComponent(
+          branch
+        )}`;
+        window.location.href = url;
+      });
+    }
+
+    // ✅ 엑셀 업로드 버튼
+    if (els.btnUploadExcel && els.inputExcel) {
+      els.btnUploadExcel.addEventListener("click", () =>
+        els.inputExcel.click()
+      );
+
+      els.inputExcel.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (
+          !confirm(
+            "선택한 엑셀의 '업로드' 시트를 기준으로 요율현황을 갱신하시겠습니까?"
+          )
+        )
+          return;
+
+        const branch =
+          userGrade === "superuser"
+            ? els.branch.value?.trim()
+            : userBranch?.trim();
+        if (!branch) return alertBox("지점을 먼저 선택해주세요.");
+
+        const formData = new FormData();
+        formData.append("excel_file", file);
+        formData.append("branch", branch);
+        formData.append("csrfmiddlewaretoken", getCSRF());
+
+        showLoading("업로드 중...");
+        try {
+          const res = await fetch("/partner/ajax/rate-userlist-upload/", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+          if (data.status === "success") {
+            alertBox(data.message || "업로드 완료");
+            await loadRateUserTable(branch);
+          } else {
+            throw new Error(data.message || "업로드 실패");
+          }
+        } catch (err) {
+          alertBox("엑셀 업로드 중 오류 발생: " + err.message);
+        } finally {
+          hideLoading();
+          els.inputExcel.value = "";
+        }
       });
     }
 
@@ -200,10 +266,16 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="order-cell">${order}</td>
         <td>${r.branch || branch}</td>
         <td class="editable" contenteditable="${editMode}">${r.table || ""}</td>
-        <td class="editable rate-cell" contenteditable="${editMode}">${r.rate || ""}</td>
+        <td class="editable rate-cell" contenteditable="${editMode}">${
+        r.rate || ""
+      }</td>
         <td>
-          <button class="btn btn-outline-secondary btn-sm btnMoveUp" ${!editMode ? "disabled" : ""}>▲</button>
-          <button class="btn btn-outline-secondary btn-sm btnMoveDown" ${!editMode ? "disabled" : ""}>▼</button>
+          <button class="btn btn-outline-secondary btn-sm btnMoveUp" ${
+            !editMode ? "disabled" : ""
+          }>▲</button>
+          <button class="btn btn-outline-secondary btn-sm btnMoveDown" ${
+            !editMode ? "disabled" : ""
+          }>▼</button>
         </td>
         <td>
           <button class="btn btn-sm btn-danger btnDeleteRow" ${
@@ -366,7 +438,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     try {
-      const res = await fetch(`/partner/ajax/rate-userlist/?branch=${encodeURIComponent(branch)}`);
+      const res = await fetch(
+        `/partner/ajax/rate-userlist/?branch=${encodeURIComponent(branch)}`
+      );
       const data = await res.json();
       table.clear();
       data.data.forEach((u) => {

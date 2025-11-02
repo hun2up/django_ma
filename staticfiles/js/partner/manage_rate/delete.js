@@ -1,4 +1,5 @@
 // django_ma/static/js/partner/manage_rate/delete.js
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, getCSRFToken, alertBox } from "./utils.js";
 import { fetchData } from "./fetch.js";

@@ -1,4 +1,6 @@
 # django_ma/partner/views.py
+
+import io
 import json
 import traceback
 from datetime import datetime
@@ -6,11 +8,12 @@ from decimal import Decimal
 import pandas as pd
 
 from django.core.paginator import Paginator
+from django.core.files.storage import default_storage
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
@@ -586,21 +589,17 @@ def ajax_fetch_branches(request):
 def ajax_table_fetch(request):
     """
     ✅ 지점(branch)별 테이블 관리 데이터 조회
-    - superuser는 모든 지점 조회 가능
-    - main_admin, sub_admin, basic은 자신의 지점만 조회 가능
-    - order 순서대로 정렬하여 반환
+    - superuser: 모든 지점 가능
+    - main_admin, sub_admin: 자신의 지점만
     """
-
     branch = request.GET.get("branch", "").strip()
     user = request.user
 
-    # 🔹 branch 검증
     if not branch:
         return JsonResponse({"status": "error", "message": "지점(branch) 정보가 없습니다."})
 
-    # 🔹 권한별 branch 접근 제한
     if user.grade != "superuser" and branch != user.branch:
-        return JsonResponse({"status": "error", "message": "다른 지점의 테이블에는 접근할 수 없습니다."})
+        return JsonResponse({"status": "error", "message": "다른 지점 테이블에는 접근할 수 없습니다."})
 
     try:
         rows = (
@@ -627,6 +626,7 @@ def ajax_table_fetch(request):
         import traceback
         print("❌ ajax_table_fetch 오류:", traceback.format_exc())
         return JsonResponse({"status": "error", "message": f"조회 중 오류 발생: {str(e)}"})
+
 
 
 # ------------------------------------------------------------
@@ -690,58 +690,198 @@ def ajax_table_save(request):
 @require_GET
 @login_required
 def ajax_rate_userlist(request):
-    """선택된 지점 내 사용자별 손보/생보 테이블 현황"""
+    branch = request.GET.get("branch", "").strip()
+    if not branch:
+        return JsonResponse({"data": []})
+
+    users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
+
+    # ✅ 해당 branch에 해당하는 user_id만 추출
+    user_ids = [u["id"] for u in users]
+
+    team_map = {
+        t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
+        for t in SubAdminTemp.objects.filter(user_id__in=user_ids)
+    }
+
+    rate_map = {
+        r.user_id: {
+            "non_life_table": r.non_life_table or "",
+            "life_table": r.life_table or "",
+        }
+        for r in RateTable.objects.filter(user_id__in=user_ids)
+    }
+
+    data = []
+    for u in users:
+        team_info = team_map.get(u["id"], {})
+        rate_info = rate_map.get(u["id"], {})
+        data.append({
+            "id": u["id"],
+            "name": u["name"],
+            "branch": u["branch"],
+            "team_a": team_info.get("team_a", ""),
+            "team_b": team_info.get("team_b", ""),
+            "team_c": team_info.get("team_c", ""),
+            "non_life_table": rate_info.get("non_life_table", ""),
+            "life_table": rate_info.get("life_table", ""),
+        })
+
+    return JsonResponse({"data": data})
+    
+
+# ------------------------------------------------------------
+# 📘 지점 내 요율현황 — 엑셀 다운로드
+# ------------------------------------------------------------
+@login_required
+def ajax_rate_userlist_excel(request):
+    """선택된 지점(branch)의 요율현황을 엑셀로 다운로드"""
+    branch = request.GET.get("branch", "").strip()
+    if not branch:
+        return JsonResponse({"error": "지점을 선택해주세요."}, status=400)
+
+    # ✅ 사용자 데이터 조회 (ajax_rate_userlist와 동일)
+    users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
+
+    team_map = {
+        t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
+        for t in SubAdminTemp.objects.filter(user_id__in=user_ids)
+    }
+
+    rate_map = {
+        r.user_id: {
+            "non_life_table": r.non_life_table or "",
+            "life_table": r.life_table or "",
+        }
+        for r in RateTable.objects.filter(user_id__in=user_ids)
+    }
+
+    data = []
+    for u in users:
+        team_info = team_map.get(u["id"], {})
+        rate_info = rate_map.get(u["id"], {})
+        data.append({
+            "지점": u["branch"],
+            "팀A": team_info.get("team_a", ""),
+            "팀B": team_info.get("team_b", ""),
+            "팀C": team_info.get("team_c", ""),
+            "성명": u["name"],
+            "사번": u["id"],
+            "손보테이블": rate_info.get("non_life_table", ""),
+            "생보테이블": rate_info.get("life_table", ""),
+        })
+
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="요율현황")
+
+    filename = f"요율현황_{branch}_{datetime.now():%Y%m%d}.xlsx"
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+# ------------------------------------------------------------
+# 📘 지점 내 요율현황 — 엑셀 업로드 (손보/생보 테이블만 업데이트)
+# ------------------------------------------------------------
+@require_POST
+@login_required
+@transaction.atomic
+def ajax_rate_userlist_upload(request):
+    """
+    ✅ 엑셀 업로드 (업로드 시트 기준)
+    - '사번' 컬럼을 CustomUser.id 와 매칭
+    - '손보테이블', '생보테이블' 컬럼 데이터만 업데이트
+    - SubAdminTemp의 팀 정보는 유지
+    """
+    excel_file = request.FILES.get("excel_file")
+    if not excel_file:
+        return JsonResponse({"status": "error", "message": "엑셀 파일이 없습니다."}, status=400)
+
     try:
-        user = request.user
-        branch = request.GET.get("branch", "").strip()
+        # 📘 1️⃣ 임시 저장 후 pandas 로드
+        file_path = default_storage.save(f"tmp/{excel_file.name}", excel_file)
+        file_path_full = default_storage.path(file_path)
+        df = pd.read_excel(file_path_full, sheet_name="업로드").fillna("")
 
-        # ✅ main_admin 자동조회
-        if not branch and user.grade == "main_admin":
-            branch = user.branch
+        required_cols = ["사번", "손보테이블", "생보테이블"]
+        for col in required_cols:
+            if col not in df.columns:
+                return JsonResponse({"status": "error", "message": f"'{col}' 컬럼이 없습니다."}, status=400)
 
-        if not branch:
-            return JsonResponse({"data": []})
+        updated_count = 0
+        skipped_count = 0
 
-        # ✅ 사용자 목록 (활성 사용자만)
-        users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
+        # 📘 2️⃣ 행별 처리
+        for _, row in df.iterrows():
+            user_id = str(row["사번"]).strip()
+            if not user_id:
+                skipped_count += 1
+                continue
 
-        # ✅ 보조 테이블 데이터 준비
-        team_map = {
-            t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
-            for t in SubAdminTemp.objects.all()
-        }
+            user = CustomUser.objects.filter(id=user_id).first()
+            if not user:
+                skipped_count += 1
+                continue
 
-        rate_map = {
-            r.user_id: {
-                "non_life_table": r.non_life_table or "",
-                "life_table": r.life_table or "",
-            }
-            for r in RateTable.objects.all()
-        }
+            # ✅ RateTable 존재 시 업데이트, 없으면 생성
+            obj, created = RateTable.objects.update_or_create(
+                user=user,
+                defaults={
+                    "non_life_table": row["손보테이블"],
+                    "life_table": row["생보테이블"],
+                },
+            )
+            updated_count += 1
 
-        # ✅ 병합 결과 구성
-        data = []
-        for u in users:
-            team_info = team_map.get(u["id"], {})
-            rate_info = rate_map.get(u["id"], {})
-            data.append({
-                "id": u["id"],
-                "name": u["name"],
-                "branch": u["branch"],
-                "team_a": team_info.get("team_a", ""),
-                "team_b": team_info.get("team_b", ""),
-                "team_c": team_info.get("team_c", ""),
-                "non_life_table": rate_info.get("non_life_table", ""),
-                "life_table": rate_info.get("life_table", ""),
-            })
+        # 📘 3️⃣ 임시 파일 삭제
+        default_storage.delete(file_path)
 
-        return JsonResponse({"data": data}, safe=False)
+        return JsonResponse({
+            "status": "success",
+            "message": f"업로드 완료 ({updated_count}건 업데이트 / {skipped_count}건 스킵됨)",
+        })
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JsonResponse({
             "status": "error",
-            "message": str(e),
-            "trace": traceback.format_exc(),
+            "message": f"업로드 중 오류: {str(e)}"
         }, status=500)
+
+# ------------------------------------------------------------
+# 📘 AJAX — 대상자 상세정보 조회 (요율변경용)
+# ------------------------------------------------------------
+@require_GET
+@login_required
+def ajax_rate_user_detail(request):
+    """대상자 상세정보 반환 (요율변경용)"""
+    user_id = request.GET.get("user_id")
+    if not user_id:
+        return JsonResponse({"status": "error", "message": "user_id가 없습니다."})
+
+    try:
+        target = CustomUser.objects.get(id=user_id)
+        rate_info = RateTable.objects.filter(user=target).first()
+
+        data = {
+            "target_name": target.name,
+            "target_id": target.id,
+            "non_life_table": rate_info.non_life_table if rate_info else "",
+            "life_table": rate_info.life_table if rate_info else "",
+            "non_life_rate": rate_info.non_life_rate if rate_info else "",
+            "life_rate": rate_info.life_rate if rate_info else "",
+        }
+        return JsonResponse({"status": "success", "data": data})
+
+    except CustomUser.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "대상자를 찾을 수 없습니다."})
+    except Exception as e:
+        import traceback
+        print("ajax_rate_user_detail error:", traceback.format_exc())
+        return JsonResponse({"status": "error", "message": str(e)})

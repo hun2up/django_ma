@@ -69,35 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ============================================================
-     2️⃣ Superuser의 부서/지점 목록 로드
-  ============================================================ */
-  /*
-  if (user.grade === "superuser") {
-    const loadPartsSafely = async (retryCount = 0) => {
-      if (typeof window.loadPartsAndBranches !== "function") {
-        if (retryCount < 5) {
-          console.warn(`⏳ loadPartsAndBranches 대기중 (${retryCount + 1}/5)`);
-          return setTimeout(() => loadPartsSafely(retryCount + 1), 300);
-        }
-        console.error("🚨 loadPartsAndBranches 함수가 정의되지 않았습니다.");
-        return;
-      }
-
-      try {
-        console.log("➡️ 부서/지점 목록 로드 시도");
-        await window.loadPartsAndBranches("manage-structure");
-        console.log("✅ 부서 목록 로드 완료");
-      } catch (err) {
-        console.error("❌ 부서 목록 로드 실패:", err);
-      }
-    };
-
-    // 0.5초 지연 후 시도 (DOM 안정화 보장)
-    setTimeout(() => loadPartsSafely(0), 500);
-  }
-    */
-
-  /* ============================================================
      3️⃣ 검색 버튼 이벤트
   ============================================================ */
   els.btnSearch?.addEventListener("click", () => {
