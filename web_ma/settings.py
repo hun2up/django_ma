@@ -193,6 +193,13 @@ SESSION_COOKIE_HTTPONLY = True       # 자바스크립트에서 접근 불가
 SESSION_COOKIE_SECURE = True         # HTTPS 전용 (Render는 자동 HTTPS)
 CSRF_COOKIE_SECURE = True            # CSRF 쿠키도 HTTPS 전용
 CSRF_COOKIE_HTTPONLY = True          # JS 접근 차단 (보안 강화)
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://django-ma.onrender.com",
+    "https://ma-support.kr",  # 실제 배포 도메인도 함께
+]
+
 
 # ✅ 5. 추가 옵션 (권장)
 # 세션 쿠키 이름 (기본값: 'sessionid', 필요 시 커스터마이징 가능)

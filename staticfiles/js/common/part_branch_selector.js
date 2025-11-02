@@ -1,89 +1,73 @@
+// django_ma/static/js/common/part_branch_selector.js
 /**
- * =======================================================
- * 📌 Superuser용 부서/지점 선택 로직 (공용 스크립트)
- * -------------------------------------------------------
- * - 공통적으로 사용하는 부서/지점 드롭다운 제어
- * - Ajax로 DB에서 part / branch 목록을 불러옴
- * - 각 페이지의 root element에 data-user-grade 속성이 있어야 함
- * 
- * 사용 방법:
- * 1. HTML에 다음 요소들이 존재해야 함:
- *    - select#partSelect
- *    - select#branchSelect
- *    - data-user-grade="superuser" 속성 (루트 컨테이너)
- * 
- * 2. 필요한 경우 `window.loadPartsAndBranches()`를 호출해 초기화 가능
- * =======================================================
+ * ✅ 공용 부서/지점 선택기 (superuser 전용)
+ * - 부서 선택 → 지점 목록 로드
+ * - 지점 선택 시 검색 버튼 자동 활성화
  */
-
-window.loadPartsAndBranches = async function(rootElementId = null) {
-  const root = rootElementId
-    ? document.getElementById(rootElementId)
-    : document.querySelector("[data-user-grade]");
-
+document.addEventListener("DOMContentLoaded", async () => {
+  const root = document.getElementById("manage-table");
   if (!root) return;
 
   const userGrade = root.dataset.userGrade;
-  const fetchPartsUrl = "/partner/ajax/fetch-parts/";
-  const fetchBranchesUrl = "/partner/ajax/fetch-branches/";
+  if (userGrade !== "superuser") return; // main_admin은 자동조회라 실행 X
 
   const partSelect = document.getElementById("partSelect");
   const branchSelect = document.getElementById("branchSelect");
+  const btnSearch = document.getElementById("btnSearch");
 
-  if (userGrade !== "superuser" || !partSelect || !branchSelect) return;
+  /* =======================================================
+     📘 부서 목록 불러오기
+  ======================================================= */
+  try {
+    const res = await fetch("/partner/ajax/fetch-parts/");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
 
-  /** -------------------------------
-   * ✅ 부서 목록 불러오기
-   * ------------------------------- */
-  async function loadParts() {
-    try {
-      const res = await fetch(fetchPartsUrl, { credentials: 'same-origin' });
-      const data = await res.json();
-      partSelect.innerHTML = `<option value="">선택</option>`;
-      data.parts.forEach(p => {
-        const opt = document.createElement("option");
-        opt.value = p;
-        opt.textContent = p;
-        partSelect.appendChild(opt);
-      });
-    } catch (err) {
-      console.error("부서 목록 불러오기 실패:", err);
-      partSelect.innerHTML = `<option value="">불러오기 실패</option>`;
-    }
+    partSelect.innerHTML =
+      `<option value="">부서 선택</option>` +
+      data.parts.map((p) => `<option value="${p}">${p}</option>`).join("");
+
+    console.log("✅ [part_branch_selector] 부서 목록 로드 완료");
+  } catch (err) {
+    console.error("❌ [part_branch_selector] 부서 목록 로드 오류:", err);
+    partSelect.innerHTML = `<option value="">로드 실패</option>`;
   }
 
-  /** -------------------------------
-   * ✅ 선택된 부서의 지점 목록 불러오기
-   * ------------------------------- */
-  async function loadBranches(part) {
-    try {
-      const res = await fetch(`${fetchBranchesUrl}?part=${encodeURIComponent(part)}`, { credentials: 'same-origin' });
-      const data = await res.json();
-      branchSelect.innerHTML = `<option value="">지점을 선택하세요</option>`;
-      data.branches.forEach(b => {
-        const opt = document.createElement("option");
-        opt.value = b;
-        opt.textContent = b;
-        branchSelect.appendChild(opt);
-      });
-      branchSelect.disabled = false;
-    } catch (err) {
-      console.error("지점 목록 불러오기 실패:", err);
-      branchSelect.innerHTML = `<option value="">불러오기 실패</option>`;
-      branchSelect.disabled = true;
-    }
-  }
-
-  /** -------------------------------
-   * ✅ 이벤트 핸들링
-   * ------------------------------- */
-  partSelect.addEventListener("change", () => {
+  /* =======================================================
+     📘 부서 선택 → 지점 목록 불러오기
+  ======================================================= */
+  partSelect?.addEventListener("change", async () => {
     const part = partSelect.value;
-    branchSelect.innerHTML = `<option value="">불러오는 중...</option>`;
+    branchSelect.innerHTML = `<option>불러오는 중...</option>`;
     branchSelect.disabled = true;
-    if (part) loadBranches(part);
+    btnSearch.disabled = true;
+
+    if (!part) return;
+
+    try {
+      const res2 = await fetch(`/partner/ajax/fetch-branches/?part=${encodeURIComponent(part)}`);
+      if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+      const data2 = await res2.json();
+
+      branchSelect.innerHTML =
+        `<option value="">지점 선택</option>` +
+        data2.branches.map((b) => `<option value="${b}">${b}</option>`).join("");
+
+      branchSelect.disabled = false;
+      console.log("✅ [part_branch_selector] 지점 목록 로드 완료");
+    } catch (err) {
+      console.error("❌ [part_branch_selector] 지점 로드 오류:", err);
+      branchSelect.innerHTML = `<option value="">로드 실패</option>`;
+    }
   });
 
-  // ✅ 초기 부서 목록 로드
-  await loadParts();
-};
+  /* =======================================================
+     📘 지점 선택 시 → 검색 버튼 활성화
+  ======================================================= */
+  branchSelect?.addEventListener("change", () => {
+    btnSearch.disabled = !branchSelect.value;
+    if (branchSelect.value) {
+      console.log(`🔹 [part_branch_selector] 지점 선택됨: ${branchSelect.value}`);
+    }
+  });
+});

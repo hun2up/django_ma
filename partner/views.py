@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp
+from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp, TableSetting
 
 
 # ------------------------------------------------------------
@@ -576,3 +576,55 @@ def ajax_fetch_branches(request):
     )
 
     return JsonResponse({"branches": list(branches)})
+
+# ------------------------------------------------------------
+# 📘 AJAX — 테이블관리 데이터 조회
+# ------------------------------------------------------------
+@require_GET
+@grade_required(['superuser', 'main_admin'])
+def ajax_table_fetch(request):
+    try:
+        user = request.user
+        branch = (request.GET.get("branch") or "").strip()
+
+        if user.grade == "main_admin":
+            branch = user.branch
+
+        qs = TableSetting.objects.filter(branch=branch).order_by("table_name")
+
+        rows = [{"branch": t.branch, "table": t.table_name, "rate": t.rate} for t in qs]
+
+        return JsonResponse({"status": "success", "rows": rows})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+# ------------------------------------------------------------
+# 📘 AJAX — 테이블관리 데이터 저장
+# ------------------------------------------------------------
+@require_POST
+@grade_required(['superuser', 'main_admin'])
+@transaction.atomic
+def ajax_table_save(request):
+    try:
+        payload = json.loads(request.body)
+        rows = payload.get("rows", [])
+        branch = (payload.get("branch") or "").strip()
+
+        if not branch:
+            return JsonResponse({"status": "error", "message": "branch 누락"}, status=400)
+
+        # 기존 데이터 전체 삭제 후 새로 저장
+        TableSetting.objects.filter(branch=branch).delete()
+
+        for r in rows:
+            table_name = (r.get("table") or "").strip()
+            rate = (r.get("rate") or "").strip()
+            if table_name:
+                TableSetting.objects.create(branch=branch, table_name=table_name, rate=rate)
+
+        return JsonResponse({"status": "success", "saved_count": len(rows)})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)

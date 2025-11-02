@@ -1,4 +1,5 @@
-// static/js/partner/manage_structure/dom_refs.js
+// django_ma/static/js/partner/manage_structure/dom_refs.js
+
 export const els = {
   root: document.getElementById("manage-structure"),
   year: document.getElementById("yearSelect"),

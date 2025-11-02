@@ -23,4 +23,8 @@ urlpatterns = [
     path("api/update-process-date/", views.ajax_update_process_date, name="ajax_update_process_date"),
     path('ajax/fetch-parts/', views.ajax_fetch_parts, name='ajax_fetch_parts'),
     path('ajax/fetch-branches/', views.ajax_fetch_branches, name='ajax_fetch_branches'),
+
+    # ✅ 테이블관리 전용 AJAX
+    path("api/table/fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
+    path("api/table/save/", views.ajax_table_save, name="ajax_table_save"),
 ]
