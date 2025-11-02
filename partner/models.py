@@ -167,3 +167,35 @@ class TableSetting(models.Model):
 
     def __str__(self):
         return f"{self.branch} - {self.table_name}"
+    
+
+# ------------------------------------------------------------
+# 📘 요율관리용 테이블
+# ------------------------------------------------------------
+class RateTable(models.Model):
+    """사용자별 요율관리용 테이블 (손보 / 생보 테이블 현황)"""
+
+    user = models.OneToOneField(
+        'accounts.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='rate_table',
+        verbose_name="사용자"
+    )
+
+    branch = models.CharField(max_length=50, blank=True, null=True, verbose_name="지점")
+    team_a = models.CharField(max_length=50, blank=True, null=True, verbose_name="팀A")
+    team_b = models.CharField(max_length=50, blank=True, null=True, verbose_name="팀B")
+    team_c = models.CharField(max_length=50, blank=True, null=True, verbose_name="팀C")
+
+    non_life_table = models.CharField(max_length=100, blank=True, null=True, verbose_name="손보 테이블명")
+    life_table = models.CharField(max_length=100, blank=True, null=True, verbose_name="생보 테이블명")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "요율관리 테이블"
+        verbose_name_plural = "요율관리 테이블"
+        ordering = ["branch", "user__name"]
+
+    def __str__(self):
+        return f"{self.user.name} ({self.branch})"

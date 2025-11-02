@@ -28,4 +28,5 @@ urlpatterns = [
     path("api/table/fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
     path("api/table/save/", views.ajax_table_save, name="ajax_table_save"),
     path("ajax/table-fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
+    path("ajax/rate-userlist/", views.ajax_rate_userlist, name="ajax_rate_userlist"),
 ]

@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp, TableSetting
+from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp, TableSetting, RateTable
 
 
 # ------------------------------------------------------------
@@ -682,3 +682,66 @@ def ajax_table_save(request):
         import traceback
         print("❌ ajax_table_save 오류:", traceback.format_exc())
         return JsonResponse({"status": "error", "message": str(e)})
+
+
+# ------------------------------------------------------------
+# 📘 요율 관리용 테이블(리스트)
+# ------------------------------------------------------------
+@require_GET
+@login_required
+def ajax_rate_userlist(request):
+    """선택된 지점 내 사용자별 손보/생보 테이블 현황"""
+    try:
+        user = request.user
+        branch = request.GET.get("branch", "").strip()
+
+        # ✅ main_admin 자동조회
+        if not branch and user.grade == "main_admin":
+            branch = user.branch
+
+        if not branch:
+            return JsonResponse({"data": []})
+
+        # ✅ 사용자 목록 (활성 사용자만)
+        users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
+
+        # ✅ 보조 테이블 데이터 준비
+        team_map = {
+            t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
+            for t in SubAdminTemp.objects.all()
+        }
+
+        rate_map = {
+            r.user_id: {
+                "non_life_table": r.non_life_table or "",
+                "life_table": r.life_table or "",
+            }
+            for r in RateTable.objects.all()
+        }
+
+        # ✅ 병합 결과 구성
+        data = []
+        for u in users:
+            team_info = team_map.get(u["id"], {})
+            rate_info = rate_map.get(u["id"], {})
+            data.append({
+                "id": u["id"],
+                "name": u["name"],
+                "branch": u["branch"],
+                "team_a": team_info.get("team_a", ""),
+                "team_b": team_info.get("team_b", ""),
+                "team_c": team_info.get("team_c", ""),
+                "non_life_table": rate_info.get("non_life_table", ""),
+                "life_table": rate_info.get("life_table", ""),
+            })
+
+        return JsonResponse({"data": data}, safe=False)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            "status": "error",
+            "message": str(e),
+            "trace": traceback.format_exc(),
+        }, status=500)
