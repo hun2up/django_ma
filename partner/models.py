@@ -152,3 +152,16 @@ class SubAdminTemp(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.part})"
+
+class TableSetting(models.Model):
+    branch = models.CharField(max_length=100)      # 지점명
+    table_name = models.CharField(max_length=100)  # 테이블명
+    rate = models.CharField(max_length=20, blank=True, null=True)  # 요율 (%)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('branch', 'table_name')
+        ordering = ['branch', 'table_name']
+
+    def __str__(self):
+        return f"{self.branch} - {self.table_name}"

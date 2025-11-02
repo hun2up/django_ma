@@ -1,134 +1,107 @@
-<!-- django_ma/partner/templates/partner/manage_tables.html -->
+<!-- django_ma/partner/templates/partner/manage_tables.html-->
+
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}테이블 관리{% endblock %}
 
 {% block content %}
-<div class="container mt-5" id="manage-tables"
-     data-fetch-parts-url="{% url 'partner:ajax_fetch_parts' %}"
-     data-fetch-branches-url="{% url 'partner:ajax_fetch_branches' %}">
 
-    <!-- ✅ 접근 제한 안내 -->
-    {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
-        <div class="alert alert-danger text-center">접근 권한이 없습니다.</div>
-    {% endif %}
-
-    <h2 class="fw-bold text-center mb-4" style="color:#003f7d;">테이블 관리 페이지</h2>
-
-    <!-- ✅ Superuser 전용 -->
-    {% if user.grade == 'superuser' %}
-        <div class="card shadow p-3 border-0 rounded-4 mb-3">
-            <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
-                <!-- 부서 선택 -->
-                <div style="flex: 0 0 220px;">
-                <label for="partSelect" class="form-label fw-semibold">부서</label>
-                <select id="partSelect" class="form-select form-select-sm">
-                    <option value="">불러오는 중...</option>
-                </select>
-                </div>
-
-                <!-- 지점 선택 -->
-                <div style="flex: 0 0 300px;">
-                <label for="branchSelect" class="form-label fw-semibold">지점</label>
-                <select id="branchSelect" class="form-select form-select-sm" disabled>
-                    <option value="">부서를 먼저 선택하세요</option>
-                </select>
-                </div>
-
-                <!-- 버튼 -->
-                <div>
-                <button type="button" id="btnSelect" class="btn btn-primary btn-sm px-4" disabled>
-                    선택
-                </button>
-                </div>
-            </form>
-        </div>
-    {% endif %}
-
-    <div class="text-center mt-5">
-        <p class="text-muted">🚧 제작중입니다 🚧</p>
-    </div>
-</div>
-
+<form id="csrfForm">{% csrf_token %}</form>
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
-  const root = document.getElementById("manage-tables");
-  if (!root) return;
-
-  const partSelect = document.getElementById("partSelect");
-  const branchSelect = document.getElementById("branchSelect");
-  const btnSelect = document.getElementById("btnSelect");
-
-  const fetchPartsUrl = root.dataset.fetchPartsUrl;
-  const fetchBranchesUrl = root.dataset.fetchBranchesUrl;
-
-  /** -------------------------
-   * ✅ 부서 목록 불러오기
-   * ------------------------- */
-  async function loadParts() {
-    try {
-      const res = await fetch(fetchPartsUrl);
-      const data = await res.json();
-
-      partSelect.innerHTML = `<option value="">선택</option>`;
-      data.parts.forEach(p => {
-        const opt = document.createElement("option");
-        opt.value = p;
-        opt.textContent = p;
-        partSelect.appendChild(opt);
-      });
-    } catch (err) {
-      console.error("부서 목록 불러오기 실패:", err);
-      partSelect.innerHTML = `<option value="">불러오기 실패</option>`;
-    }
-  }
-
-  /** -------------------------
-   * ✅ 선택된 부서의 지점 목록 불러오기
-   * ------------------------- */
-  async function loadBranches(part) {
-    try {
-      const res = await fetch(`${fetchBranchesUrl}?part=${encodeURIComponent(part)}`);
-      const data = await res.json();
-
-      branchSelect.innerHTML = `<option value="">지점을 선택하세요</option>`;
-      data.branches.forEach(b => {
-        const opt = document.createElement("option");
-        opt.value = b;
-        opt.textContent = b;
-        branchSelect.appendChild(opt);
-      });
-
-      branchSelect.disabled = false;
-      btnSelect.disabled = true;
-    } catch (err) {
-      console.error("지점 목록 불러오기 실패:", err);
-      branchSelect.innerHTML = `<option value="">불러오기 실패</option>`;
-      branchSelect.disabled = true;
-    }
-  }
-
-  /** -------------------------
-   * ✅ 이벤트 핸들링
-   * ------------------------- */
-  partSelect.addEventListener("change", () => {
-    const selectedPart = partSelect.value;
-    branchSelect.innerHTML = `<option value="">불러오는 중...</option>`;
-    branchSelect.disabled = true;
-    btnSelect.disabled = true;
-    if (selectedPart) loadBranches(selectedPart);
-  });
-
-  branchSelect.addEventListener("change", () => {
-    btnSelect.disabled = !branchSelect.value;
-  });
-
-  btnSelect.addEventListener("click", () => {
-    alert(`선택된 부서: ${partSelect.value}\n선택된 지점: ${branchSelect.value}`);
-  });
-
-  // 초기 로드 시 부서 목록 자동 불러오기
-  await loadParts();
-});
+  window.csrfToken = "{{ csrf_token }}";
 </script>
+
+<div id="manage-table"
+     data-user-grade="{{ user.grade }}"
+     data-branch="{{ user.branch }}"
+     data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
+     data-save-url="{% url 'partner:ajax_table_save' %}"
+     data-delete-url="">
+
+
+  <!-- ✅ 접근 제한 (sub_admin 차단) -->
+  {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+      <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+  {% endif %}
+
+  <h3 class="fw-bold text-center mb-4" style="color:#003f7d;">테이블 관리 페이지</h3>
+
+  <!-- ✅ Superuser 전용 : 부서/지점 선택 카드 -->
+  {% if user.grade == 'superuser' %}
+  <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
+    <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
+      <!-- 부서 선택 -->
+      <div style="flex: 0 0 220px;">
+        <label for="partSelect" class="form-label fw-semibold">부서</label>
+        <select id="partSelect" class="form-select form-select-sm">
+          <option value="">불러오는 중...</option>
+        </select>
+      </div>
+
+      <!-- 지점 선택 -->
+      <div style="flex: 0 0 300px;">
+        <label for="branchSelect" class="form-label fw-semibold">지점</label>
+        <select id="branchSelect" class="form-select form-select-sm" disabled>
+          <option value="">부서를 먼저 선택하세요</option>
+        </select>
+      </div>
+
+      <!-- 검색 버튼 -->
+      <div style="flex: 0 0 120px;">
+        <button type="button" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ========================== 메인 테이블 ========================== -->
+  <div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="fw-bold mb-0">📊 테이블 관리 목록</h6>
+      <div>
+        <button id="btnToggleEdit" class="btn btn-sm btn-outline-secondary me-2">수정 모드 전환</button>
+        <button id="btnAddRow" class="btn btn-outline-primary btn-sm me-2">행 추가</button>
+        <button id="btnSave" class="btn btn-success btn-sm">저장</button>
+        <button id="btnReset" class="btn btn-sm btn-secondary">초기화</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover align-middle text-center" id="mainTable">
+        <thead class="table-light">
+          <tr>
+            <th style="width:25%">지점</th>
+            <th style="width:35%">테이블</th>
+            <th style="width:25%">요율</th>
+            <th style="width:15%">관리</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="data-row">
+            <td class="branch-cell">{{ user.branch }}</td>
+            <td class="editable" contenteditable="false"></td>
+            <td class="editable" contenteditable="false"></td>
+            <td>
+              <button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================== 로딩 오버레이 ========================== -->
+  <div id="loadingOverlay" hidden
+      style="position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(255,255,255,0.7);display:flex;align-items:center;
+      justify-content:center;z-index:2000;flex-direction:column;">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2 fw-bold">처리 중...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module" src="{% static 'js/common/part_branch_selector.js' %}"></script>
+<script type="module" src="{% static 'js/partner/manage_table.js' %}"></script>
 {% endblock %}

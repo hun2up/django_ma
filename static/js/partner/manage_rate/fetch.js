@@ -1,13 +1,12 @@
 // django_ma/static/js/partner/manage_rate/fetch.js
-
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading } from "./utils.js";
 
 let mainDT = null;
 
-/**
- * ✅ DataTables 초기화 (1회)
- */
+/* ============================================================
+   ✅ DataTables 초기화 (1회)
+============================================================ */
 function ensureMainDT() {
   if (!els.mainTable) return null;
   if (!window.jQuery || !window.jQuery.fn?.DataTable) return null;
@@ -24,20 +23,20 @@ function ensureMainDT() {
   return mainDT;
 }
 
-/**
- * ✅ 서버에서 데이터 받아오기
- * payload = { ym, branch, grade, level, team_a, team_b, team_c }
- */
+/* ============================================================
+   ✅ 서버 데이터 조회
+   payload = { ym, branch, grade, level, team_a, team_b, team_c }
+============================================================ */
 export async function fetchData(payload = {}) {
   if (!els.root) return;
 
   const baseUrl = els.root.dataset.dataFetchUrl;
   if (!baseUrl) {
-    console.warn("[rate/fetch] data-fetch-url 이 없습니다.");
+    console.warn("[rate/fetch] ⚠️ data-fetch-url 누락");
     return;
   }
 
-  // 🔹 month 파라미터 안전 보정 (YYYY-MM)
+  // 🔹 month 파라미터 보정 (YYYY-MM)
   let ym = (payload.ym || "").trim();
   if (ym && !/^\d{4}-\d{2}$/.test(ym)) {
     const y = ym.slice(0, 4);
@@ -63,30 +62,47 @@ export async function fetchData(payload = {}) {
     const res = await fetch(url.toString(), {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     });
-    const data = await res.json();
 
-    if (!data || data.status !== "success") {
-      console.warn("[rate/fetch] success 아님, 빈 상태로 렌더");
+    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
+
+    const data = await res.json();
+    const rows = Array.isArray(data?.rows) ? data.rows : [];
+
+    if (data.status !== "success") {
+      console.warn("[rate/fetch] ⚠️ 서버 응답 status != success", data);
       renderInputSection([]);
       renderMainSheet([]);
+      revealSections();
+      hideLoading();
       return;
     }
 
-    const rows = Array.isArray(data.rows) ? data.rows : [];
+    console.log(`✅ [rate/fetch] ${rows.length}건 수신 완료`);
     renderInputSection(rows);
     renderMainSheet(rows);
   } catch (err) {
-    console.error("[rate/fetch] 에러 발생", err);
+    console.error("❌ [rate/fetch] 예외 발생:", err);
     renderInputSection([]);
     renderMainSheet([]);
   } finally {
+    revealSections();
     hideLoading();
   }
 }
 
-/**
- * ✅ 내용입력 카드 렌더링
- */
+/* ============================================================
+   ✅ UI 표시 제어 (항상 노출 보장)
+============================================================ */
+function revealSections() {
+  const inputSec = document.getElementById("inputSection");
+  const mainSec = document.getElementById("mainSheet");
+  if (inputSec) inputSec.hidden = false;
+  if (mainSec) mainSec.hidden = false;
+}
+
+/* ============================================================
+   ✅ 내용입력 렌더링
+============================================================ */
 function renderInputSection(rows) {
   if (!els.inputTable) return;
   const tbody = els.inputTable.querySelector("tbody");
@@ -97,12 +113,13 @@ function renderInputSection(rows) {
     tbody.appendChild(createEmptyInputRow());
     return;
   }
+
   rows.forEach((row) => tbody.appendChild(createInputRowFromData(row)));
 }
 
-/**
- * ✅ 메인 시트 렌더링
- */
+/* ============================================================
+   ✅ 메인시트 렌더링
+============================================================ */
 function renderMainSheet(rows) {
   const dt = ensureMainDT();
   if (dt) {
@@ -129,7 +146,7 @@ function renderMainSheet(rows) {
     return;
   }
 
-  // 백업 모드
+  // ⚙️ fallback: DataTables 미사용 시 수동 렌더링
   if (!els.mainTable) return;
   const tbody = els.mainTable.querySelector("tbody");
   if (!tbody) return;
@@ -137,10 +154,7 @@ function renderMainSheet(rows) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.textContent = "데이터가 없습니다.";
-    td.colSpan = 12;
-    tr.appendChild(td);
+    tr.innerHTML = `<td colspan="12" class="text-center text-muted">데이터가 없습니다.</td>`;
     tbody.appendChild(tr);
     return;
   }
@@ -165,9 +179,9 @@ function renderMainSheet(rows) {
   });
 }
 
-/**
- * ✅ 서버 응답 → 표준형 필드 정규화
- */
+/* ============================================================
+   ✅ 데이터 정규화
+============================================================ */
 function normalizeRateRow(row = {}) {
   return {
     id: row.id || row.pk || "",
@@ -185,9 +199,9 @@ function normalizeRateRow(row = {}) {
   };
 }
 
-/**
- * ✅ 빈 입력 행
- */
+/* ============================================================
+   ✅ 입력행 생성
+============================================================ */
 function createEmptyInputRow() {
   const tr = document.createElement("tr");
   tr.classList.add("input-row");
@@ -225,9 +239,9 @@ function createInputRowFromData(row) {
   return tr;
 }
 
-/**
- * ✅ 액션 버튼 생성
- */
+/* ============================================================
+   ✅ 액션 버튼
+============================================================ */
 function buildActionButtons(row) {
   return `
     <button type="button" class="btn btn-sm btn-outline-danger btnDeleteRow" data-id="${row.id || ""}">
