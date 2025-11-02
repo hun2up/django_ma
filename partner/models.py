@@ -1,4 +1,5 @@
 # django_ma/partner/models.py
+
 from django.db import models
 from accounts.models import CustomUser
 

@@ -24,6 +24,17 @@
     data-team-b="{{ user.team_b|default:'' }}"
     data-team-c="{{ user.team_c|default:'' }}">
 
+    <script>
+      window.currentUser = {
+        id: "{{ user.id|default:'' }}",
+        name: "{{ user.name|default:'' }}",
+        branch: "{{ user.branch|default:'' }}",
+        part: "{{ user.part|default:'' }}",
+        grade: "{{ user.grade|default:'' }}",
+      };
+      window.csrfToken = "{{ csrf_token }}";
+    </script>
+
   {% if user.grade not in 'superuser main_admin sub_admin' %}
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
   {% endif %}
@@ -116,10 +127,10 @@
             <th>사번<br>(대상자)</th>
             <th>손보테이블<br>(변경전)</th>
             <th>손보요율<br>(변경전)</th>
-            <th>생보테이블<br>(변경전)</th>
-            <th>생보요율<br>(변경전)</th>
             <th>손보테이블<br>(변경후)<span class="text-danger">*</span></th>
             <th>손보요율<br>(변경후)</th>
+            <th>생보테이블<br>(변경전)</th>
+            <th>생보요율<br>(변경전)</th>            
             <th>생보테이블<br>(변경후)<span class="text-danger">*</span></th>
             <th>생보요율<br>(변경후)</th>
             <th>비고</th>
@@ -136,10 +147,10 @@
             <td><input type="text" class="form-control readonly-field" name="tg_id" readonly></td>
             <td><input type="text" class="form-control readonly-field" name="before_ftable" readonly></td>
             <td><input type="text" class="form-control readonly-field text-center" name="before_frate" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="before_ltable" readonly></td>
-            <td><input type="text" class="form-control readonly-field text-center" name="before_lrate" readonly></td>
             <td><input type="text" class="form-control" name="after_ftable" placeholder="선택 또는 입력"></td>
             <td><input type="text" class="form-control readonly-field text-center" name="after_frate" readonly></td>
+            <td><input type="text" class="form-control readonly-field" name="before_ltable" readonly></td>
+            <td><input type="text" class="form-control readonly-field text-center" name="before_lrate" readonly></td>            
             <td><input type="text" class="form-control" name="after_ltable" placeholder="선택 또는 입력"></td>
             <td><input type="text" class="form-control readonly-field text-center" name="after_lrate" readonly></td>
             <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>
@@ -170,15 +181,18 @@
       <table class="table table-striped align-middle w-100" id="mainTable">
         <thead class="table-light">
           <tr>
-            <th>성명(요청자)</th>
-            <th>사번(요청자)</th>
-            <th>소속(요청자)</th>
-            <th>성명(대상자)</th>
-            <th>사번(대상자)</th>
-            <th>테이블(변경전)</th>
-            <th>테이블(변경후)</th>
-            <th>요율(변경전)</th>
-            <th>요율(변경후)</th>
+            <th>성명<br>(요청자)</th>
+            <th>사번<br>(요청자)</th>            
+            <th>성명<br>(대상자)</th>
+            <th>사번<br>(대상자)</th>
+            <th>손보테이블<br>(변경전)</th>
+            <th>손보요율<br>(변경전)</th>
+            <th>손보테이블<br>(변경후)</th>
+            <th>손보요율<br>(변경후)</th>
+            <th>생보테이블<br>(변경전)</th>
+            <th>생보요율<br>(변경전)</th>
+            <th>생보테이블<br>(변경후)</th>
+            <th>생보요율<br>(변경후)</th>
             <th>비고</th>
             <th>처리일자</th>
             <th>삭제</th>

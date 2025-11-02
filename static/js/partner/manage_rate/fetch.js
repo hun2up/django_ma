@@ -1,4 +1,5 @@
 // django_ma/static/js/partner/manage_rate/fetch.js
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading } from "./utils.js";
 
@@ -191,10 +192,10 @@ function normalizeRateRow(row = {}) {
     target_id: row.target_id || row.tg_id || "",
     before_ftable: row.before_ftable || "",
     before_frate: row.before_frate || "",
-    before_ltable: row.before_ltable || "",
-    before_lrate: row.before_lrate || "",
     after_ftable: row.after_ftable || "",
     after_frate: row.after_frate || "",
+    before_ltable: row.before_ltable || "",
+    before_lrate: row.before_lrate || "",    
     after_ltable: row.after_ltable || "",
     after_lrate: row.after_lrate || "",
     memo: row.memo || "",
@@ -216,10 +217,10 @@ function createEmptyInputRow() {
     <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" readonly></td>
     <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" readonly></td>
     <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
-    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>
     <td><input type="text" name="after_ftable" class="form-control form-control-sm"></td>
     <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
+    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" readonly></td>
+    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>    
     <td><input type="text" name="after_ltable" class="form-control form-control-sm"></td>
     <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>
     <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="상세하게 기재"></td>
@@ -247,13 +248,13 @@ function createInputRowFromData(row) {
     <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" value="${r.requester_id || ""}" readonly></td>
     <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" value="${r.target_name || ""}" readonly></td>
     <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" value="${r.target_id || ""}" readonly></td>
-    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" value="${r.table_before || ""}" readonly></td>
-    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" value="${r.rate_before || ""}" readonly></td>
-    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" value="${r.before_ltable || ""}" readonly></td>
-    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.before_lrate || ""}" readonly></td>
+    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" value="${r.before_ftable || ""}" readonly></td>
+    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" value="${r.before_frate || ""}" readonly></td>
     <td><input type="text" name="after_ftable" class="form-control form-control-sm" value="${r.after_ftable || ""}"></td>
     <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" value="${r.after_frate || ""}" readonly></td>
-    <td><input type="text" name="after_ltable" class="form-control form-control-sm" value="${r.after_ltable || ""}"></td>
+    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" value="${r.before_ltable || ""}" readonly></td>
+    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.before_lrate || ""}" readonly></td>
+        <td><input type="text" name="after_ltable" class="form-control form-control-sm" value="${r.after_ltable || ""}"></td>
     <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.after_lrate || ""}" readonly></td>
     <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}" placeholder="상세하게 기재"></td>
     <td class="text-center">
