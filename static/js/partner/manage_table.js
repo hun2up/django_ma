@@ -1,11 +1,12 @@
 /**
- * ✅ 테이블 관리 페이지 (v4.2)
+ * ✅ 테이블 관리 페이지 (v4.3)
  * ------------------------------------------------------------
  * - DataTables 완전 차단 (다른 페이지 영향 없음)
  * - 드래그앤드롭 제거 → ▲ / ▼ 버튼으로 순서 조정
  * - ↓ 버튼 정상 작동 (아래로 이동)
  * - 요율 입력: 정수만 (0~100), 자동 %
  * - 빈칸은 저장 제외
+ * - ✅ 요율현황 : superuser는 검색 버튼 클릭 시, main_admin은 자동조회
  * ------------------------------------------------------------
  */
 
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $.fn.dataTable.ext.errMode = "none";
     const originalDT = $.fn.DataTable;
     $.fn.DataTable = function (...args) {
-      if (this.attr("id") === "mainTable") return this; // 이 페이지의 테이블은 차단
+      if (this.attr("id") === "mainTable") return this; // 이 페이지의 메인 테이블은 차단
       return originalDT.apply(this, args);
     };
   }
@@ -70,17 +71,21 @@ document.addEventListener("DOMContentLoaded", () => {
   init();
 
   function init() {
-    // main_admin 자동조회
-    if (userGrade === "main_admin") {
-      setTimeout(() => fetchData(userBranch), 300);
+    // ✅ main_admin은 페이지 진입 시 자동 조회 (테이블 + 요율현황)
+    if (userGrade === "main_admin" && userBranch) {
+      setTimeout(() => {
+        fetchData(userBranch);
+        loadRateUserTable(userBranch);
+      }, 300);
     }
 
-    // superuser: 수동조회
+    // ✅ superuser는 검색 버튼 클릭 시 조회
     if (userGrade === "superuser" && els.btnSearch) {
       els.btnSearch.addEventListener("click", () => {
-        const branch = els.branch.value;
+        const branch = els.branch.value?.trim();
         if (!branch) return alertBox("지점을 선택해주세요.");
         fetchData(branch);
+        loadRateUserTable(branch);
       });
     }
 
@@ -180,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---------------------------------------------------------
-     테이블 렌더링 (▲ ▼ 버튼 포함)
+     테이블 렌더링
   --------------------------------------------------------- */
   function renderTable(rows = [], branch) {
     els.tableBody.innerHTML = "";
@@ -237,37 +242,35 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ---------------------------------------------------------
-     행 이동 (▲/▼)
+     행 이동 / 추가 / 삭제 / 저장 / 초기화
   --------------------------------------------------------- */
   document.addEventListener("click", (e) => {
     if (!editMode) return;
     const upBtn = e.target.closest(".btnMoveUp");
     const downBtn = e.target.closest(".btnMoveDown");
+    const delBtn = e.target.closest(".btnDeleteRow");
 
     if (upBtn) {
       const row = upBtn.closest("tr");
       const prev = row.previousElementSibling;
-      if (prev) {
-        row.parentNode.insertBefore(row, prev);
-        updateOrderNumbers();
-      }
-      return;
+      if (prev) row.parentNode.insertBefore(row, prev);
+      updateOrderNumbers();
     }
 
     if (downBtn) {
       const row = downBtn.closest("tr");
       const next = row.nextElementSibling;
-      if (next) {
-        next.after(row);
-        updateOrderNumbers();
-      }
-      return;
+      if (next) next.after(row);
+      updateOrderNumbers();
+    }
+
+    if (delBtn) {
+      if (!confirm("해당 행을 삭제하시겠습니까?")) return;
+      delBtn.closest("tr")?.remove();
+      updateOrderNumbers();
     }
   });
 
-  /* ---------------------------------------------------------
-     행 추가 / 삭제
-  --------------------------------------------------------- */
   els.btnAdd?.addEventListener("click", () => {
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
     if (!branch) return alertBox("지점을 먼저 선택해주세요.");
@@ -288,23 +291,11 @@ document.addEventListener("DOMContentLoaded", () => {
         <button class="btn btn-sm btn-danger btnDeleteRow" ${
           !editMode || userGrade === "sub_admin" ? "disabled" : ""
         }>삭제</button>
-      </td>
-    `;
+      </td>`;
     els.tableBody.appendChild(tr);
     updateOrderNumbers();
   });
 
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest(".btnDeleteRow");
-    if (!btn || !editMode) return;
-    if (!confirm("해당 행을 삭제하시겠습니까?")) return;
-    btn.closest("tr")?.remove();
-    updateOrderNumbers();
-  });
-
-  /* ---------------------------------------------------------
-     저장
-  --------------------------------------------------------- */
   els.btnSave?.addEventListener("click", async () => {
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
     if (!branch) return alertBox("지점 정보가 없습니다.");
@@ -346,12 +337,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  /* ---------------------------------------------------------
-     초기화
-  --------------------------------------------------------- */
   els.btnReset?.addEventListener("click", async () => {
     if (!confirm("테이블을 초기화하시겠습니까?")) return;
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
     await fetchData(branch);
   });
+
+  // ------------------------------------------------------------
+  // ✅ 지점 내 사용자 요율현황 테이블 로드
+  // ------------------------------------------------------------
+  async function loadRateUserTable(branch) {
+    if (!branch) return;
+    const table = $("#rateUserTable").DataTable({
+      destroy: true,
+      searching: true,
+      paging: true,
+      pageLength: 10,
+      lengthChange: true,
+      order: [[0, "asc"]],
+      info: false,
+      language: {
+        lengthMenu: "_MENU_개씩 보기",
+        search: "검색:",
+        zeroRecords: "데이터가 없습니다.",
+        infoEmpty: "데이터 없음",
+        paginate: { next: "다음", previous: "이전" },
+      },
+    });
+
+    try {
+      const res = await fetch(`/partner/ajax/rate-userlist/?branch=${encodeURIComponent(branch)}`);
+      const data = await res.json();
+      table.clear();
+      data.data.forEach((u) => {
+        table.row.add([
+          u.branch || "",
+          u.team_a || "",
+          u.team_b || "",
+          u.team_c || "",
+          u.name || "",
+          u.id || "",
+          u.non_life_table || "",
+          u.life_table || "",
+        ]);
+      });
+      table.draw();
+    } catch (err) {
+      console.error("요율현황 로드 실패", err);
+    }
+  }
 });
