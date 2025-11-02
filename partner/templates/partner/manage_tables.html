@@ -4,57 +4,53 @@
 {% load static %}
 {% block title %}테이블 관리{% endblock %}
 
-{% block content %}
+{% block extra_head %}
+<!-- ❌ DataTables 로드 금지 -->
+<!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> -->
 
+<!-- ✅ 필요한 경우 SortableJS만 -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
 <form id="csrfForm">{% csrf_token %}</form>
-<script>
-  window.csrfToken = "{{ csrf_token }}";
-</script>
+<script>window.csrfToken = "{{ csrf_token }}";</script>
 
 <div id="manage-table"
      data-user-grade="{{ user.grade }}"
      data-branch="{{ user.branch }}"
      data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
-     data-save-url="{% url 'partner:ajax_table_save' %}"
-     data-delete-url="">
+     data-save-url="{% url 'partner:ajax_table_save' %}">
 
-
-  <!-- ✅ 접근 제한 (sub_admin 차단) -->
   {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
       <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
   {% endif %}
 
   <h3 class="fw-bold text-center mb-4" style="color:#003f7d;">테이블 관리 페이지</h3>
 
-  <!-- ✅ Superuser 전용 : 부서/지점 선택 카드 -->
   {% if user.grade == 'superuser' %}
   <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
     <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
-      <!-- 부서 선택 -->
-      <div style="flex: 0 0 220px;">
+      <div style="flex:0 0 220px;">
         <label for="partSelect" class="form-label fw-semibold">부서</label>
         <select id="partSelect" class="form-select form-select-sm">
           <option value="">불러오는 중...</option>
         </select>
       </div>
-
-      <!-- 지점 선택 -->
-      <div style="flex: 0 0 300px;">
+      <div style="flex:0 0 300px;">
         <label for="branchSelect" class="form-label fw-semibold">지점</label>
         <select id="branchSelect" class="form-select form-select-sm" disabled>
           <option value="">부서를 먼저 선택하세요</option>
         </select>
       </div>
-
-      <!-- 검색 버튼 -->
-      <div style="flex: 0 0 120px;">
+      <div style="flex:0 0 120px;">
         <button type="button" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
       </div>
     </form>
   </div>
   {% endif %}
 
-  <!-- ========================== 메인 테이블 ========================== -->
   <div class="card p-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h6 class="fw-bold mb-0">📊 테이블 관리 목록</h6>
@@ -70,27 +66,31 @@
       <table class="table table-bordered table-hover align-middle text-center" id="mainTable">
         <thead class="table-light">
           <tr>
+            <th style="width:8%">순번</th>
             <th style="width:25%">지점</th>
             <th style="width:35%">테이블</th>
-            <th style="width:25%">요율</th>
-            <th style="width:15%">관리</th>
+            <th style="width:20%">요율(%)</th>
+            <th style="width:10%">편집</th> 
+            <th style="width:12%">삭제</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr class="data-row">
+          <tr class="data-row" data-order="1">
+            <td class="order-cell">1</td>
             <td class="branch-cell">{{ user.branch }}</td>
             <td class="editable" contenteditable="false"></td>
-            <td class="editable" contenteditable="false"></td>
+            <td class="editable rate-cell" contenteditable="false"></td>
             <td>
-              <button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button>
-            </td>
+            <button class="btn btn-outline-secondary btn-sm btnMoveUp" disabled>▲</button>
+            <button class="btn btn-outline-secondary btn-sm btnMoveDown" disabled>▼</button>
+          </td>
+            <td><button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button></td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- ========================== 로딩 오버레이 ========================== -->
   <div id="loadingOverlay" hidden
       style="position:fixed;top:0;left:0;width:100%;height:100%;
       background:rgba(255,255,255,0.7);display:flex;align-items:center;
@@ -99,6 +99,25 @@
     <div class="mt-2 fw-bold">처리 중...</div>
   </div>
 </div>
+
+<style>
+  /* ✅ 테이블 관리 카드 전체 폭 제한 */
+  #manage-table .card {
+    max-width: 1100px; /* 원하는 폭 (예: 1000~1200px 추천) */
+    margin: 0 auto;    /* 중앙 정렬 */
+  }
+
+  /* ✅ 테이블 내용 정렬 */
+  #mainTable {
+    width: 100%;
+  }
+</style>
+
+<style>
+  #mainTable td, #mainTable th { font-size: 16px; vertical-align: middle; }
+  #mainTable .btnDeleteRow { font-size: 13px; }
+  .sortable-ghost { opacity: 0.6; background: #e6f0ff; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
