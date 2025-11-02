@@ -159,6 +159,7 @@ class TableSetting(models.Model):
     rate = models.CharField(max_length=20, blank=True, null=True)  # 요율 (%)
     order = models.PositiveIntegerField(default=0, help_text="표시 순서")
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('branch', 'table_name')

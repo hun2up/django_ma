@@ -406,3 +406,28 @@ table {
   text-align: center !important;
   vertical-align: middle !important;  /* 세로 중앙 정렬 */
 }
+
+/* =============================
+   📘 요율관리 - 테이블 확인 모달팝업 스타일
+   ============================= */
+#tableCheckModal table th,
+#tableCheckModal table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 6px 8px;
+}
+
+#tableCheckModal table th {
+  font-weight: 600;
+  background-color: #f8f9fa;
+}
+
+#tableCheckModal table td {
+  font-size: 0.9rem;
+}
+
+#tableCheckModal table td.text-center {
+  font-weight: 500;
+  color: #003f7d; /* 인카 블루톤으로 강조 */
+}
