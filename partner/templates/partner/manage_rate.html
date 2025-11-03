@@ -1,7 +1,8 @@
 <!-- django_ma/partner/templates/partner/manage_rate.html -->
+
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}요율변경{% endblock %}
+{% block title %}요율변경 요청{% endblock %}
 
 {% block extra_head %}
 <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -16,256 +17,105 @@
     data-selected-year="{% firstof selected_year current_year %}"
     data-selected-month="{% firstof selected_month current_month %}"
     data-default-branch="{{ user.branch }}"
-    data-data-fetch-url="{{ data_fetch_url }}"
-    data-data-save-url="{{ data_save_url }}"
-    data-data-delete-url="{{ data_delete_url }}"
-    data-user-level="{{ user.level|default:'' }}"
-    data-team-a="{{ user.team_a|default:'' }}"
-    data-team-b="{{ user.team_b|default:'' }}"
-    data-team-c="{{ user.team_c|default:'' }}">
+    data-data-fetch-url="{% url 'partner:ajax_fetch' %}"
+    data-data-save-url="{% url 'partner:ajax_save' %}"
+    data-data-delete-url="{% url 'partner:ajax_delete' %}">
 
-    <script>
-      window.currentUser = {
-        id: "{{ user.id|default:'' }}",
-        name: "{{ user.name|default:'' }}",
-        branch: "{{ user.branch|default:'' }}",
-        part: "{{ user.part|default:'' }}",
-        grade: "{{ user.grade|default:'' }}",
-      };
-      window.csrfToken = "{{ csrf_token }}";
-    </script>
+  <h3 class="fw-bold text-center mb-4" style="color:#003f7d;">요율변경 요청 페이지</h3>
 
-  {% if user.grade not in 'superuser main_admin sub_admin' %}
-    <div class="alert alert-danger">접근 권한이 없습니다.</div>
-  {% endif %}
-
-  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">요율변경 요청 페이지</h3>
-
-  <!-- ✅ 상단 컨트롤 -->
-  <div class="card shadow p-3 border-0 rounded-4 mb-3">
-    <form class="row g-2 align-items-end">
-      {% csrf_token %}
-      <div class="col-6 col-md-1">
-        <label class="form-label mb-1">연도</label>
-        <select id="yearSelect" class="form-select"></select>
-      </div>
-      <div class="col-6 col-md-1">
-        <label class="form-label mb-1">월도</label>
-        <select id="monthSelect" class="form-select"></select>
-      </div>
-
-      {% if user.grade == 'superuser' %}
-      <div class="col-6 col-md-2">
-        <label class="form-label mb-1">부서</label>
-        <select id="partSelect" class="form-select form-select-sm">
-          <option value="">불러오는 중...</option>
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label mb-1">지점</label>
-        <select id="branchSelect" class="form-select form-select-sm" disabled>
-          <option value="">부서를 먼저 선택하세요</option>
-        </select>
-      </div>
-      {% endif %}
-
-      <div class="col-12 col-md-1 d-grid">
-        <button type="button" id="btnSearchPeriod" class="btn btn-primary">검색</button>
-      </div>
-    </form>
-    <div class="small text-muted mt-2">
-      ※ 과거 데이터는 존재하는 월도만 조회 가능하며, 미래는 최대 +1개월까지 조회 가능
-    </div>
-  </div>
-
-  {% if user.grade in 'superuser main_admin' %}
-  <div class="alert alert-info py-2 mb-3">
-    요율변경 기능 사용 전 반드시 
-    <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
-    과 
-    <a href="{% url 'partner:manage_tables' %}" class="fw-bold text-decoration-underline text-primary">수수료 테이블</a>
-    을 설정해야 합니다.
-  </div>
-  {% endif %}
-
-  <!-- ✅ 내용입력 -->
-  <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
-      <div class="d-flex gap-2">
-        <button type="button" id="btnCheckTable" class="btn btn-outline-info btn-sm">테이블 확인</button>
-        <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
-        <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
-        <button type="button" id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
-      </div>
-    </div>
-
+  <!-- ✅ 내용입력 카드 -->
+  <div class="card shadow-sm p-3 mb-4">
+    <h5 class="fw-bold text-primary mb-3">내용입력</h5>
     <div class="table-responsive">
-      <table class="table align-middle" id="inputTable">
-        <colgroup>
-          <col style="width: 5%"> <!-- 성명(요청자) -->
-          <col style="width: 6%"> <!-- 사번(요청자) -->
-          <col style="width: 5%"> <!-- 성명(대상자) -->
-          <col style="width: 6%"> <!-- 사번(대상자) -->
-          <col style="width: 8%"> <!-- 손보테이블(변경전) -->
-          <col style="width: 5%"> <!-- 손보요율(변경전) -->
-          <col style="width: 8%"> <!-- 생보테이블(변경전) -->
-          <col style="width: 5%"> <!-- 생보요율(변경전) -->
-          <col style="width: 9%"> <!-- 손보테이블(변경후) -->          
-          <col style="width: 5%"> <!-- 손보요율(변경후) -->
-          <col style="width: 9%"> <!-- 생보테이블(변경후) -->          
-          <col style="width: 5%"> <!-- 생보요율(변경후) -->
-          <col style="width: 16%"> <!-- 비고 -->
-          <col style="width: 4%"> <!-- 검색 --> 
-          <col style="width: 4%"> <!-- 삭제 -->
-        </colgroup>
+      <table class="table table-bordered align-middle text-center" id="inputTable">
         <thead class="table-light">
           <tr>
-            <th>성명<br>(요청자)</th>
-            <th>사번<br>(요청자)</th>
-            <th>성명<br>(대상자)</th>
-            <th>사번<br>(대상자)</th>
-            <th>손보테이블<br>(변경전)</th>
-            <th>손보요율<br>(변경전)</th>
-            <th>손보테이블<br>(변경후)<span class="text-danger">*</span></th>
-            <th>손보요율<br>(변경후)</th>
-            <th>생보테이블<br>(변경전)</th>
-            <th>생보요율<br>(변경전)</th>            
-            <th>생보테이블<br>(변경후)<span class="text-danger">*</span></th>
-            <th>생보요율<br>(변경후)</th>
+            <th>요청자명</th>
+            <th>요청자사번</th>
+            <th>요청자지점</th>
+            <th>대상자명</th>
+            <th>대상자사번</th>
+            <th>손보(변경전)</th>
+            <th>손보요율(%)</th>
+            <th>손보(변경후)</th>
+            <th>손보요율(%)</th>
+            <th>생보(변경전)</th>
+            <th>생보요율(%)</th>
+            <th>생보(변경후)</th>
+            <th>생보요율(%)</th>
             <th>비고</th>
-            <th>검색</th>
             <th>삭제</th>
           </tr>
         </thead>
         <tbody>
-          <!-- 최초 1행 템플릿 — JS로 복제/최대 10개까지 -->
           <tr class="input-row">
-            <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="tg_name" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="tg_id" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="before_ftable" readonly></td>
-            <td><input type="text" class="form-control readonly-field text-center" name="before_frate" readonly></td>
-            <td><input type="text" class="form-control" name="after_ftable" placeholder="선택 또는 입력"></td>
-            <td><input type="text" class="form-control readonly-field text-center" name="after_frate" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="before_ltable" readonly></td>
-            <td><input type="text" class="form-control readonly-field text-center" name="before_lrate" readonly></td>            
-            <td><input type="text" class="form-control" name="after_ltable" placeholder="선택 또는 입력"></td>
-            <td><input type="text" class="form-control readonly-field text-center" name="after_lrate" readonly></td>
-            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>
-            <td class="text-center">
-              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-            </td>
-            <td class="text-center">
-              <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
-            </td>
+            <td><input type="text" name="rq_name" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="rq_id" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="rq_branch" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="tg_name" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="tg_id" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="before_ftable" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="before_frate" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="after_ftable" class="form-control form-control-sm"></td>
+            <td><input type="text" name="after_frate" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="before_ltable" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="before_lrate" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="after_ltable" class="form-control form-control-sm"></td>
+            <td><input type="text" name="after_lrate" class="form-control form-control-sm" readonly></td>
+            <td><input type="text" name="memo" class="form-control form-control-sm"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger btnRemoveRow">삭제</button></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div class="small text-muted">※ 대상자는 한 번에 최대 10명까지 추가 가능합니다.</div>
-  </div>
-
-  <div class="alert alert-info py-2 mb-3">
-    입력 후 수정은 불가합니다. 수정 필요 시 최상위 관리자에게 문의하세요.
-  </div>
-
-  <!-- ✅ 메인시트 -->
-  <div class="card shadow p-3 border-0 rounded-4" id="mainSheet" hidden>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
-      <div class="small text-muted" id="sheetNotice"></div>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-striped align-middle w-100" id="mainTable">
-        <thead class="table-light">
-          <tr>
-            <th>성명<br>(요청자)</th>
-            <th>사번<br>(요청자)</th>            
-            <th>성명<br>(대상자)</th>
-            <th>사번<br>(대상자)</th>
-            <th>손보테이블<br>(변경전)</th>
-            <th>손보요율<br>(변경전)</th>
-            <th>손보테이블<br>(변경후)</th>
-            <th>손보요율<br>(변경후)</th>
-            <th>생보테이블<br>(변경전)</th>
-            <th>생보요율<br>(변경전)</th>
-            <th>생보테이블<br>(변경후)</th>
-            <th>생보요율<br>(변경후)</th>
-            <th>비고</th>
-            <th>처리일자</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="mt-3 text-end">
+      <button id="btnAddRow" class="btn btn-outline-primary btn-sm me-2">행 추가</button>
+      <button id="btnResetRows" class="btn btn-outline-secondary btn-sm me-2">초기화</button>
+      <button id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
     </div>
   </div>
 
-  <!-- ✅ 테이블 확인 모달 -->
-  <div class="modal fade" id="tableCheckModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">지점별 테이블 확인</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-        </div>
-        <div class="modal-body">
-          <div id="tableCheckBody" class="table-responsive text-center">
-            <div class="py-4 text-muted">불러오는 중...</div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-        </div>
-      </div>
-    </div>
+  <!-- ✅ 메인시트 (조회 결과) -->
+  <div class="card shadow-sm p-3">
+    <h5 class="fw-bold text-primary mb-3">요율변경 요청 내역</h5>
+    <table class="table table-bordered table-hover text-center" id="mainTable">
+      <thead class="table-light">
+        <tr>
+          <th>요청자</th>
+          <th>대상자</th>
+          <th>손보(변경전→후)</th>
+          <th>생보(변경전→후)</th>
+          <th>비고</th>
+          <th>삭제</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
-  <!-- ✅ 로딩 -->
-  <div class="loading-overlay" id="loadingOverlay" hidden>
-    <div class="loading-box">
-      <div class="spinner-border" role="status"></div>
-      <div class="mt-2">처리 중...</div>
-    </div>
+  <!-- ✅ 로딩 오버레이 -->
+  <div id="loadingOverlay" hidden
+      style="position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(255,255,255,0.7);display:flex;align-items:center;
+      justify-content:center;z-index:2000;flex-direction:column;">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2 fw-bold">처리 중...</div>
   </div>
 </div>
 
-<!-- 공통 스크립트 -->
-<script src="{% static 'js/common/part_branch_selector.js' %}?v={{ now|date:'U' }}"></script>
-<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={{ now|date:'U' }}"></script>
-<script type="module" src="{% static 'js/partner/manage_rate/index.js' %}?v={{ now|date:'U' }}"></script>
-
-<!-- ✅ Boot 데이터 -->
-<script>
-  window.ManageRateBoot = {
-    userGrade: "{{ user.grade|default:'' }}",
-    currentYear: {{ current_year|default:0 }},
-    currentMonth: {{ current_month|default:0 }},
-    selectedYear: {{ selected_year|default:0 }},
-    selectedMonth: {{ selected_month|default:0 }},
-    autoLoad: {{ auto_load|yesno:"true,false" }},
-    dataFetchUrl: "{{ data_fetch_url|default:'' }}",
-    dataSaveUrl: "{{ data_save_url|default:'' }}",
-    dataDeleteUrl: "{{ data_delete_url|default:'' }}",
-  };
-</script>
-
+<!-- ✅ 현재 로그인 사용자 정보 전달 -->
 <script>
   window.currentUser = {
-    id: "{{ user.id|escapejs }}",
+    id: "{{ user.id }}",
     name: "{{ user.name|escapejs }}",
-    part: "{{ user.part|default:''|escapejs }}",
-    branch: "{{ user.branch|default:''|escapejs }}",
-    grade: "{{ user.grade|default:''|escapejs }}",
-    level: "{{ subadmin_info.level|default:''|escapejs }}",
-    team_a: "{{ subadmin_info.team_a|default:''|escapejs }}",
-    team_b: "{{ subadmin_info.team_b|default:''|escapejs }}",
-    team_c: "{{ subadmin_info.team_c|default:''|escapejs }}"
+    branch: "{{ user.branch|escapejs }}",
+    part: "{{ user.part|escapejs }}",
+    grade: "{{ user.grade|escapejs }}",
   };
-  window.csrfToken = "{{ csrf_token }}";
 </script>
 
-{% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
+{% endblock %}
+
+{% block extra_js %}
+<script type="module" src="{% static 'js/partner/manage_rate/index.js' %}"></script>
 {% endblock %}
