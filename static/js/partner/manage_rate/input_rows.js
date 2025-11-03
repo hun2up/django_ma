@@ -171,7 +171,6 @@ async function fetchTargetDetail(targetId) {
 export async function fillTargetInfo(row, targetId) {
   try {
     const data = await fetchTargetDetail(targetId);
-
     if (data.status !== "success") {
       alertBox(data.message || "대상자 정보를 불러오지 못했습니다.");
       return;
@@ -179,32 +178,81 @@ export async function fillTargetInfo(row, targetId) {
 
     const info = data.data || {};
 
-    // 대상자 정보
-    const tgName = row.querySelector('input[name="tg_name"]');
-    if (tgName) tgName.value = info.target_name || "";
+    // 기본 정보
+    row.querySelector('input[name="tg_name"]').value = info.target_name || "";
+    row.querySelector('input[name="tg_id"]').value = info.target_id || "";
 
-    const tgId = row.querySelector('input[name="tg_id"]');
-    if (tgId) tgId.value = info.target_id || "";
+    // 기존 테이블/요율 (변경전)
+    row.querySelector('input[name="before_ftable"]').value = info.non_life_table || "";
+    row.querySelector('input[name="before_frate"]').value = info.non_life_rate || "";
+    row.querySelector('input[name="before_ltable"]').value = info.life_table || "";
+    row.querySelector('input[name="before_lrate"]').value = info.life_rate || "";
 
-    // ✅ 테이블관리에서 가져온 '변경전' 값들
-    const beforeFTable = row.querySelector('input[name="before_ftable"]');
-    if (beforeFTable) beforeFTable.value = info.non_life_table || "";
+    // 변경후 테이블 선택 드롭다운으로 전환
+    await loadTableDropdowns(row);
 
-    const beforeFRate = row.querySelector('input[name="before_frate"]');
-    if (beforeFRate) beforeFRate.value = info.non_life_rate || "";
-
-    const beforeLTable = row.querySelector('input[name="before_ltable"]');
-    if (beforeLTable) beforeLTable.value = info.life_table || "";
-
-    const beforeLRate = row.querySelector('input[name="before_lrate"]');
-    if (beforeLRate) beforeLRate.value = info.life_rate || "";
-
-    // 전체는 다시 잠금
-    row.querySelectorAll("input").forEach((el) => (el.readOnly = true));
-    // 변경후 칸만 다시 열기
-    allowEditableFields(row);
   } catch (err) {
     console.error("❌ 대상자 정보 로드 실패:", err);
     alertBox("대상자 정보를 불러오는 중 오류가 발생했습니다.");
+  }
+}
+
+/* =======================================================
+   ✅ 요청자 branch 기준 테이블 목록 불러오기
+   ======================================================= */
+async function loadTableDropdowns(row) {
+  const branch = window.currentUser?.branch || "";
+  if (!branch) return;
+
+  try {
+    const res = await fetch(`/partner/ajax_table_fetch/?branch=${encodeURIComponent(branch)}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    const data = await res.json();
+    const tables = data.rows || [];
+
+    // 테이블 옵션 HTML 구성
+    const options = tables
+      .map(t => `<option value="${t.table || t.table_name}">${t.table || t.table_name}</option>`)
+      .join("");
+
+    // 손보 select
+    const fTableCell = row.querySelector('input[name="after_ftable"]')?.parentElement;
+    const fSelect = document.createElement("select");
+    fSelect.name = "after_ftable";
+    fSelect.className = "form-select form-select-sm";
+    fSelect.innerHTML = `<option value="">선택</option>${options}`;
+    fTableCell.innerHTML = "";
+    fTableCell.appendChild(fSelect);
+
+    // 생보 select
+    const lTableCell = row.querySelector('input[name="after_ltable"]')?.parentElement;
+    const lSelect = document.createElement("select");
+    lSelect.name = "after_ltable";
+    lSelect.className = "form-select form-select-sm";
+    lSelect.innerHTML = `<option value="">선택</option>${options}`;
+    lTableCell.innerHTML = "";
+    lTableCell.appendChild(lSelect);
+
+    fSelect.addEventListener("change", e => {
+      const selected = tables.find(
+        t => t.table === e.target.value || t.table_name === e.target.value
+      );
+      if (selected) {
+        row.querySelector('input[name="after_frate"]').value = selected.rate || "";
+      }
+    });
+
+    lSelect.addEventListener("change", e => {
+      const selected = tables.find(
+        t => t.table === e.target.value || t.table_name === e.target.value
+      );
+      if (selected) {
+        row.querySelector('input[name="after_lrate"]').value = selected.rate || "";
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ 테이블 목록 로드 실패:", err);
   }
 }
