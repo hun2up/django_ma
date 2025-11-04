@@ -1,21 +1,22 @@
-// django_ma/static/js/partner/manage_rate/save.js
+// ======================================================
+// 📘 요율변경 요청 페이지 - 저장 로직 (v5.2)
+// ======================================================
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken, selectedYM } from "./utils.js";
 import { fetchData } from "./fetch.js";
 import { resetInputSection } from "./input_rows.js";
 
-/**
- * ✅ 편제변경 저장 (안전형)
- */
+/* =======================================================
+   ✅ 저장 버튼 클릭 시 실행
+   ======================================================= */
 export async function saveRows() {
   const rows = Array.from(els.inputTable.querySelectorAll("tbody tr.input-row"));
   const payload = [];
 
-  // 🔹 데이터 수집 및 검증
   for (const row of rows) {
-    const rq_id = row.querySelector("[name='rq_id']")?.value.trim() || "";
-    const tg_id = row.querySelector("[name='tg_id']")?.value.trim() || "";
+    const rq_id = row.querySelector('[name="rq_id"]')?.value.trim();
+    const tg_id = row.querySelector('[name="tg_id"]')?.value.trim();
 
     if (!tg_id) {
       alertBox("대상자를 선택해주세요.");
@@ -23,12 +24,23 @@ export async function saveRows() {
     }
 
     payload.push({
-      requester_id: rq_id,
+      requester_id: rq_id || window.currentUser?.id || "",
       target_id: tg_id,
-      chg_branch: row.querySelector("[name='chg_branch']")?.value.trim() || "",
-      or_flag: row.querySelector("[name='or_flag']")?.checked || false,
-      chg_rank: row.querySelector("[name='chg_rank']")?.value.trim() || "",
-      memo: row.querySelector("[name='memo']")?.value.trim() || "",
+      before_ftable: row.querySelector('[name="before_ftable"]')?.value || "",
+      before_frate: row.querySelector('[name="before_frate"]')?.value || "",
+      before_ltable: row.querySelector('[name="before_ltable"]')?.value || "",
+      before_lrate: row.querySelector('[name="before_lrate"]')?.value || "",
+      after_ftable:
+        row.querySelector('select[name="after_ftable"]')?.value ||
+        row.querySelector('input[name="after_ftable"]')?.value ||
+        "",
+      after_frate: row.querySelector('[name="after_frate"]')?.value || "",
+      after_ltable:
+        row.querySelector('select[name="after_ltable"]')?.value ||
+        row.querySelector('input[name="after_ltable"]')?.value ||
+        "",
+      after_lrate: row.querySelector('[name="after_lrate"]')?.value || "",
+      memo: row.querySelector('[name="memo"]')?.value || "",
     });
   }
 
@@ -38,6 +50,7 @@ export async function saveRows() {
   }
 
   showLoading("저장 중...");
+  console.log("💾 저장 payload:", payload);
 
   try {
     const res = await fetch(els.root.dataset.dataSaveUrl, {
@@ -49,46 +62,22 @@ export async function saveRows() {
       body: JSON.stringify({
         rows: payload,
         month: selectedYM(els.year, els.month),
-        part: els.branch?.value || window.currentUser?.part || "",
-        branch: els.branch?.value || window.currentUser?.branch || "",
+        part: window.currentUser?.part || "",
+        branch: window.currentUser?.branch || "", // ← 단순 조회 참고용
       }),
     });
 
-    const text = await res.text();
-    console.log("📦 [saveRows] Raw Response:", text);
+    const data = await res.json();
 
-    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
-
-    let result = {};
-    try {
-      result = JSON.parse(text);
-    } catch {
-      throw new Error("서버 응답 파싱 실패");
-    }
-
-    if (result.status === "success") {
-      const count = result.saved_count ?? payload.length;
-      alertBox(`✅ ${count}건 저장 완료`);
-
-      // 🔹 입력 폼 리셋
+    if (data.status === "success") {
+      alertBox(`✅ ${data.saved_count || payload.length}건 저장 완료`);
       resetInputSection();
-
-      // 🔹 재조회 (안전 실행)
-      try {
-        const ym = `${els.year.value}-${els.month.value}`;
-        const branch = els.branch?.value || window.currentUser?.branch || "";
-        await fetchData(ym, branch);
-      } catch (reErr) {
-        console.warn("⚠️ 저장 후 재조회 중 오류:", reErr);
-        alertBox("저장은 완료되었지만, 테이블 새로고침 중 오류가 발생했습니다.");
-      }
-
+      await fetchData(selectedYM(els.year, els.month), window.currentUser?.branch || "");
     } else {
-      alertBox(result.message || "저장 중 오류가 발생했습니다.");
+      throw new Error(data.message || "저장 실패");
     }
-
   } catch (err) {
-    console.error("❌ saveRows error:", err);
+    console.error("❌ saveRows 오류:", err);
     alertBox("저장 중 오류가 발생했습니다.");
   } finally {
     hideLoading();
