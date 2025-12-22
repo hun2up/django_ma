@@ -15,7 +15,14 @@ import os
 import logging
 from pathlib import Path
 import dj_database_url
-from decouple import config
+from decouple import Config, RepositoryEnv
+
+ENV = os.environ.get("ENV", "dev")
+
+if ENV == "prod":
+    config = Config(RepositoryEnv(".env.prod"))
+else:
+    config = Config(RepositoryEnv(".env.dev"))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,13 +31,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-default-key-for-dev")
+SECRET_KEY = config("SECRET_KEY")
+DEBUG = config("DEBUG", cast=bool, default=True)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("RENDER", None) is None
-
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.environ.get("RENDER_EXTERNAL_HOSTNAME", "django-ma.onrender.com")]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "local.ma-support.kr",
+    "ma-support.kr",
+]
 
 
 # Application definition
@@ -88,19 +97,26 @@ WSGI_APPLICATION = 'web_ma.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'incar_ma_6fjd',
-        'USER': 'incar_ma',
-        'PASSWORD': 'ci4lbQyePjiNVFTLzImq3kYAS3ENRcUo',
-        'HOST': 'dpg-d3k8lmffte5s73876dt0-a.oregon-postgres.render.com',
-        'PORT': '5432',
-        'OPTIONS': {
-            'sslmode': 'require',  # ✅ 이 줄이 SSL 인증 handshake 필수
-        },
+if ENV == "prod":
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=config("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("DB_NAME"),
+            "USER": config("DB_USER"),
+            "PASSWORD": config("DB_PASSWORD"),
+            "HOST": config("DB_HOST"),
+            "PORT": config("DB_PORT"),
+            "OPTIONS": {"client_encoding": "UTF8"},
+        }
+    }
 
 
 # Password validation
@@ -194,11 +210,10 @@ SESSION_COOKIE_SECURE = True         # HTTPS 전용 (Render는 자동 HTTPS)
 CSRF_COOKIE_SECURE = True            # CSRF 쿠키도 HTTPS 전용
 CSRF_COOKIE_HTTPONLY = True          # JS 접근 차단 (보안 강화)
 CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
-    "https://django-ma.onrender.com",
-    "https://ma-support.kr",  # 실제 배포 도메인도 함께
+    "https://local.ma-support.kr",
+    "https://ma-support.kr",
 ]
+
 
 
 # ✅ 5. 추가 옵션 (권장)
