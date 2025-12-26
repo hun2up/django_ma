@@ -1,24 +1,42 @@
 // django_ma/static/js/partner/manage_rate/dom_refs.js
 export const els = {
-  // ✅ 루트
-  root:
-    document.getElementById("manage-rate") ||
-    document.getElementById("manage-structure"),
+  get root() {
+    return document.getElementById("manage-rate");
+  },
 
-  // ✅ 상단 컨트롤
-  yearSelect: document.getElementById("yearSelect"),
-  monthSelect: document.getElementById("monthSelect"),
-  partSelect: document.getElementById("partSelect"),
-  branchSelect: document.getElementById("branchSelect"),
-  btnSearch: document.getElementById("btnSearchPeriod"),
+  get yearSelect() {
+    return document.getElementById("yearSelect");
+  },
+  get monthSelect() {
+    return document.getElementById("monthSelect");
+  },
+  get partSelect() {
+    return document.getElementById("partSelect");
+  },
+  get branchSelect() {
+    return document.getElementById("branchSelect");
+  },
+  get btnSearch() {
+    return document.getElementById("btnSearchPeriod");
+  },
 
-  // ✅ 내용입력 카드
-  inputTable: document.getElementById("inputTable"),
-  mainTable: document.getElementById("mainTable"),
-  btnAddRow: document.getElementById("btnAddRow"),
-  btnResetRows: document.getElementById("btnResetRows"),
-  btnSaveRows: document.getElementById("btnSaveRows"),
+  get inputTable() {
+    return document.getElementById("inputTable");
+  },
+  get mainTable() {
+    return document.getElementById("mainTable");
+  },
+  get btnAddRow() {
+    return document.getElementById("btnAddRow");
+  },
+  get btnResetRows() {
+    return document.getElementById("btnResetRows");
+  },
+  get btnSaveRows() {
+    return document.getElementById("btnSaveRows");
+  },
 
-  // ✅ 공용 로딩
-  loadingOverlay: document.getElementById("loadingOverlay"),
+  get loadingOverlay() {
+    return document.getElementById("loadingOverlay");
+  },
 };

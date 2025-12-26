@@ -4,9 +4,13 @@
 {% block title %}편제변경{% endblock %}
 
 {% block extra_head %}
-  <!-- ✅ DataTables CSS/JS는 HEAD 안쪽에 포함 -->
+  <!-- ✅ jQuery 먼저 -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+  <!-- ✅ DataTables + Bootstrap5 -->
   <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -19,9 +23,9 @@
     data-future-until="{{ future_select_until|default:'' }}"
     data-data-fetch-url="{{ data_fetch_url }}"
     data-data-save-url="{{ data_save_url }}"
-    data-data-delete-url="{% url 'partner:ajax_delete' %}"
+    data-data-delete-url="{{ data_delete_url }}"
     data-set-deadline-url="{{ set_deadline_url }}"
-    data-search-user-url="{{ search_user_url|default:'/board/search-user/' }}"
+    data-search-user-url="{{ search_user_url|default:'/api/accounts/search-user/' }}"
     data-update-process-date-url="{% url 'partner:ajax_update_process_date' %}">
 
   {% if user.grade not in 'superuser main_admin sub_admin' %}
@@ -171,13 +175,13 @@
           <col style="width: 4%"> <!-- 성명(대상자) -->
           <col style="width: 5%"> <!-- 사번(대상자) -->
           <col style="width: 12%"> <!-- 소속(변경전) -->
-          <col style="width: 12%"> <!-- 소속(변경후) -->
+          <col style="width: 9%"> <!-- 소속(변경후) -->
           <col style="width: 6%"> <!-- 직급(변경전) -->          
           <col style="width: 6%"> <!-- 직급(변경후) -->
           <col style="width: 4%"> <!-- OR -->
-          <col style="width: 18%"> <!-- 비고 -->
-          <col style="width: 5%"> <!-- 요청일자 -->
-          <col style="width: 5%"> <!-- 처리일자 -->
+          <col style="width: 15%"> <!-- 비고 -->
+          <col style="width: 8%"> <!-- 요청일자 -->
+          <col style="width: 8%"> <!-- 처리일자 -->
           <col style="width: 4%"> <!-- 삭제 -->
 
         </colgroup>
@@ -255,5 +259,5 @@
   window.csrfToken = "{{ csrf_token }}";
 </script>
 
-{% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
+{% include 'components/search_user_modal.html' with search_url=search_user_url|default:'/api/accounts/search-user/' %}
 {% endblock %}

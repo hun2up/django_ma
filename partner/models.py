@@ -3,6 +3,36 @@
 from django.db import models
 from accounts.models import CustomUser
 
+class RateChange(models.Model):
+    requester = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="ratechange_requests")
+    target = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="ratechange_targets")
+
+    part = models.CharField(max_length=50, default="-")
+    branch = models.CharField(max_length=50, default="-")
+    month = models.CharField(max_length=7, db_index=True)  # "YYYY-MM"
+
+    # 변경 전
+    before_ftable = models.CharField(max_length=100, blank=True, default="")
+    before_frate  = models.CharField(max_length=20,  blank=True, default="")
+    before_ltable = models.CharField(max_length=100, blank=True, default="")
+    before_lrate  = models.CharField(max_length=20,  blank=True, default="")
+
+    # 변경 후
+    after_ftable = models.CharField(max_length=100, blank=True, default="")
+    after_frate  = models.CharField(max_length=20,  blank=True, default="")
+    after_ltable = models.CharField(max_length=100, blank=True, default="")
+    after_lrate  = models.CharField(max_length=20,  blank=True, default="")
+
+    memo = models.CharField(max_length=200, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    process_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["month", "branch"]),
+        ]
 
 # ------------------------------------------------------------
 # 📘 편제 변경 (조직 관리)
@@ -28,6 +58,8 @@ class StructureChange(models.Model):
         related_name="structure_targets",
         help_text="변경 대상자"
     )
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # 🔹 소속 정보
     part = models.CharField(max_length=50, blank=True, null=True, verbose_name="부서")
