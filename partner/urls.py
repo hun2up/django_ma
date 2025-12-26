@@ -1,4 +1,5 @@
 # django_ma/partner/urls.py
+
 from django.urls import path
 from . import views
 
@@ -6,7 +7,7 @@ app_name = "partner"
 
 urlpatterns = [
     # ------------------------------------------------------------
-    # 📘 메인 페이지
+    # Pages
     # ------------------------------------------------------------
     path("", views.redirect_to_calculate, name="calculate_home"),
     path("calculate/", views.manage_calculate, name="manage_calculate"),
@@ -17,36 +18,62 @@ urlpatterns = [
     path("upload-grades-excel/", views.upload_grades_excel, name="upload_grades_excel"),
 
     # ------------------------------------------------------------
-    # 📘 공용 Ajax (편제·요율 공용)
+    # Structure Change (편제변경) - 전용 API
     # ------------------------------------------------------------
-    path("api/save/", views.ajax_save, name="ajax_save"),
-    path("api/delete/", views.ajax_delete, name="ajax_delete"),
-    path("api/fetch/", views.ajax_fetch, name="ajax_fetch"),
-    path("api/update-process-date/", views.ajax_update_process_date, name="ajax_update_process_date"),
+    path("api/structure/fetch/", views.structure_fetch, name="structure_fetch"),
+    path("api/structure/save/", views.structure_save, name="structure_save"),
+    path("api/structure/delete/", views.structure_delete, name="structure_delete"),
+    path(
+        "api/structure/update-process-date/",
+        views.ajax_update_process_date,
+        name="structure_update_process_date",
+    ),
 
     # ------------------------------------------------------------
-    # 📘 권한관리
+    # Rate Change (요율변경) - 전용 API
+    # ------------------------------------------------------------
+    path("api/rate/fetch/", views.rate_fetch, name="rate_fetch"),
+    path("api/rate/save/", views.rate_save, name="rate_save"),
+    path("api/rate/delete/", views.rate_delete, name="rate_delete"),
+
+    # ✅ 요율 처리일자 전용 alias (view는 공용 재사용)
+    path(
+        "api/rate/update-process-date/",
+        views.ajax_update_process_date,
+        name="rate_update_process_date",
+    ),
+
+    # ------------------------------------------------------------
+    # Permission Management
     # ------------------------------------------------------------
     path("api/users-data/", views.ajax_users_data, name="ajax_users_data"),
     path("api/update-level/", views.ajax_update_level, name="ajax_update_level"),
 
     # ------------------------------------------------------------
-    # 📘 공용 부서/지점 데이터
+    # Part/Branch utilities
     # ------------------------------------------------------------
-    path("ajax_fetch_parts/", views.ajax_fetch_parts, name="ajax_fetch_parts"),
-    path("ajax_fetch_branches/", views.ajax_fetch_branches, name="ajax_fetch_branches"),
+    path("ajax/fetch-parts/", views.ajax_fetch_parts, name="ajax_fetch_parts"),
+    path("ajax/fetch-branches/", views.ajax_fetch_branches, name="ajax_fetch_branches"),
 
     # ------------------------------------------------------------
-    # 📘 테이블 관리 (TableSetting)
+    # Table Setting
     # ------------------------------------------------------------
-    path("ajax_table_fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),  # ✅ index.js와 일치
-    path("ajax_table_save/", views.ajax_table_save, name="ajax_table_save"),
+    path("ajax/table-fetch/", views.ajax_table_fetch, name="ajax_table_fetch"),
+    path("ajax/table-save/", views.ajax_table_save, name="ajax_table_save"),
 
     # ------------------------------------------------------------
-    # 📘 요율 관리 (RateTable)
+    # RateTable (요율현황)
     # ------------------------------------------------------------
     path("ajax/rate-userlist/", views.ajax_rate_userlist, name="ajax_rate_userlist"),
     path("ajax/rate-userlist-excel/", views.ajax_rate_userlist_excel, name="ajax_rate_userlist_excel"),
     path("ajax/rate-userlist-upload/", views.ajax_rate_userlist_upload, name="ajax_rate_userlist_upload"),
     path("ajax/rate-user-detail/", views.ajax_rate_user_detail, name="ajax_rate_user_detail"),
+
+    # ------------------------------------------------------------
+    # Legacy aliases (편제 공용)
+    # ------------------------------------------------------------
+    path("api/fetch/", views.structure_fetch, name="ajax_fetch"),
+    path("api/save/", views.structure_save, name="ajax_save"),
+    path("api/delete/", views.structure_delete, name="ajax_delete"),
+    path("api/update-process-date/", views.ajax_update_process_date, name="ajax_update_process_date"),
 ]

@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import os
+import uuid
+
 from io import BytesIO
 from datetime import datetime, date
 
@@ -18,10 +20,14 @@ from django.contrib.staticfiles import finders
 from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import render
 from django.urls import path
+from django.conf import settings
 
 from .forms import ExcelUploadForm
 from .models import CustomUser
 from .custom_admin import custom_admin_site
+from .tasks import process_users_excel_task
+
+from django.core.cache import cache
 
 
 # ============================================================
@@ -186,105 +192,39 @@ def upload_users_from_excel_view(request):
 
     form = ExcelUploadForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(
-            request,
-            "admin/accounts/customuser/upload_excel.html",
-            {"form": form, "error": "폼이 유효하지 않습니다."},
-        )
+        return render(request, "admin/accounts/customuser/upload_excel.html", {"form": form, "error": "폼이 유효하지 않습니다."})
 
-    try:
-        excel_file = request.FILES["file"]
-        headers, ws = _load_upload_sheet(excel_file)
+    excel_file = request.FILES["file"]
 
-        results: list[list] = []
-        success_new = 0
-        success_update = 0
-        error_count = 0
-        total = 0
+    # 1) task_id 생성
+    task_id = uuid.uuid4().hex
 
-        # ✅ rows를 메모리에 올리지 않고 스트리밍 처리
-        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            total += 1
-            row_data = dict(zip(headers, row))
+    # 2) 업로드 파일을 MEDIA_ROOT 아래 임시 저장
+    temp_dir = getattr(settings, "UPLOAD_TEMP_DIR", settings.MEDIA_ROOT / "upload_temp")
+    os.makedirs(temp_dir, exist_ok=True)
 
-            user_id = _to_str(row_data.get("사번"))
-            name = _to_str(row_data.get("성명"))
+    save_name = f"accounts_upload_{task_id}_{excel_file.name}"
+    save_path = os.path.join(str(temp_dir), save_name)
 
-            if not user_id or not name:
-                results.append([idx, user_id, name, "❌ ID 또는 이름 누락"])
-                error_count += 1
-                continue
+    # Django storage로 저장(윈도우 경로 이슈 최소화)
+    # 단, default_storage는 경로가 MEDIA_ROOT 기준일 수 있어 직접 저장해도 됩니다.
+    with open(save_path, "wb") as f:
+        for chunk in excel_file.chunks():
+            f.write(chunk)
 
-            grade_raw = _to_str(row_data.get("등급")).lower()
-            grade_val = GRADE_MAP.get(grade_raw, "basic")
+    # 3) cache 초기화
+    cache.set(f"upload_progress:{task_id}", 0, timeout=60*60)
+    cache.set(f"upload_status:{task_id}", "PENDING", timeout=60*60)
 
-            status_val = _to_str(row_data.get("상태")) or "재직"
-            is_superuser = grade_val == "superuser"
-            is_staff = grade_val in {"superuser", "main_admin", "sub_admin"}
+    # 4) Celery task 실행 (즉시 반환)
+    process_users_excel_task.delay(task_id=task_id, file_path=save_path, batch_size=500)
 
-            # ✅ IS_ACTIVE / is_active 둘 다 지원
-            is_active_cell = row_data.get("IS_ACTIVE")
-            if is_active_cell is None:
-                is_active_cell = row_data.get("is_active")
-            is_active = parse_bool(is_active_cell, default=True)
-
-            defaults = dict(
-                name=name,
-                channel=_to_str(row_data.get("채널")),
-                part=_to_str(row_data.get("부서")),
-                branch=_to_str(row_data.get("지점")),
-                grade=grade_val,
-                status=status_val,
-                regist=_to_str(row_data.get("손생등록여부")),
-                birth=parse_date(row_data.get("생년월일")),
-                enter=parse_date(row_data.get("입사일")),
-                quit=parse_date(row_data.get("퇴사일")),
-                is_active=is_active,
-                is_staff=is_staff,
-                is_superuser=is_superuser,
-            )
-
-            try:
-                user = CustomUser.objects.filter(id=user_id).first()
-                if user:
-                    for k, v in defaults.items():
-                        setattr(user, k, v)
-                    user.save()
-                    success_update += 1
-                    results.append([idx, user_id, name, "✅ 기존 업데이트"])
-                else:
-                    CustomUser.objects.create_user(
-                        id=user_id,
-                        password=_to_str(row_data.get("비밀번호")) or user_id,
-                        **defaults,
-                    )
-                    success_new += 1
-                    results.append([idx, user_id, name, "🟢 신규 등록"])
-
-            except Exception as e:
-                error_count += 1
-                results.append([idx, user_id, name, f"❌ 오류: {e}"])
-
-        result_wb = _make_upload_result_workbook(
-            results=results,
-            total=total,
-            new_cnt=success_new,
-            upd_cnt=success_update,
-            err_cnt=error_count,
-        )
-
-        output = BytesIO()
-        result_wb.save(output)
-        output.seek(0)
-
-        filename = f"upload_result_{datetime.now():%Y%m%d_%H%M}.xlsx"
-        response = HttpResponse(output.getvalue(), content_type=EXCEL_CONTENT_TYPE)
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        return response
-
-    except Exception as e:
-        messages.error(request, f"Excel 파일 처리 중 오류: {e}")
-        return render(request, "admin/accounts/customuser/upload_excel.html", {"form": ExcelUploadForm()})
+    # 5) 같은 템플릿을 다시 렌더하고 task_id를 내려줘서 진행률 폴링 시작
+    return render(request, "admin/accounts/customuser/upload_excel.html", {
+        "form": ExcelUploadForm(),
+        "task_id": task_id,
+        "message": "업로드 작업을 시작했습니다. 진행률을 확인하세요.",
+    })
 
 
 # ============================================================
@@ -315,6 +255,12 @@ def upload_excel_template_view(request):
         filename=TEMPLATE_DOWNLOAD_NAME,
     )
 
+
+def upload_users_result_view(request, task_id: str):
+    path = cache.get(f"upload_result_path:{task_id}")
+    if not path or not os.path.exists(path):
+        raise Http404("결과 파일을 찾을 수 없습니다.")
+    return FileResponse(open(path, "rb"), as_attachment=True, filename=os.path.basename(path))
 
 # ============================================================
 # ✅ 관리자 페이지 커스터마이징
@@ -378,6 +324,11 @@ class CustomUserAdmin(UserAdmin):
                 "upload-template/",
                 self.admin_site.admin_view(upload_excel_template_view),
                 name="upload_excel_template",
+            ),
+            path(
+                "upload-result/<str:task_id>/",
+                self.admin_site.admin_view(upload_users_result_view),
+                name="upload_users_result",
             ),
         ]
         return custom_urls + urls

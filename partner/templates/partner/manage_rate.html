@@ -5,35 +5,28 @@
 
 {% block extra_head %}
 <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4" id="manage-rate"
-    data-user-grade="{{ user.grade }}"
-    data-current-year="{{ current_year|default:''|default_if_none:'' }}{% if not current_year %}{% now 'Y' %}{% endif %}"
-    data-current-month="{{ current_month|default:''|default_if_none:'' }}{% if not current_month %}{% now 'n' %}{% endif %}"
+  <div class="container-fluid mt-4" id="manage-rate"
+    data-user-grade="{{ user.grade|default:'' }}"
+    data-default-branch="{{ user.branch|default:'' }}"
     data-selected-year="{% firstof selected_year current_year %}"
     data-selected-month="{% firstof selected_month current_month %}"
-    data-default-branch="{{ user.branch }}"
-    data-data-fetch-url="{{ data_fetch_url }}"
-    data-data-save-url="{{ data_save_url }}"
-    data-data-delete-url="{{ data_delete_url }}"
-    data-user-level="{{ user.level|default:'' }}"
-    data-team-a="{{ user.team_a|default:'' }}"
-    data-team-b="{{ user.team_b|default:'' }}"
-    data-team-c="{{ user.team_c|default:'' }}">
-
-    <script>
-      window.currentUser = {
-        id: "{{ user.id|default:'' }}",
-        name: "{{ user.name|default:'' }}",
-        branch: "{{ user.branch|default:'' }}",
-        part: "{{ user.part|default:'' }}",
-        grade: "{{ user.grade|default:'' }}",
-      };
-      window.csrfToken = "{{ csrf_token }}";
-    </script>
+    data-fetch-url="{% url 'partner:rate_fetch' %}"
+    data-save-url="{% url 'partner:rate_save' %}"
+    data-delete-url="{% url 'partner:rate_delete' %}"
+    data-table-fetch-url="{% url 'partner:ajax_table_fetch' %}"
+    data-target-detail-url="{% url 'partner:ajax_rate_user_detail' %}"
+    data-update-process-date-url="{% url 'partner:rate_update_process_date' %}"
+    data-user-level="{{ subadmin_info.level|default:'' }}"
+    data-team-a="{{ subadmin_info.team_a|default:'' }}"
+    data-team-b="{{ subadmin_info.team_b|default:'' }}"
+    data-team-c="{{ subadmin_info.team_c|default:'' }}"
+    >
 
   {% if user.grade not in 'superuser main_admin sub_admin' %}
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
@@ -232,10 +225,10 @@
   </div>
 </div>
 
-<!-- 공통 스크립트 -->
-<script src="{% static 'js/common/part_branch_selector.js' %}?v={{ now|date:'U' }}"></script>
-<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={{ now|date:'U' }}"></script>
-<script type="module" src="{% static 'js/partner/manage_rate/index.js' %}?v={{ now|date:'U' }}"></script>
+{% now "U" as cache_bust %}
+<script src="{% static 'js/common/part_branch_selector.js' %}?v={{ cache_bust }}"></script>
+<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={{ cache_bust }}"></script>
+<script type="module" src="{% static 'js/partner/manage_rate/index.js' %}?v={{ cache_bust }}"></script>
 
 <!-- ✅ Boot 데이터 -->
 <script>
@@ -246,9 +239,6 @@
     selectedYear: {{ selected_year|default:0 }},
     selectedMonth: {{ selected_month|default:0 }},
     autoLoad: {{ auto_load|yesno:"true,false" }},
-    dataFetchUrl: "{{ data_fetch_url|default:'' }}",
-    dataSaveUrl: "{{ data_save_url|default:'' }}",
-    dataDeleteUrl: "{{ data_delete_url|default:'' }}",
   };
 </script>
 
@@ -259,6 +249,8 @@
     part: "{{ user.part|default:''|escapejs }}",
     branch: "{{ user.branch|default:''|escapejs }}",
     grade: "{{ user.grade|default:''|escapejs }}",
+
+    // ✅ SubAdminTemp 기준
     level: "{{ subadmin_info.level|default:''|escapejs }}",
     team_a: "{{ subadmin_info.team_a|default:''|escapejs }}",
     team_b: "{{ subadmin_info.team_b|default:''|escapejs }}",

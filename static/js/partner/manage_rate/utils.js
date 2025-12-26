@@ -1,4 +1,4 @@
-// django_ma/static/js/partner/manage_structure/utils.js
+// django_ma/static/js/partner/manage_rate/utils.js
 
 export function showLoading(msg = "처리 중...") {
   const overlay = document.getElementById("loadingOverlay");
@@ -15,19 +15,22 @@ export function hideLoading() {
 }
 
 export function alertBox(msg) {
-  // 그냥 alert로
   window.alert(msg);
 }
 
 export function getCSRFToken() {
-  return (
-    window.csrfToken ||
-    document.cookie.match(/csrftoken=([^;]+)/)?.[1] ||
-    ""
-  );
+  return window.csrfToken || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";
 }
 
 export function pad2(n) {
   n = Number(n);
   return n < 10 ? "0" + n : String(n);
+}
+
+// ✅ save/delete에서 공통으로 쓰는 YYYY-MM
+export function selectedYM(yearSelectEl, monthSelectEl) {
+  const y = yearSelectEl?.value;
+  const m = monthSelectEl?.value;
+  if (!y || !m) return "";
+  return `${y}-${pad2(m)}`;
 }

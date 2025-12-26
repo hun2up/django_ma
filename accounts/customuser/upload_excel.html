@@ -1,0 +1,51 @@
+{% if task_id %}
+<div class="mt-3">
+  <div class="progress" style="height: 20px;">
+    <div id="progBar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+  </div>
+  <div class="mt-2">
+    <span id="progText">처리 중...</span>
+  </div>
+  <div class="mt-3">
+    <a id="downloadBtn" class="btn btn-success disabled" href="#" aria-disabled="true">결과 다운로드</a>
+  </div>
+  <div class="text-danger mt-2" id="errText"></div>
+</div>
+
+<script>
+(function(){
+  const taskId = "{{ task_id }}";
+  const bar = document.getElementById("progBar");
+  const text = document.getElementById("progText");
+  const err = document.getElementById("errText");
+  const btn = document.getElementById("downloadBtn");
+
+  async function tick(){
+    const res = await fetch(`/accounts/upload-progress/?task_id=${taskId}`, {cache:"no-store"});
+    const data = await res.json();
+
+    const p = data.percent ?? 0;
+    bar.style.width = p + "%";
+    bar.textContent = p + "%";
+
+    text.textContent = `${data.status} (${p}%)`;
+
+    if (data.status === "FAILURE") {
+      err.textContent = data.error || "처리 실패";
+      return; // stop
+    }
+
+    if (data.status === "SUCCESS" && data.download_url) {
+      btn.href = data.download_url;
+      btn.classList.remove("disabled");
+      btn.removeAttribute("aria-disabled");
+      text.textContent = "완료! 결과 파일을 다운로드하세요.";
+      return; // stop
+    }
+
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
+{% endif %}

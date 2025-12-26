@@ -1,4 +1,5 @@
 # django_ma/partner/apps.py
+
 from django.apps import AppConfig
 
 

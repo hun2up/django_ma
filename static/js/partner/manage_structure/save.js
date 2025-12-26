@@ -25,6 +25,7 @@ export async function saveRows() {
     payload.push({
       requester_id: rq_id,
       target_id: tg_id,
+      tg_rank: row.querySelector("[name='tg_rank']")?.value.trim() || "",
       chg_branch: row.querySelector("[name='chg_branch']")?.value.trim() || "",
       or_flag: row.querySelector("[name='or_flag']")?.checked || false,
       chg_rank: row.querySelector("[name='chg_rank']")?.value.trim() || "",

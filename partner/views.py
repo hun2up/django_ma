@@ -4,113 +4,174 @@ import io
 import json
 import traceback
 from datetime import datetime
-from decimal import Decimal
-import pandas as pd
 
-from django.core.paginator import Paginator
-from django.core.files.storage import default_storage
+import pandas as pd
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_GET, require_POST
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .models import StructureChange, PartnerChangeLog, StructureDeadline, SubAdminTemp, TableSetting, RateTable
-
+from .models import (
+    PartnerChangeLog,
+    RateChange,
+    RateTable,
+    StructureChange,
+    SubAdminTemp,
+    TableSetting,
+)
 
 # ------------------------------------------------------------
 # 공용 상수
 # ------------------------------------------------------------
-BRANCH_PARTS = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"]
+BRANCH_PARTS = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부", "MA사업5부"]
 
 
 # ------------------------------------------------------------
-# 📘 기본 페이지 리디렉션
+# 공용 유틸
+# ------------------------------------------------------------
+def normalize_month(month: str) -> str:
+    month = (month or "").strip()
+    if not month:
+        return ""
+    if "-" in month:
+        try:
+            y, m = month.split("-")
+            return f"{y}-{int(m):02d}"
+        except Exception:
+            return month
+    # 혹시 202501 같은 값이 오면 보정
+    digits = "".join([c for c in month if c.isdigit()])
+    if len(digits) == 6:
+        return f"{digits[:4]}-{digits[4:6]}"
+    return month
+
+
+def parse_yyyy_mm_dd_or_none(value: str):
+    v = (value or "").strip()
+    if not v:
+        return None
+    return datetime.strptime(v, "%Y-%m-%d").date()
+
+
+def build_affiliation_display(user: CustomUser) -> str:
+    """
+    표기 규칙:
+    - team_a가 없거나 '-'면: user.branch 표기
+    - team_a가 있으면: 'team_a team_b team_c' (단, team_b/team_c가 '-'면 제외)
+    """
+    def clean(x: str) -> str:
+        x = (x or "").strip()
+        return "" if x == "-" else x
+
+    branch = clean(getattr(user, "branch", "")) or "-"
+
+    sa = SubAdminTemp.objects.filter(user=user).first()
+    if not sa:
+        return branch
+
+    team_a = clean(getattr(sa, "team_a", ""))
+    team_b = clean(getattr(sa, "team_b", ""))
+    team_c = clean(getattr(sa, "team_c", ""))
+
+    if not team_a:
+        return branch
+
+    parts = [p for p in [team_a, team_b, team_c] if p]
+    return " ".join(parts) if parts else branch
+
+
+def find_table_rate(branch: str, table_name: str) -> str:
+    if not table_name:
+        return ""
+    ts = (
+        TableSetting.objects.filter(branch=branch, table_name=table_name)
+        .order_by("order")
+        .first()
+    )
+    return (ts.rate or "") if ts else ""
+
+
+# ------------------------------------------------------------
+# Pages
 # ------------------------------------------------------------
 @login_required
 def redirect_to_calculate(request):
-    """기본 수수료 페이지 접속 시 → 채권관리 페이지로 리다이렉트"""
     return redirect("partner:manage_calculate")
 
 
 @login_required
-@grade_required(['superuser', 'main_admin', 'sub_admin'])
+@grade_required(["superuser", "main_admin", "sub_admin"])
 def manage_calculate(request):
-    """지점효율 (제작중)"""
     return render(request, "partner/manage_calculate.html")
 
 
-# ------------------------------------------------------------
-# 📘 요율변경 요청 페이지
-# ------------------------------------------------------------
 @login_required
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def manage_rate(request):
-    """요율변경 요청 페이지"""
     now = datetime.now()
-    current_year = now.year
-    current_month = now.month
-
-    context = {
-        "current_year": current_year,
-        "current_month": current_month,
-        "selected_year": current_year,
-        "selected_month": current_month,
-        "auto_load": True,  # sub_admin 자동조회
-        # ✅ JS가 참조할 URL들
-        "data_fetch_url": "/partner/api/fetch/",
-        "data_save_url": "/partner/api/save/",
-        "data_delete_url": "/partner/api/delete/",
-    }
-    return render(request, "partner/manage_rate.html", context)
-
-
-# ------------------------------------------------------------
-# 📘 테이블 관리 페이지
-# ------------------------------------------------------------
-@login_required
-@grade_required(['superuser', 'main_admin'])
-def manage_tables(request):
-    """테이블관리 (제작중)"""
-    return render(request, "partner/manage_tables.html")
-
-
-# ------------------------------------------------------------
-# 📘 편제변경 메인 페이지
-# ------------------------------------------------------------
-@login_required
-@grade_required(["superuser", "main_admin", "sub_admin"])
-def manage_charts(request):
-    """편제변경 메인 페이지"""
-    now = datetime.now()
-    month_str = f"{now.year}-{now.month:02d}"
     user = request.user
-
-    selected_branch = None
     subadmin_info = SubAdminTemp.objects.filter(user=user).first()
-    if user.grade == "main_admin" and user.branch:
-        selected_branch = user.branch
 
     context = {
         "current_year": now.year,
         "current_month": now.month,
         "selected_year": now.year,
         "selected_month": now.month,
-        "available_periods": [f"{now.year}-{m:02d}" for m in range(1, now.month + 1)],
-        "future_select_until": (
-            f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01"
-        ),
+        "auto_load": True,
+
+        # ✅ 템플릿에서 subadmin_info를 쓰고 있음(누락되면 data- 속성들이 비거나 에러)
+        "subadmin_info": subadmin_info,
+
+        # ✅ JS가 참조할 URL들
+        "data_fetch_url": reverse("partner:rate_fetch"),
+        "data_save_url": reverse("partner:rate_save"),
+        "data_delete_url": reverse("partner:rate_delete"),
+
+        # ✅ 처리일자 업데이트 URL(요율 전용 alias 권장)
+        "update_process_date_url": reverse("partner:ajax_update_process_date"),
+    }
+    return render(request, "partner/manage_rate.html", context)
+
+
+@login_required
+@grade_required(["superuser", "main_admin"])
+def manage_tables(request):
+    return render(request, "partner/manage_tables.html")
+
+
+@login_required
+@grade_required(["superuser", "main_admin", "sub_admin"])
+def manage_charts(request):
+    now = datetime.now()
+    user = request.user
+
+    selected_branch = None
+    if user.grade == "main_admin" and user.branch:
+        selected_branch = user.branch
+
+    subadmin_info = SubAdminTemp.objects.filter(user=user).first()
+
+    context = {
+        "current_year": now.year,
+        "current_month": now.month,
+        "selected_year": now.year,
+        "selected_month": now.month,
         "branches": BRANCH_PARTS,
         "selected_branch": selected_branch,
-        "data_fetch_url": "/partner/api/fetch/",
-        "data_save_url": "/partner/api/save/",
-        "data_delete_url": "/partner/api/delete/",
-        "set_deadline_url": "/partner/api/set-deadline/",
+
+        # ✅ 가능하면 reverse로 통일(하지만 기존 JS 호환 위해 legacy도 유지)
+        "data_fetch_url": reverse("partner:structure_fetch"),
+        "data_save_url": reverse("partner:structure_save"),
+        "data_delete_url": reverse("partner:structure_delete"),
+        "update_process_date_url": reverse("partner:structure_update_process_date"),
+
         "auto_load": user.grade in ["main_admin", "sub_admin"],
         "subadmin_info": subadmin_info,
     }
@@ -118,53 +179,56 @@ def manage_charts(request):
 
 
 # ------------------------------------------------------------
-# 📘 AJAX — 데이터 저장 (공용)
+# Structure (편제) - 공용 save/delete/fetch
 # ------------------------------------------------------------
 @require_POST
 @grade_required(["superuser", "main_admin", "sub_admin"])
 @transaction.atomic
 def ajax_save(request):
-    """AJAX — 대상자 입력내용 저장"""
     try:
-        payload = json.loads(request.body)
+        payload = json.loads(request.body or "{}")
         items = payload.get("rows", [])
-        month = (payload.get("month") or "").strip()
-        if month and "-" in month:
-            y, m = month.split("-")
-            month = f"{y}-{int(m):02d}"
+        month = normalize_month(payload.get("month") or "")
 
         user = request.user
-        part = payload.get("part") or getattr(user, "part", "") or "-"
-        branch = payload.get("branch") or getattr(user, "branch", "") or "-"
+        part = (payload.get("part") or getattr(user, "part", "") or "-").strip()
+        branch = (payload.get("branch") or getattr(user, "branch", "") or "-").strip()
         if user.grade in ["main_admin", "sub_admin"]:
-            branch = getattr(user, "branch", "") or branch
+            branch = (getattr(user, "branch", "") or branch).strip()
 
         created_count = 0
         for row in items:
-            target = CustomUser.objects.filter(id=row.get("target_id")).first()
+            target_id = str(row.get("target_id") or "").strip()
+            if not target_id:
+                continue
+
+            target = CustomUser.objects.filter(id=target_id).first()
             if not target:
                 continue
+
+            display_branch = build_affiliation_display(target)
+
             StructureChange.objects.create(
                 requester=user,
                 target=target,
                 part=part,
                 branch=branch,
-                target_branch=getattr(target, "branch", "") or "-",
-                chg_branch=row.get("chg_branch") or "-",
-                or_flag=row.get("or_flag", False),
-                rank=row.get("tg_rank") or "-",
-                chg_rank=row.get("chg_rank") or "-",
-                memo=row.get("memo") or "",
                 month=month,
+
+                target_branch=display_branch,
+                chg_branch=(row.get("chg_branch") or "-").strip() or "-",
+                or_flag=bool(row.get("or_flag", False)),
+                rank=(row.get("tg_rank") or "-").strip() or "-",
+                chg_rank=(row.get("chg_rank") or "-").strip() or "-",
+                memo=(row.get("memo") or "").strip(),
             )
             created_count += 1
 
         PartnerChangeLog.objects.create(
             user=user,
             action="save",
-            detail=f"{created_count}건 저장 (월도: {month}, 부서: {part}, 지점: {branch})",
+            detail=f"{created_count}건 저장 (structure / 월도:{month} / 부서:{part} / 지점:{branch})",
         )
-
         return JsonResponse({"status": "success", "saved_count": created_count})
 
     except Exception as e:
@@ -172,14 +236,10 @@ def ajax_save(request):
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
-# ------------------------------------------------------------
-# 📘 AJAX — 데이터 삭제
-# ------------------------------------------------------------
 @require_POST
 @grade_required(["superuser", "main_admin", "sub_admin"])
 @transaction.atomic
 def ajax_delete(request):
-    """AJAX — 편제변경/요율변경 행 삭제"""
     try:
         data = json.loads(request.body or "{}")
         record_id = data.get("id")
@@ -188,94 +248,101 @@ def ajax_delete(request):
 
         record = get_object_or_404(StructureChange, id=record_id)
         user = request.user
-        if not (
-            user.grade in ["superuser", "main_admin"] or record.requester_id == user.id
-        ):
+
+        if not (user.grade in ["superuser", "main_admin"] or record.requester_id == user.id):
             return JsonResponse({"status": "error", "message": "삭제 권한이 없습니다."}, status=403)
 
         deleted_id = record.id
         record.delete()
+
         PartnerChangeLog.objects.create(
             user=user, action="delete", detail=f"StructureChange #{deleted_id} 삭제"
         )
         return JsonResponse({"status": "success", "message": f"#{deleted_id} 삭제 완료"})
+
     except Exception as e:
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
-# ------------------------------------------------------------
-# 📘 AJAX — 데이터 조회 (fetch)
-# ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_fetch(request):
-    """AJAX — 편제변경/요율변경 데이터 조회"""
     try:
         user = request.user
-        month = (request.GET.get("month") or "").strip()
+        month = normalize_month(request.GET.get("month") or "")
         branch = (request.GET.get("branch") or "").strip()
 
-        if month and "-" in month:
-            y, m = month.split("-")
-            month = f"{y}-{int(m):02d}"
-
         qs = StructureChange.objects.filter(month=month).select_related("requester", "target")
-        if user.grade == "superuser" and branch:
-            qs = qs.filter(branch__iexact=branch)
-        elif user.grade == "main_admin":
-            qs = qs.filter(branch__iexact=user.branch)
-        elif user.grade == "sub_admin":
+
+        if user.grade == "superuser":
+            if branch:
+                qs = qs.filter(branch__iexact=branch)
+        else:
             qs = qs.filter(branch__iexact=user.branch)
 
-        rows = [
-            {
-                "id": sc.id,
-                "requester_id": getattr(sc.requester, "id", ""),
-                "requester_name": getattr(sc.requester, "name", ""),
-                "requester_branch": getattr(sc.requester, "branch", ""),
-                "target_id": getattr(sc.target, "id", ""),
-                "target_name": getattr(sc.target, "name", ""),
-                "table_before": getattr(sc, "branch", ""),
-                "table_after": getattr(sc, "chg_branch", ""),
-                "rate_before": getattr(sc, "rank", ""),
-                "rate_after": getattr(sc, "chg_rank", ""),
-                "memo": sc.memo or "",
-                "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
-            }
-            for sc in qs
-        ]
+        rows = []
+        for sc in qs:
+            rows.append(
+                {
+                    "id": sc.id,
+                    "requester_id": getattr(sc.requester, "id", ""),
+                    "requester_name": getattr(sc.requester, "name", ""),
+                    "requester_branch": build_affiliation_display(sc.requester),
+                    "target_id": getattr(sc.target, "id", ""),
+                    "target_name": getattr(sc.target, "name", ""),
+                    "target_branch": sc.target_branch or "",
+                    "chg_branch": sc.chg_branch or "",
+                    "rank": sc.rank or "",
+                    "chg_rank": sc.chg_rank or "",
+                    "or_flag": bool(sc.or_flag),
+                    "memo": sc.memo or "",
+                    "request_date": sc.created_at.strftime("%Y-%m-%d") if sc.created_at else "",
+                    "process_date": sc.process_date.strftime("%Y-%m-%d") if sc.process_date else "",
+                }
+            )
+
         return JsonResponse({"status": "success", "rows": rows})
+
     except Exception as e:
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e), "rows": []}, status=500)
 
 
 # ------------------------------------------------------------
-# 주요 코드 구분 주석
-# ------------------------------------------------------------
-
-
-# ------------------------------------------------------------
-# 📘 4. 편제변경 — 처리일자 수정
+# 처리일자 수정(편제/요율 공용) - ✅ 핵심
 # ------------------------------------------------------------
 @require_POST
 @grade_required(["superuser", "main_admin"])
 @transaction.atomic
 def ajax_update_process_date(request):
-    """AJAX — 메인시트 처리일자 수정"""
+    """AJAX — 메인시트 처리일자 수정 (편제/요율 공용)"""
     try:
-        payload = json.loads(request.body)
+        payload = json.loads(request.body or "{}")
+
         record_id = payload.get("id")
-        new_date = payload.get("process_date")
+        new_date = (payload.get("process_date") or "").strip()
+        kind = (payload.get("type") or payload.get("kind") or "structure").strip().lower()  # rate|structure
 
-        record = get_object_or_404(StructureChange, id=record_id)
+        if not record_id:
+            return JsonResponse({"status": "error", "message": "id 누락"}, status=400)
 
-        # YYYY-MM-DD 형식 검증
-        try:
-            parsed_date = datetime.strptime(new_date, "%Y-%m-%d").date()
-        except ValueError:
-            return JsonResponse({"status": "error", "message": "날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)"}, status=400)
+        # 빈값이면 None 처리(삭제)
+        if new_date == "":
+            parsed_date = None
+        else:
+            try:
+                parsed_date = parse_yyyy_mm_dd_or_none(new_date)
+            except ValueError:
+                return JsonResponse(
+                    {"status": "error", "message": "날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)"},
+                    status=400,
+                )
+
+        if kind == "rate":
+            record = get_object_or_404(RateChange, id=record_id)
+        else:
+            record = get_object_or_404(StructureChange, id=record_id)
 
         record.process_date = parsed_date
         record.save(update_fields=["process_date"])
@@ -283,10 +350,14 @@ def ajax_update_process_date(request):
         PartnerChangeLog.objects.create(
             user=request.user,
             action="update_process_date",
-            detail=f"ID {record_id} 처리일자 수정 → {new_date}",
+            detail=f"[{kind}] ID {record_id} 처리일자 수정 → {new_date or 'NULL'}",
         )
 
-        return JsonResponse({"status": "success", "message": f"처리일자 {new_date}로 변경 완료"})
+        return JsonResponse({
+            "status": "success",
+            "message": "처리일자 변경 완료",
+            "process_date": new_date,  # 프론트 동기화용
+        })
 
     except Exception as e:
         traceback.print_exc()
@@ -294,99 +365,75 @@ def ajax_update_process_date(request):
 
 
 # ------------------------------------------------------------
-# 📘 권한관리 페이지 (조회 전용 버전)
+# 권한관리
 # ------------------------------------------------------------
-# partner/views.py
 @login_required
 @grade_required(["superuser", "main_admin"])
 def manage_grades(request):
-    """권한관리 페이지"""
     user = request.user
-    selected_part = request.GET.get("part", "").strip() or None
+    selected_part = (request.GET.get("part") or "").strip() or None
     parts = ["MA사업1부", "MA사업2부", "MA사업3부", "MA사업4부"]
 
-    base_user_qs = CustomUser.objects.filter(grade="sub_admin")
-    
-    # ✅ 중간관리자(SubAdminTemp)
+    base_sub_admin_users = CustomUser.objects.filter(grade="sub_admin")
+
     if user.grade == "superuser":
-        if selected_part:
-            subadmin_qs = SubAdminTemp.objects.filter(part=selected_part, user__in=base_user_qs)
-        else:
-            subadmin_qs = SubAdminTemp.objects.none()  # 선택 전엔 빈 상태
-    elif user.grade == "main_admin":
+        subadmin_qs = (
+            SubAdminTemp.objects.filter(part=selected_part, user__in=base_sub_admin_users)
+            if selected_part
+            else SubAdminTemp.objects.none()
+        )
+        users_all = (
+            CustomUser.objects.filter(part=selected_part)
+            if selected_part
+            else CustomUser.objects.none()
+        )
+    else:
         selected_part = user.branch
-        subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch, user__in=base_user_qs)
-    else:
-        subadmin_qs = SubAdminTemp.objects.none()
-
-    # ✅ 전체 사용자(CustomUser)
-    if user.grade == "superuser":
-        if selected_part:
-            users_all = CustomUser.objects.filter(part=selected_part)
-        else:
-            users_all = CustomUser.objects.none()  # 선택 전엔 빈 상태
-    elif user.grade == "main_admin":
+        subadmin_qs = SubAdminTemp.objects.filter(branch=user.branch, user__in=base_sub_admin_users)
         users_all = CustomUser.objects.filter(branch=user.branch)
-    else:
-        users_all = CustomUser.objects.none()
 
-    empty_message_subadmin = ""
-    if not subadmin_qs.exists():
-        empty_message_subadmin = "표시할 중간관리자가 없습니다."
-
+    empty_message_subadmin = "" if subadmin_qs.exists() else "표시할 중간관리자가 없습니다."
     LEVELS = ["-", "A레벨", "B레벨", "C레벨"]
 
-    return render(request, "partner/manage_grades.html", {
-        "parts": parts,
-        "selected_part": selected_part,
-        "users_subadmin": subadmin_qs,
-        "users_all": users_all,
-        "empty_message_subadmin": empty_message_subadmin,
-        "levels": LEVELS,
-    })
+    return render(
+        request,
+        "partner/manage_grades.html",
+        {
+            "parts": parts,
+            "selected_part": selected_part,
+            "users_subadmin": subadmin_qs,
+            "users_all": users_all,
+            "empty_message_subadmin": empty_message_subadmin,
+            "levels": LEVELS,
+        },
+    )
 
 
-# ------------------------------------------------------------
-# 📘 권한관리 — 엑셀 업로드 처리 (조회 외 유일 수정 기능)
-# ------------------------------------------------------------
 @transaction.atomic
 @login_required
 def upload_grades_excel(request):
-    """
-    ✅ 엑셀 업로드를 통한 전체설계사 명단(allUserTable) 갱신
-    - SubAdminTemp(=allUserTable 저장소)에만 반영
-    - CustomUser는 수정하지 않음
-    - 이후 중간관리자(subAdminTable)는 CustomUser.grade=sub_admin 필터로 SubAdminTemp와 매칭
-    """
     if request.method == "POST" and request.FILES.get("excel_file"):
         file = request.FILES["excel_file"]
-
         try:
-            # 📘 '업로드' 시트에서 읽기
             df = pd.read_excel(file, sheet_name="업로드").fillna("")
-
             required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
             for col in required_cols:
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
                     return redirect("partner:manage_grades")
 
-            # ✅ 부서/지점/등급은 무시
-            ignore_cols = ["부서", "지점", "등급"]
-            for col in ignore_cols:
+            for col in ["부서", "지점", "등급"]:
                 if col in df.columns:
                     df = df.drop(columns=[col])
 
             updated, created = 0, 0
-
             for _, row in df.iterrows():
                 user_id = str(row["사번"]).strip()
                 cu = CustomUser.objects.filter(id=user_id).first()
                 if not cu:
-                    continue  # 존재하지 않는 사번은 스킵
+                    continue
 
-                # ✅ 전체사용자(allUserTable = SubAdminTemp)에 업데이트
-                obj, is_created = SubAdminTemp.objects.update_or_create(
+                _, is_created = SubAdminTemp.objects.update_or_create(
                     user=cu,
                     defaults={
                         "part": cu.part or "-",
@@ -406,50 +453,47 @@ def upload_grades_excel(request):
             messages.success(request, f"업로드 완료: 신규 {created}건, 수정 {updated}건 반영")
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
             messages.error(request, f"엑셀 처리 중 오류 발생: {e}")
-
     else:
         messages.warning(request, "엑셀 파일을 선택하세요.")
 
     return redirect("partner:manage_grades")
 
 
-# ------------------------------------------------------------
-# 📘 권한관리 — 전체 사용자 Ajax 조회 (조회 전용)
-# ------------------------------------------------------------
 @login_required
 def ajax_users_data(request):
-    """
-    DataTables 서버사이드 조회 전용
-    ------------------------------------------------------------
-    수정 불가, 조회 전용 버전
-    ------------------------------------------------------------
-    """
     user = request.user
-    start = int(request.GET.get("start", 0))
-    length = int(request.GET.get("length", 10))
-    search = request.GET.get("search[value]", "").strip()
-    selected_part = request.GET.get("part", "").strip() or None
+
+    try:
+        start = max(int(request.GET.get("start", 0)), 0)
+    except ValueError:
+        start = 0
+
+    try:
+        length = int(request.GET.get("length", 10))
+        if length <= 0:
+            length = 10
+    except ValueError:
+        length = 10
+
+    search = (request.GET.get("search[value]", "") or "").strip()
+    selected_part = (request.GET.get("part", "") or "").strip() or None
 
     if user.grade == "superuser":
-        qs = CustomUser.objects.all()
+        base_qs = CustomUser.objects.all()
         if selected_part:
-            qs = qs.filter(part=selected_part)
+            base_qs = base_qs.filter(part=selected_part)
     elif user.grade == "main_admin":
-        qs = CustomUser.objects.filter(branch=user.branch)
+        base_qs = CustomUser.objects.filter(branch=user.branch)
     else:
-        return JsonResponse({
-            "data": [],
-            "recordsTotal": 0,
-            "recordsFiltered": 0
-    })
+        return JsonResponse({"data": [], "recordsTotal": 0, "recordsFiltered": 0})
 
-    # ✅ 검색 조건 추가 (팀A/B/C까지 포함)
+    records_total = base_qs.count()
+    qs = base_qs
+
     if search:
-        # 먼저 CustomUser 기준 필터링
-        user_ids_from_custom = list(
+        ids_from_custom = list(
             qs.filter(
                 Q(name__icontains=search)
                 | Q(id__icontains=search)
@@ -457,9 +501,7 @@ def ajax_users_data(request):
                 | Q(part__icontains=search)
             ).values_list("id", flat=True)
         )
-
-        # 그 다음 SubAdminTemp(팀/직급)에서 검색되는 user_id 추출
-        user_ids_from_subadmin = list(
+        ids_from_subadmin = list(
             SubAdminTemp.objects.filter(
                 Q(team_a__icontains=search)
                 | Q(team_b__icontains=search)
@@ -467,57 +509,46 @@ def ajax_users_data(request):
                 | Q(position__icontains=search)
             ).values_list("user_id", flat=True)
         )
+        combined_ids = set(ids_from_custom) | set(ids_from_subadmin)
+        qs = qs.filter(id__in=combined_ids)
 
-        # 두 결과를 합쳐서 중복 제거
-        combined_user_ids = set(user_ids_from_custom + user_ids_from_subadmin)
+    records_filtered = qs.count()
+    qs = qs.order_by("name", "id")
+    page_qs = qs.only("id", "name", "branch", "part")[start : start + length]
 
-        qs = qs.filter(id__in=combined_user_ids)
-
-    # ✅ 페이징 처리
-    total_count = qs.count()
-    paginator = Paginator(qs.only("id", "name", "branch", "part", "grade")[:2000], length)
-    page_number = start // length + 1
-    page = paginator.get_page(page_number)
-
-    # ✅ SubAdminTemp 매핑 (팀A/B/C/직급 정보 포함)
+    page_ids = [u.id for u in page_qs]
     subadmin_map = {
         str(sa.user_id): {
-            "position": sa.position or "",
-            "team_a": sa.team_a or "",
-            "team_b": sa.team_b or "",
-            "team_c": sa.team_c or "",
+            "position": sa.position or "-",
+            "team_a": sa.team_a or "-",
+            "team_b": sa.team_b or "-",
+            "team_c": sa.team_c or "-",
         }
-        for sa in SubAdminTemp.objects.filter(user_id__in=[u.id for u in page])
+        for sa in SubAdminTemp.objects.filter(user_id__in=page_ids)
     }
 
-    # ✅ DataTables JSON 변환
     data = []
-    for u in page:
-        sa_info = subadmin_map.get(str(u.id), {})
-        data.append({
-            "part": u.part or "-",
-            "branch": u.branch or "-",
-            "name": u.name or "-",
-            "user_id": u.id,
-            "position": sa_info.get("position", "-"),
-            "team_a": sa_info.get("team_a", "-"),
-            "team_b": sa_info.get("team_b", "-"),
-            "team_c": sa_info.get("team_c", "-"),
-        })
+    for u in page_qs:
+        sa = subadmin_map.get(str(u.id), {})
+        data.append(
+            {
+                "part": u.part or "-",
+                "branch": u.branch or "-",
+                "name": u.name or "-",
+                "user_id": u.id,
+                "position": sa.get("position", "-"),
+                "team_a": sa.get("team_a", "-"),
+                "team_b": sa.get("team_b", "-"),
+                "team_c": sa.get("team_c", "-"),
+            }
+        )
 
-    return JsonResponse({
-        "data": data,
-        "recordsTotal": total_count,
-        "recordsFiltered": total_count,
-    })
+    return JsonResponse({"data": data, "recordsTotal": records_total, "recordsFiltered": records_filtered})
 
 
-
-# ------------------------------------------------------------
-# 📘 레벨관리
-# ------------------------------------------------------------
 @require_POST
-@csrf_exempt  # ⚠️ 필요 시만 (ajax 요청시 CSRF 토큰 안 보낼 경우)
+@login_required
+@grade_required(["superuser", "main_admin"])
 def ajax_update_level(request):
     user_id = request.POST.get("user_id")
     level = request.POST.get("level")
@@ -531,23 +562,14 @@ def ajax_update_level(request):
         return JsonResponse({"success": False, "error": "User not found"})
 
 
-# ------------------------------------------------------------
-# 📘 부서 목록 불러오기
-# ------------------------------------------------------------
 @login_required
-@grade_required(['superuser'])
+@grade_required(["superuser"])
 def ajax_fetch_parts(request):
-    """
-    등록된 모든 부서(part) 목록 반환
-    """
-
-    # 제외할 부서명 리스트 (정확히 일치)
     exclude_list = ["1인GA사업부", "MA사업0부"]
-
     parts = (
         CustomUser.objects.exclude(part__isnull=True)
         .exclude(part__exact="")
-        .exclude(part__in=exclude_list)  # 🚫 특정 부서 제외
+        .exclude(part__in=exclude_list)
         .values_list("part", flat=True)
         .distinct()
         .order_by("part")
@@ -555,20 +577,13 @@ def ajax_fetch_parts(request):
     return JsonResponse({"parts": list(parts)})
 
 
-# ------------------------------------------------------------
-# 📘 지점 목록 불러오기
-# ------------------------------------------------------------
 @login_required
-@grade_required(['superuser'])
+@grade_required(["superuser"])
 def ajax_fetch_branches(request):
-    """
-    선택된 부서(part)에 해당하는 모든 지점(branch) 목록 반환
-    """
     part = request.GET.get("part")
     if not part:
         return JsonResponse({"branches": []})
 
-    # part와 정확히 일치하는 사용자만 필터링 (공백/NULL 제거)
     branches = (
         CustomUser.objects.filter(part__iexact=part)
         .exclude(branch__isnull=True)
@@ -577,22 +592,17 @@ def ajax_fetch_branches(request):
         .distinct()
         .order_by("branch")
     )
-
     return JsonResponse({"branches": list(branches)})
 
+
 # ------------------------------------------------------------
-# 📘 AJAX — 테이블관리 데이터 조회
+# TableSetting
 # ------------------------------------------------------------
 @require_GET
 @login_required
-@grade_required(['superuser', 'main_admin', 'sub_admin'])
+@grade_required(["superuser", "main_admin", "sub_admin"])
 def ajax_table_fetch(request):
-    """
-    ✅ 지점(branch)별 테이블 관리 데이터 조회
-    - superuser: 모든 지점 가능
-    - main_admin, sub_admin: 자신의 지점만
-    """
-    branch = request.GET.get("branch", "").strip()
+    branch = (request.GET.get("branch") or "").strip()
     user = request.user
 
     if not branch:
@@ -619,33 +629,17 @@ def ajax_table_fetch(request):
             }
             for r in rows
         ]
-
         return JsonResponse({"status": "success", "rows": data})
 
     except Exception as e:
-        import traceback
-        print("❌ ajax_table_fetch 오류:", traceback.format_exc())
+        traceback.print_exc()
         return JsonResponse({"status": "error", "message": f"조회 중 오류 발생: {str(e)}"})
 
 
-
-# ------------------------------------------------------------
-# 📘 AJAX — 테이블관리 데이터 저장
-# ------------------------------------------------------------
 @require_POST
 @login_required
-@grade_required(['superuser', 'main_admin'])
+@grade_required(["superuser", "main_admin"])
 def ajax_table_save(request):
-    """
-    테이블 관리 데이터 저장
-    - branch별 기존 데이터 전체 삭제 후 재삽입
-    - order(순서) 필드 포함 저장
-    """
-    import json
-    from django.db import transaction
-    from django.http import JsonResponse
-    from .models import TableSetting
-
     try:
         data = json.loads(request.body.decode("utf-8"))
         branch = data.get("branch")
@@ -655,10 +649,8 @@ def ajax_table_save(request):
             return JsonResponse({"status": "error", "message": "요청 데이터가 잘못되었습니다."})
 
         with transaction.atomic():
-            # 기존 branch 데이터 전체 삭제
             TableSetting.objects.filter(branch=branch).delete()
 
-            # 새 데이터 삽입
             objs = []
             for r in rows:
                 order = int(r.get("order") or 0)
@@ -667,48 +659,42 @@ def ajax_table_save(request):
                 if not table_name and not rate:
                     continue
 
-                objs.append(TableSetting(
-                    branch=branch,
-                    table_name=table_name,
-                    rate=rate,
-                    order=order,
-                ))
+                objs.append(
+                    TableSetting(branch=branch, table_name=table_name, rate=rate, order=order)
+                )
 
             TableSetting.objects.bulk_create(objs)
 
         return JsonResponse({"status": "success", "saved_count": len(objs)})
 
     except Exception as e:
-        import traceback
-        print("❌ ajax_table_save 오류:", traceback.format_exc())
+        traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)})
 
 
 # ------------------------------------------------------------
-# 📘 요율 관리용 테이블(리스트)
+# RateTable(요율현황)
 # ------------------------------------------------------------
 @require_GET
 @login_required
 def ajax_rate_userlist(request):
-    branch = request.GET.get("branch", "").strip()
+    branch = (request.GET.get("branch") or "").strip()
     if not branch:
         return JsonResponse({"data": []})
 
-    users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
-
-    # ✅ 해당 branch에 해당하는 user_id만 추출
+    users = (
+        CustomUser.objects.filter(branch=branch, is_active=True)
+        .values("id", "name", "branch")
+        .order_by("name")
+    )
     user_ids = [u["id"] for u in users]
 
     team_map = {
         t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
         for t in SubAdminTemp.objects.filter(user_id__in=user_ids)
     }
-
     rate_map = {
-        r.user_id: {
-            "non_life_table": r.non_life_table or "",
-            "life_table": r.life_table or "",
-        }
+        r.user_id: {"non_life_table": r.non_life_table or "", "life_table": r.life_table or ""}
         for r in RateTable.objects.filter(user_id__in=user_ids)
     }
 
@@ -716,43 +702,45 @@ def ajax_rate_userlist(request):
     for u in users:
         team_info = team_map.get(u["id"], {})
         rate_info = rate_map.get(u["id"], {})
-        data.append({
-            "id": u["id"],
-            "name": u["name"],
-            "branch": u["branch"],
-            "team_a": team_info.get("team_a", ""),
-            "team_b": team_info.get("team_b", ""),
-            "team_c": team_info.get("team_c", ""),
-            "non_life_table": rate_info.get("non_life_table", ""),
-            "life_table": rate_info.get("life_table", ""),
-        })
+        data.append(
+            {
+                "id": u["id"],
+                "name": u["name"],
+                "branch": u["branch"],
+                "team_a": team_info.get("team_a", ""),
+                "team_b": team_info.get("team_b", ""),
+                "team_c": team_info.get("team_c", ""),
+                "non_life_table": rate_info.get("non_life_table", ""),
+                "life_table": rate_info.get("life_table", ""),
+            }
+        )
 
     return JsonResponse({"data": data})
-    
 
-# ------------------------------------------------------------
-# 📘 지점 내 요율현황 — 엑셀 다운로드
-# ------------------------------------------------------------
+
 @login_required
 def ajax_rate_userlist_excel(request):
-    """선택된 지점(branch)의 요율현황을 엑셀로 다운로드"""
-    branch = request.GET.get("branch", "").strip()
+    branch = (request.GET.get("branch") or "").strip()
     if not branch:
         return JsonResponse({"error": "지점을 선택해주세요."}, status=400)
 
-    # ✅ 사용자 데이터 조회 (ajax_rate_userlist와 동일)
-    users = CustomUser.objects.filter(branch=branch, is_active=True).values("id", "name", "branch").order_by("name")
+    user = request.user
+    if user.grade != "superuser" and branch != user.branch:
+        return JsonResponse({"error": "다른 지점 데이터에는 접근할 수 없습니다."}, status=403)
+
+    users = list(
+        CustomUser.objects.filter(branch=branch, is_active=True)
+        .values("id", "name", "branch")
+        .order_by("name")
+    )
+    user_ids = [u["id"] for u in users]
 
     team_map = {
         t.user_id: {"team_a": t.team_a, "team_b": t.team_b, "team_c": t.team_c}
         for t in SubAdminTemp.objects.filter(user_id__in=user_ids)
     }
-
     rate_map = {
-        r.user_id: {
-            "non_life_table": r.non_life_table or "",
-            "life_table": r.life_table or "",
-        }
+        r.user_id: {"non_life_table": r.non_life_table or "", "life_table": r.life_table or ""}
         for r in RateTable.objects.filter(user_id__in=user_ids)
     }
 
@@ -760,16 +748,18 @@ def ajax_rate_userlist_excel(request):
     for u in users:
         team_info = team_map.get(u["id"], {})
         rate_info = rate_map.get(u["id"], {})
-        data.append({
-            "지점": u["branch"],
-            "팀A": team_info.get("team_a", ""),
-            "팀B": team_info.get("team_b", ""),
-            "팀C": team_info.get("team_c", ""),
-            "성명": u["name"],
-            "사번": u["id"],
-            "손보테이블": rate_info.get("non_life_table", ""),
-            "생보테이블": rate_info.get("life_table", ""),
-        })
+        data.append(
+            {
+                "지점": u["branch"],
+                "팀A": team_info.get("team_a", ""),
+                "팀B": team_info.get("team_b", ""),
+                "팀C": team_info.get("team_c", ""),
+                "성명": u["name"],
+                "사번": u["id"],
+                "손보테이블": rate_info.get("non_life_table", ""),
+                "생보테이블": rate_info.get("life_table", ""),
+            }
+        )
 
     df = pd.DataFrame(data)
     output = io.BytesIO()
@@ -785,25 +775,15 @@ def ajax_rate_userlist_excel(request):
     return response
 
 
-# ------------------------------------------------------------
-# 📘 지점 내 요율현황 — 엑셀 업로드 (손보/생보 테이블만 업데이트)
-# ------------------------------------------------------------
 @require_POST
 @login_required
 @transaction.atomic
 def ajax_rate_userlist_upload(request):
-    """
-    ✅ 엑셀 업로드 (업로드 시트 기준)
-    - '사번' 컬럼을 CustomUser.id 와 매칭
-    - '손보테이블', '생보테이블' 컬럼 데이터만 업데이트
-    - SubAdminTemp의 팀 정보는 유지
-    """
     excel_file = request.FILES.get("excel_file")
     if not excel_file:
         return JsonResponse({"status": "error", "message": "엑셀 파일이 없습니다."}, status=400)
 
     try:
-        # 📘 1️⃣ 임시 저장 후 pandas 로드
         file_path = default_storage.save(f"tmp/{excel_file.name}", excel_file)
         file_path_full = default_storage.path(file_path)
         df = pd.read_excel(file_path_full, sheet_name="업로드").fillna("")
@@ -813,10 +793,8 @@ def ajax_rate_userlist_upload(request):
             if col not in df.columns:
                 return JsonResponse({"status": "error", "message": f"'{col}' 컬럼이 없습니다."}, status=400)
 
-        updated_count = 0
-        skipped_count = 0
+        updated_count, skipped_count = 0, 0
 
-        # 📘 2️⃣ 행별 처리
         for _, row in df.iterrows():
             user_id = str(row["사번"]).strip()
             if not user_id:
@@ -828,107 +806,212 @@ def ajax_rate_userlist_upload(request):
                 skipped_count += 1
                 continue
 
-            # ✅ RateTable 존재 시 업데이트, 없으면 생성
-            obj, created = RateTable.objects.update_or_create(
+            RateTable.objects.update_or_create(
                 user=user,
-                defaults={
-                    "non_life_table": row["손보테이블"],
-                    "life_table": row["생보테이블"],
-                },
+                defaults={"non_life_table": row["손보테이블"], "life_table": row["생보테이블"]},
             )
             updated_count += 1
 
-        # 📘 3️⃣ 임시 파일 삭제
         default_storage.delete(file_path)
 
-        return JsonResponse({
-            "status": "success",
-            "message": f"업로드 완료 ({updated_count}건 업데이트 / {skipped_count}건 스킵됨)",
-        })
+        return JsonResponse(
+            {"status": "success", "message": f"업로드 완료 ({updated_count}건 업데이트 / {skipped_count}건 스킵됨)"}
+        )
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
-        return JsonResponse({
-            "status": "error",
-            "message": f"업로드 중 오류: {str(e)}"
-        }, status=500)
+        return JsonResponse({"status": "error", "message": f"업로드 중 오류: {str(e)}"}, status=500)
 
-# ------------------------------------------------------------
-# 📘 AJAX — 대상자 상세정보 조회 (요율변경용)
-# ------------------------------------------------------------
-from django.views.decorators.http import require_GET
-from django.contrib.auth.decorators import login_required
 
-@login_required
 @require_GET
+@login_required
 def ajax_rate_user_detail(request):
-    """
-    요율변경 페이지에서 검색된 '대상자' 한 명의
-    - 손보테이블명
-    - 생보테이블명
-    - 손보요율(%)
-    - 생보요율(%)
-    를 돌려준다.
-
-    테이블명은 RateTable 에서 가져오고,
-    요율(%)은 테이블관리(TableSetting)에서 같은 지점+테이블명으로 다시 찾는다.
-    """
-    user_id = request.GET.get("user_id", "").strip()
+    user_id = (request.GET.get("user_id") or "").strip()
     if not user_id:
-      return JsonResponse({"status": "error", "message": "user_id가 없습니다."}, status=400)
+        return JsonResponse({"status": "error", "message": "user_id가 없습니다."}, status=400)
 
     try:
-        # 1) 대상자
         target = CustomUser.objects.get(id=user_id)
 
-        # 2) 대상자의 '기본 손보/생보 테이블명' (rate_table)
         rate_info = RateTable.objects.filter(user=target).first()
         non_life_table = rate_info.non_life_table if rate_info else ""
         life_table = rate_info.life_table if rate_info else ""
 
-        # 3) 테이블관리에서 실제 요율(%) 가져오기
-        non_life_rate = ""
-        life_rate = ""
+        non_life_rate = find_table_rate(target.branch, non_life_table)
+        life_rate = find_table_rate(target.branch, life_table)
 
-        # 손보
-        if non_life_table:
-            ts = (
-                TableSetting.objects
-                .filter(branch=target.branch, table_name=non_life_table)
-                .order_by("order")
-                .first()
-            )
-            if ts:
-                # TableSetting.rate 에는 "30%" 이런 식으로 들어있다고 가정
-                non_life_rate = ts.rate or ""
-
-        # 생보
-        if life_table:
-            ts2 = (
-                TableSetting.objects
-                .filter(branch=target.branch, table_name=life_table)
-                .order_by("order")
-                .first()
-            )
-            if ts2:
-                life_rate = ts2.rate or ""
-
-        data = {
-            "target_name": target.name,
-            "target_id": target.id,
-            "non_life_table": non_life_table,   # 손보테이블(변경전)
-            "life_table": life_table,           # 생보테이블(변경전)
-            "non_life_rate": non_life_rate,     # 손보요율(변경전)
-            "life_rate": life_rate,             # 생보요율(변경전)
-            "branch": target.branch or "",
-        }
-        return JsonResponse({"status": "success", "data": data})
+        return JsonResponse(
+            {
+                "status": "success",
+                "data": {
+                    "target_name": target.name,
+                    "target_id": target.id,
+                    "non_life_table": non_life_table,
+                    "life_table": life_table,
+                    "non_life_rate": non_life_rate,
+                    "life_rate": life_rate,
+                    "branch": target.branch or "",
+                },
+            }
+        )
 
     except CustomUser.DoesNotExist:
         return JsonResponse({"status": "error", "message": "대상자를 찾을 수 없습니다."}, status=404)
     except Exception as e:
-        import traceback
-        print("ajax_rate_user_detail error:", traceback.format_exc())
+        traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
+
+# ------------------------------------------------------------
+# RateChange (요율변경)
+# ------------------------------------------------------------
+@require_GET
+@login_required
+@grade_required(["superuser", "main_admin", "sub_admin"])
+def rate_fetch(request):
+    user = request.user
+    month = normalize_month(request.GET.get("month") or "")
+    branch = (request.GET.get("branch") or "").strip()
+
+    qs = RateChange.objects.filter(month=month).select_related("requester", "target")
+
+    if user.grade == "superuser":
+        if branch:
+            qs = qs.filter(branch__iexact=branch)
+    else:
+        qs = qs.filter(branch__iexact=user.branch)
+
+    rows = []
+    for rc in qs:
+        rows.append(
+            {
+                "id": rc.id,
+                "requester_name": rc.requester.name,
+                "requester_id": rc.requester.id,
+                "target_name": rc.target.name,
+                "target_id": rc.target.id,
+
+                "before_ftable": rc.before_ftable,
+                "before_frate": rc.before_frate,
+                "after_ftable": rc.after_ftable,
+                "after_frate": rc.after_frate,
+
+                "before_ltable": rc.before_ltable,
+                "before_lrate": rc.before_lrate,
+                "after_ltable": rc.after_ltable,
+                "after_lrate": rc.after_lrate,
+
+                "memo": rc.memo,
+                "request_date": rc.created_at.strftime("%Y-%m-%d") if rc.created_at else "",
+                "process_date": rc.process_date.strftime("%Y-%m-%d") if rc.process_date else "",
+            }
+        )
+
+    return JsonResponse({"status": "success", "kind": "rate", "rows": rows})
+
+
+@require_POST
+@login_required
+@grade_required(["superuser", "main_admin", "sub_admin"])
+@transaction.atomic
+def rate_save(request):
+    payload = json.loads(request.body or "{}")
+    rows = payload.get("rows", [])
+    month = normalize_month(payload.get("month") or "")
+
+    user = request.user
+    part = (payload.get("part") or getattr(user, "part", "") or "-").strip()
+    branch = (payload.get("branch") or getattr(user, "branch", "") or "-").strip()
+    if user.grade in ["main_admin", "sub_admin"]:
+        branch = (getattr(user, "branch", "") or branch).strip()
+
+    saved = 0
+    for r in rows:
+        target_id = str(r.get("target_id") or "").strip()
+        if not target_id:
+            continue
+
+        target = CustomUser.objects.filter(id=target_id).first()
+        if not target:
+            continue
+
+        rt = RateTable.objects.filter(user=target).first()
+        before_ftable = rt.non_life_table if rt else ""
+        before_ltable = rt.life_table if rt else ""
+
+        before_frate = find_table_rate(target.branch, before_ftable)
+        before_lrate = find_table_rate(target.branch, before_ltable)
+
+        after_ftable = (r.get("after_ftable") or "").strip()
+        after_ltable = (r.get("after_ltable") or "").strip()
+
+        after_frate = find_table_rate(target.branch, after_ftable)
+        after_lrate = find_table_rate(target.branch, after_ltable)
+
+        memo = (r.get("memo") or "").strip()
+
+        RateChange.objects.create(
+            requester=user,
+            target=target,
+            part=part,
+            branch=branch,
+            month=month,
+
+            before_ftable=before_ftable,
+            before_frate=before_frate,
+            before_ltable=before_ltable,
+            before_lrate=before_lrate,
+
+            after_ftable=after_ftable,
+            after_frate=after_frate,
+            after_ltable=after_ltable,
+            after_lrate=after_lrate,
+
+            memo=memo,
+        )
+        saved += 1
+
+    return JsonResponse({"status": "success", "saved_count": saved})
+
+
+@require_POST
+@login_required
+@grade_required(["superuser", "main_admin"])
+@transaction.atomic
+def rate_delete(request):
+    data = json.loads(request.body or "{}")
+    record_id = data.get("id")
+    if not record_id:
+        return JsonResponse({"status": "error", "message": "id 누락"}, status=400)
+
+    rc = get_object_or_404(RateChange, id=record_id)
+    user = request.user
+
+    if not (user.grade in ["superuser", "main_admin"] or rc.requester_id == user.id):
+        return JsonResponse({"status": "error", "message": "삭제 권한이 없습니다."}, status=403)
+
+    rc.delete()
+    return JsonResponse({"status": "success"})
+
+
+# ------------------------------------------------------------
+# Structure endpoints (전용 alias)
+# ------------------------------------------------------------
+@require_GET
+@grade_required(["superuser", "main_admin", "sub_admin"])
+def structure_fetch(request):
+    return ajax_fetch(request)
+
+
+@require_POST
+@grade_required(["superuser", "main_admin", "sub_admin"])
+@transaction.atomic
+def structure_save(request):
+    return ajax_save(request)
+
+
+@require_POST
+@grade_required(["superuser", "main_admin", "sub_admin"])
+@transaction.atomic
+def structure_delete(request):
+    return ajax_delete(request)
