@@ -20,41 +20,10 @@ export const els = {
   searchResults: document.getElementById("searchResults"),
 };
 
+/**
+ * ✅ 연/월 초기화는 common/manage_boot.js에서만 수행합니다.
+ * 이 함수는 더 이상 사용하지 않도록 비활성화합니다.
+ */
 export function initSelectOptions() {
-  const now = new Date();
-  const thisY = now.getFullYear();
-  const thisM = now.getMonth() + 1;
-
-  const selectedY = parseInt(window.ManageStructureBoot?.selectedYear ?? thisY, 10);
-  const selectedM = parseInt(window.ManageStructureBoot?.selectedMonth ?? thisM, 10);
-
-  // ✅ 연도 목록 채우기
-  if (els.year) {
-    els.year.innerHTML = ""; // 혹시 기존 값 초기화
-    for (let y = thisY - 2; y <= thisY + 1; y++) {
-      const opt = document.createElement("option");
-      opt.value = y;
-      opt.textContent = `${y}년`;
-      if (y === selectedY) opt.selected = true;
-      els.year.appendChild(opt);
-    }
-  }
-
-  // ✅ 월도 목록 채우기
-  if (els.month) {
-    els.month.innerHTML = ""; // 혹시 기존 값 초기화
-    for (let m = 1; m <= 12; m++) {
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = `${m}월`;
-      if (m === selectedM) opt.selected = true;
-      els.month.appendChild(opt);
-    }
-  }
-
-  // ✅ 확인용 로그 (테스트 끝나면 제거 가능)
-  console.log("[initSelectOptions] selected year/month 적용 완료:", selectedY, selectedM);
-  console.log("[initSelectOptions] year select value:", els.year.value);
-  console.log("[initSelectOptions] month select value:", els.month.value);
+  // intentionally no-op
 }
-

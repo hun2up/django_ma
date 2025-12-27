@@ -6,7 +6,7 @@ let mainDT = null;
 let delegationBound = false;
 
 /* ============================================================
-   Dataset helpers
+   Dataset helpers (템플릿 data- 키 변화에 안전하게)
 ============================================================ */
 function dsUrl(keys = []) {
   const ds = els.root?.dataset;
@@ -19,13 +19,16 @@ function dsUrl(keys = []) {
 }
 
 function getFetchUrl() {
-  return dsUrl(["fetchUrl", "dataFetchUrl"]);
+  // manage_charts.html: data-data-fetch-url
+  return dsUrl(["fetchUrl", "dataFetchUrl", "dataDataFetchUrl", "dataFetch"]);
 }
 function getUpdateProcessDateUrl() {
+  // manage_charts.html: data-update-process-date-url
   return dsUrl(["updateProcessDateUrl", "dataUpdateProcessDateUrl"]);
 }
 function getDeleteUrl() {
-  return dsUrl(["deleteUrl", "dataDeleteUrl"]);
+  // manage_charts.html: data-data-delete-url
+  return dsUrl(["deleteUrl", "dataDeleteUrl", "dataDataDeleteUrl"]);
 }
 
 function getUserGrade() {
@@ -37,13 +40,22 @@ function canEditProcessDate() {
   return g === "superuser" || g === "main_admin";
 }
 
-function canDeleteRow() {
+function canDeleteRow(row) {
+  // ✅ 서버에서도 권한 검사하지만, UI에서도 최소한으로 필터
+  // 기존 정책: superuser/main_admin만 삭제 버튼 노출
   const g = getUserGrade();
-  return g === "superuser" || g === "main_admin";
+  if (g === "superuser" || g === "main_admin") return true;
+
+  // (옵션) requester 본인 삭제를 허용하려면 아래 주석 해제
+  // if (g === "sub_admin") {
+  //   return String(row?.requester_id || "") === String(window.currentUser?.id || "");
+  // }
+
+  return false;
 }
 
 /* ============================================================
-   Escapes
+   Escapes (XSS 방지)
 ============================================================ */
 function escapeHtml(v) {
   const s = String(v ?? "");
@@ -60,12 +72,49 @@ function escapeAttr(v) {
 
 /* ============================================================
    Render helpers
-   - 변경후 강조(.cell-after)
 ============================================================ */
 function renderAfterCell(val) {
   const v = String(val ?? "").trim();
   if (!v) return "";
   return `<span class="cell-after">${escapeHtml(v)}</span>`;
+}
+
+function renderOrFlag(val) {
+  return val ? "O" : "";
+}
+
+/**
+ * ✅ 처리일자 스타일
+ * - sub_admin: 텍스트만
+ * - superuser/main_admin: date input
+ */
+function renderProcessDateCell(_value, _type, row) {
+  const grade = getUserGrade();
+  const val = (row.process_date || "").trim();
+
+  if (grade === "sub_admin") {
+    return `<span>${escapeHtml(val)}</span>`;
+  }
+
+  const disabledAttr = canEditProcessDate() ? "" : "disabled";
+  return `
+    <input type="date"
+           class="form-control form-control-sm processDateInput"
+           data-id="${escapeAttr(row.id || "")}"
+           value="${escapeAttr(val)}"
+           ${disabledAttr} />
+  `;
+}
+
+function buildActionButtons(row) {
+  if (!canDeleteRow(row)) return "";
+  return `
+    <button type="button"
+            class="btn btn-sm btn-outline-danger btnDeleteRow"
+            data-id="${escapeAttr(row.id || "")}">
+      삭제
+    </button>
+  `;
 }
 
 /* ============================================================
@@ -85,7 +134,7 @@ async function updateProcessDate(id, value) {
     body: JSON.stringify({
       id,
       process_date: value || "",
-      kind: "structure",
+      kind: "structure", // ✅ views.py ajax_update_process_date에서 kind로 분기
     }),
   });
 
@@ -98,7 +147,7 @@ async function updateProcessDate(id, value) {
 
 async function deleteStructureRow(id) {
   const url = getDeleteUrl();
-  if (!url) throw new Error("delete_url 누락 (data-delete-url 확인)");
+  if (!url) throw new Error("delete_url 누락 (data-data-delete-url 확인)");
 
   const res = await fetch(url, {
     method: "POST",
@@ -118,72 +167,39 @@ async function deleteStructureRow(id) {
 }
 
 /* ============================================================
-   Cells
-============================================================ */
-function buildActionButtons(row) {
-  if (!canDeleteRow()) return "";
-  return `
-    <button type="button"
-            class="btn btn-sm btn-outline-danger btnDeleteRow"
-            data-id="${escapeAttr(row.id || "")}">
-      삭제
-    </button>
-  `;
-}
-
-/**
- * ✅ 처리일자 스타일
- * - 편제변경 sub_admin이 텍스트 형태라면, 동일 룰 유지
- */
-function renderProcessDateCell(_value, _type, row) {
-  const grade = getUserGrade();
-  const val = (row.process_date || "").trim();
-
-  if (grade === "sub_admin") {
-    return `<span>${escapeHtml(val || "")}</span>`;
-  }
-
-  const disabledAttr = canEditProcessDate() ? "" : "disabled";
-  return `
-    <input type="date"
-           class="form-control form-control-sm processDateInput"
-           data-id="${escapeAttr(row.id || "")}"
-           value="${escapeAttr(val)}"
-           ${disabledAttr} />
-  `;
-}
-
-/* ============================================================
    DataTables columns
-   ⚠️ 실제 컬럼 순서는 네 템플릿/서버 rows 키에 맞춰 조정 가능
-   - 핵심: chg_branch(변경후), chg_rank(변경후)만 강조
+   ✅ manage_charts.html mainTable (14열)과 1:1 매칭
 ============================================================ */
 const MAIN_COLUMNS = [
+  // 1~3 요청자
   { data: "requester_name", defaultContent: "" },
   { data: "requester_id", defaultContent: "" },
   { data: "requester_branch", defaultContent: "" },
 
+  // 4~6 대상자
   { data: "target_name", defaultContent: "" },
   { data: "target_id", defaultContent: "" },
-  { data: "target_branch", defaultContent: "" },
-  { data: "target_rank", defaultContent: "" },
+  { data: "target_branch", defaultContent: "" }, // 변경전 소속(서버 target_branch)
 
-  // ✅ 소속(변경후) 강조
-  {
-    data: "chg_branch",
-    defaultContent: "",
-    render: (val) => renderAfterCell(val),
-  },
+  // 7 변경후 소속(강조)
+  { data: "chg_branch", defaultContent: "", render: (val) => renderAfterCell(val) },
 
-  // ✅ 직급(변경후) 강조
-  {
-    data: "chg_rank",
-    defaultContent: "",
-    render: (val) => renderAfterCell(val),
-  },
+  // 8 변경전 직급(서버 rank)
+  { data: "rank", defaultContent: "" },
 
+  // 9 변경후 직급(강조)
+  { data: "chg_rank", defaultContent: "", render: (val) => renderAfterCell(val) },
+
+  // 10 OR
+  { data: "or_flag", defaultContent: false, render: (val) => renderOrFlag(!!val) },
+
+  // 11 비고
   { data: "memo", defaultContent: "" },
 
+  // 12 요청일자(서버 request_date)
+  { data: "request_date", defaultContent: "" },
+
+  // 13 처리일자
   {
     data: "process_date",
     orderable: false,
@@ -191,6 +207,8 @@ const MAIN_COLUMNS = [
     render: renderProcessDateCell,
     defaultContent: "",
   },
+
+  // 14 삭제
   {
     data: "id",
     orderable: false,
@@ -202,6 +220,9 @@ const MAIN_COLUMNS = [
 
 const MAIN_COLSPAN = MAIN_COLUMNS.length;
 
+/* ============================================================
+   DataTables initialize / fallback
+============================================================ */
 function canUseDataTables() {
   return !!(els.mainTable && window.jQuery && window.jQuery.fn?.DataTable);
 }
@@ -260,15 +281,14 @@ function renderFallback(rows) {
       <td>${escapeHtml(r.target_name)}</td>
       <td>${escapeHtml(r.target_id)}</td>
       <td>${escapeHtml(r.target_branch)}</td>
-      <td>${escapeHtml(r.target_rank)}</td>
 
-      <!-- ✅ 변경후 소속 강조 -->
       <td>${renderAfterCell(r.chg_branch)}</td>
-
-      <!-- ✅ 변경후 직급 강조 -->
+      <td>${escapeHtml(r.rank)}</td>
       <td>${renderAfterCell(r.chg_rank)}</td>
 
+      <td class="text-center">${renderOrFlag(!!r.or_flag)}</td>
       <td>${escapeHtml(r.memo)}</td>
+      <td class="text-center">${escapeHtml(r.request_date)}</td>
 
       <td class="text-center">
         ${
@@ -284,6 +304,7 @@ function renderFallback(rows) {
 
       <td class="text-center">${buildActionButtons(r)}</td>
     `;
+
     tbody.appendChild(tr);
   });
 }
@@ -301,6 +322,8 @@ function renderMain(rows) {
 
 /* ============================================================
    Delegation (once)
+   - 처리일자 변경
+   - 삭제 클릭
 ============================================================ */
 function bindDelegationOnce() {
   if (delegationBound) return;
@@ -322,7 +345,7 @@ function bindDelegationOnce() {
       await updateProcessDate(id, value);
     } catch (err) {
       console.error(err);
-      alertBox?.(err?.message || "처리일자 저장 실패") ?? alert(err?.message || "처리일자 저장 실패");
+      (alertBox || alert)(err?.message || "처리일자 저장 실패");
     } finally {
       hideLoading();
     }
@@ -333,29 +356,47 @@ function bindDelegationOnce() {
     const btn = e.target?.closest?.(".btnDeleteRow");
     if (!btn) return;
     if (!els.mainTable || !els.mainTable.contains(btn)) return;
-    if (!canDeleteRow()) return;
 
     const id = String(btn.dataset.id || "").trim();
     if (!id) return;
 
     if (!confirm("해당 행을 삭제할까요?")) return;
 
+    // UI 중복클릭 방지
+    btn.disabled = true;
+
     showLoading("삭제 중...");
     try {
       await deleteStructureRow(id);
-      // 🔹 삭제 후 재조회는 fetchData 호출자가 담당 (여기서는 이벤트만 처리)
-      window.dispatchEvent(new CustomEvent("structureRowDeleted"));
+
+      // ✅ 삭제 후 재조회는 여기서 바로 수행(안전하고 일관됨)
+      // (기존 delete.js/커스텀 이벤트 의존 제거)
+      const y = String(els.year?.value || "").trim();
+      const m = String(els.month?.value || "").trim();
+      const ym = `${y}-${m.padStart(2, "0")}`;
+
+      const branch =
+        String(els.branch?.value || "").trim() ||
+        String(window.currentUser?.branch || "").trim() ||
+        "";
+
+      await fetchData(ym, branch);
     } catch (err) {
       console.error(err);
-      alertBox?.(err?.message || "삭제 실패") ?? alert(err?.message || "삭제 실패");
+      (alertBox || alert)(err?.message || "삭제 실패");
     } finally {
       hideLoading();
+      btn.disabled = false;
     }
   });
 }
 
 /* ============================================================
    Normalize (서버 키 변화에 안전하게)
+   ✅ views.py ajax_fetch() 구조에 맞춰 흡수:
+     - rank
+     - or_flag
+     - request_date
 ============================================================ */
 function normalizeRow(row = {}) {
   return {
@@ -368,22 +409,28 @@ function normalizeRow(row = {}) {
     target_name: row.target_name || row.tg_name || "",
     target_id: row.target_id || row.tg_id || "",
     target_branch: row.target_branch || row.tg_branch || "",
-    target_rank: row.target_rank || row.tg_rank || "",
 
-    // ✅ 변경후 데이터: chg_* 우선, 없으면 after_* 계열도 흡수
+    // ✅ 변경후 데이터: chg_* 우선
     chg_branch: row.chg_branch || row.after_branch || row.new_branch || "",
     chg_rank: row.chg_rank || row.after_rank || row.new_rank || "",
 
+    // ✅ 서버는 변경전 직급이 rank
+    rank: row.rank || row.target_rank || row.tg_rank || "",
+
+    // ✅ OR
+    or_flag: !!row.or_flag,
+
     memo: row.memo || "",
+    request_date: row.request_date || "",
     process_date: row.process_date || "",
   };
 }
 
 /* ============================================================
    Fetch
-   - 호출: fetchData(ym, branch)
+   - 호출: fetchData(ym, branch, meta?)  ← meta는 와도 무시
 ============================================================ */
-export async function fetchData(ym, branch) {
+export async function fetchData(ym, branch, _metaIgnored) {
   if (!els.root) return;
 
   bindDelegationOnce();
@@ -401,7 +448,10 @@ export async function fetchData(ym, branch) {
 
   showLoading("데이터를 불러오는 중입니다...");
   try {
-    const res = await fetch(url.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } });
+    const res = await fetch(url.toString(), {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+
     const data = await res.json().catch(() => ({}));
     const rawRows = Array.isArray(data?.rows) ? data.rows : [];
 

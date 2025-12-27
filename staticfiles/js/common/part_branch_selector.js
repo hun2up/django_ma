@@ -3,6 +3,7 @@
 /**
  * ✅ 공용 부서/지점 선택기 (superuser 전용)
  * - 편제변경 / 요율변경 / 테이블관리 페이지 공용
+ * - main_admin/sub_admin은 자동조회 흐름이라 보통 실행하지 않음
  */
 document.addEventListener("DOMContentLoaded", async () => {
   // ✅ 세 페이지 중 하나라도 있으면 실행
@@ -13,13 +14,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!root) return;
 
   const userGrade = root.dataset.userGrade;
-  if (userGrade !== "superuser") return; // main_admin은 자동조회라 실행 X
+  if (userGrade !== "superuser") return;
 
   const partSelect = document.getElementById("partSelect");
   const branchSelect = document.getElementById("branchSelect");
+
+  // 페이지별 검색 버튼 id가 다를 수 있어 후보 탐색
   const btnSearch =
     document.getElementById("btnSearch") ||
-    document.getElementById("btnSearchPeriod"); // 페이지별 id 다름
+    document.getElementById("btnSearchPeriod");
 
   if (!partSelect || !branchSelect) return;
 
@@ -58,7 +61,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!part) return;
 
     try {
-      const res2 = await fetch(`/partner/ajax/fetch-branches/?part=${encodeURIComponent(part)}`);
+      const res2 = await fetch(
+        `/partner/ajax/fetch-branches/?part=${encodeURIComponent(part)}`
+      );
       if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
       const data2 = await res2.json();
 
@@ -88,4 +93,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 });
-  

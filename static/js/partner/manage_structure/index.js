@@ -2,111 +2,76 @@
 import { fetchData } from "./fetch.js";
 import { initInputRowEvents } from "./input_rows.js";
 import { initManageBoot } from "../../common/manage_boot.js";
-const { root, boot, user } = initManageBoot("structure");
 
 /**
- * 📘 Manage Structure (편제변경 페이지)
- * - 연도·월도 드롭다운 생성
- * - superuser의 부서/지점 목록 로드
- * - 검색 버튼 및 자동조회 처리
+ * ✅ Firefox 안정화 핵심:
+ * - initManageBoot("structure") 반환값을 바로 구조분해하면
+ *   파폭에서 undefined일 때 즉시 TypeError로 스크립트가 죽음
+ * - 따라서 safe ctx 패턴으로 처리
  */
-document.addEventListener("DOMContentLoaded", () => {
+const ctx = initManageBoot("structure") || {};
+const root = ctx.root || document.getElementById("manage-structure");
+const boot = ctx.boot || window.ManageStructureBoot || {};
+const user = ctx.user || window.currentUser || {};
+
+function onReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+onReady(() => {
+  if (!root) {
+    console.error("⚠️ manage-structure root 요소를 찾을 수 없습니다.");
+    return;
+  }
+
   const els = {
     year: document.getElementById("yearSelect"),
     month: document.getElementById("monthSelect"),
     branch: document.getElementById("branchSelect"),
     btnSearch: document.getElementById("btnSearchPeriod"),
-    root: document.getElementById("manage-structure"),
     inputSection: document.getElementById("inputSection"),
     mainSheet: document.getElementById("mainSheet"),
-    mainTable: document.getElementById("mainTable"),
     inputTable: document.getElementById("inputTable"),
   };
 
-  // ✅ 필수 요소 검사
-  if (!els.year || !els.month || !els.root) {
-    console.error("⚠️ 필수 요소 누락 (year/month/root)");
+  if (!els.year || !els.month) {
+    console.error("⚠️ yearSelect/monthSelect 요소 누락");
     return;
   }
 
-  const boot = window.ManageStructureBoot || {};
-  const now = new Date();
-  const user = window.currentUser || {};
-
-  const selectedYear = Number(boot.selectedYear || now.getFullYear());
-  const selectedMonth = Number(boot.selectedMonth || now.getMonth() + 1);
-
-  /* ============================================================
-     1️⃣ 연도/월도 드롭다운 채우기
-  ============================================================ */
-  const fillDropdown = (selectEl, start, end, selectedValue, suffix) => {
-    selectEl.innerHTML = "";
-    for (let v = start; v <= end; v++) {
-      const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = `${v}${suffix}`;
-      if (v === selectedValue) opt.selected = true;
-      selectEl.appendChild(opt);
-    }
-  };
-
-  fillDropdown(els.year, 2023, 2026, selectedYear, "년");
-  fillDropdown(els.month, 1, 12, selectedMonth, "월");
-
-  console.log("✅ 초기화 완료", {
-    selectedYear,
-    selectedMonth,
-    userGrade: user.grade,
-    autoLoad: boot.autoLoad,
-  });
-
-    /* ============================================================
-     2️⃣ 요청자 자동입력 초기화
-  ============================================================ */
+  // ✅ 요청자 자동입력 초기화
   if (els.inputTable) {
-    initInputRowEvents();  // ✅ 반드시 여기에 있어야 자동입력됨
-    console.log("✅ 요청자 정보 자동입력 초기화 완료");
+    try {
+      initInputRowEvents();
+      console.log("✅ 요청자 정보 자동입력 초기화 완료");
+    } catch (e) {
+      console.error("❌ initInputRowEvents 오류:", e);
+    }
   }
 
-  /* ============================================================
-     3️⃣ 검색 버튼 이벤트
-  ============================================================ */
+  // ✅ 검색 버튼
   els.btnSearch?.addEventListener("click", () => {
-    const year = els.year.value;
-    const month = els.month.value;
-    const ym = `${year}-${String(month).padStart(2, "0")}`;
+    const y = els.year.value;
+    const m = String(els.month.value).padStart(2, "0");
+    const ym = `${y}-${m}`;
+
     const branch = els.branch?.value?.trim() || user.branch?.trim() || "";
 
-    console.log("🔍 검색 버튼 클릭 → fetchData 호출", { ym, branch });
+    els.inputSection?.removeAttribute("hidden");
+    els.mainSheet?.removeAttribute("hidden");
 
-    // ✅ 검색 시 카드 표시 보장
-    requestAnimationFrame(() => {
-      els.inputSection?.removeAttribute("hidden");
-      els.mainSheet?.removeAttribute("hidden");
-      fetchData(ym, branch);
-    });
+    console.log("🔍 검색 클릭 → fetchData", { ym, branch });
+    fetchData(ym, branch);
   });
 
-  /* ============================================================
-     4️⃣ main_admin / sub_admin 자동조회
-  ============================================================ */
-  if (boot.autoLoad && ["main_admin", "sub_admin"].includes(user.grade)) {
-    const year = els.year.value;
-    const month = els.month.value;
-    const ym = `${year}-${String(month).padStart(2, "0")}`;
-    const branch = user.branch?.trim() || "";
-
-    console.log("🟢 autoLoad → 현재월 기준 자동조회", { ym, branch });
-
-    // 렌더 완료 후 안전하게 실행
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        els.inputSection?.removeAttribute("hidden");
-        els.mainSheet?.removeAttribute("hidden");
-
-        // Bootstrap 렌더 사이클 이후 fetch (레이아웃 깨짐 방지)
-        setTimeout(() => fetchData(ym, branch), 200);
-      });
-    }, 700);
+  // ✅ autoLoad fetch 자체는 manage_boot.js에서 하므로
+  // 여기서는 화면 표시만 보조
+  if (boot.autoLoad && ["main_admin", "sub_admin"].includes((user.grade || "").trim())) {
+    els.inputSection?.removeAttribute("hidden");
+    els.mainSheet?.removeAttribute("hidden");
   }
 });

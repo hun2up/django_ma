@@ -390,6 +390,10 @@ input[name^="premium_"] {
 
 #mainTable td {
   font-size: 12px;
+  max-width: 200px;
+  white-space: nowrap;     /* 줄바꿈 방지 */
+  text-overflow: ellipsis; /* ... 처리 */
+  overflow: hidden;
 }
 
 table {
@@ -430,4 +434,51 @@ table {
 #tableCheckModal table td.text-center {
   font-weight: 500;
   color: #003f7d; /* 인카 블루톤으로 강조 */
+}
+
+
+/* ===============================
+   Firefox DataTables Layout Fix
+================================ */
+
+/* flex 컨테이너 안 테이블 깨짐 방지 */
+#mainSheet {
+  min-width: 0;
+}
+
+/* DataTables wrapper 폭 고정 */
+#mainTable_wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* table 폭 강제 */
+#mainTable {
+  width: 100% !important;
+  table-layout: fixed;
+}
+
+/* bootstrap row 영향 제거 */
+#mainTable_wrapper .row {
+  width: 100%;
+  margin: 0;
+}
+
+/* =======================================================
+   ✅ (추가) 변경후 데이터 강조 스타일 (편제/요율/지점효율 공용)
+   - input처럼 보이지 않게, 결과값처럼 보이게
+   ======================================================= */
+.cell-after {
+  color: #005BAC;
+  font-weight: 600;
+  background-color: #f1f7ff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: inline-block;
+  line-height: 1.4;
+}
+
+td .cell-after {
+  white-space: nowrap;
+  max-width: 100%;
 }

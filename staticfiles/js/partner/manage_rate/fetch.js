@@ -1,281 +1,521 @@
 // django_ma/static/js/partner/manage_rate/fetch.js
-
 import { els } from "./dom_refs.js";
-import { showLoading, hideLoading } from "./utils.js";
+import { showLoading, hideLoading, alertBox } from "./utils.js";
+import { resetInputSection } from "./input_rows.js";
 
 let mainDT = null;
 
-/* ============================================================
-   ✅ DataTables 초기화 (1회)
-============================================================ */
-function ensureMainDT() {
-  if (!els.mainTable) return null;
-  if (!window.jQuery || !window.jQuery.fn?.DataTable) return null;
-  if (mainDT) return mainDT;
+// 1회만 바인딩
+let delegationBound = false;
 
-  mainDT = window.jQuery(els.mainTable).DataTable({
-    paging: false,
-    searching: false,
-    info: false,
-    ordering: false,
-    destroy: true,
-    language: { emptyTable: "데이터가 없습니다." },
-  });
-  return mainDT;
+/* ============================================================
+   Dataset helpers
+============================================================ */
+function getDatasetUrl(root, keys = []) {
+  const ds = root?.dataset;
+  if (!ds) return "";
+  for (const k of keys) {
+    const v = ds[k];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  return "";
+}
+
+function getFetchBaseUrl() {
+  return getDatasetUrl(els.root, ["fetchUrl", "dataFetchUrl", "fetchURL", "dataFetchURL"]);
+}
+
+function getUpdateProcessDateUrl() {
+  return getDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
+}
+
+function getDeleteUrl() {
+  return getDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
+}
+
+function getUserGrade() {
+  return String(els.root?.dataset?.userGrade || "").trim();
+}
+
+function canEditProcessDate() {
+  const g = getUserGrade();
+  return g === "superuser" || g === "main_admin";
+}
+
+function canDeleteRow() {
+  const g = getUserGrade();
+  return g === "superuser" || g === "main_admin";
 }
 
 /* ============================================================
-   ✅ 서버 데이터 조회
-   payload = { ym, branch, grade, level, team_a, team_b, team_c }
+   Normalizers / Escapes
 ============================================================ */
-export async function fetchData(payload = {}) {
-  if (!els.root) return;
+function normalizeYM(ym) {
+  const s = String(ym || "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
 
-  const baseUrl = els.root.dataset.dataFetchUrl;
-  if (!baseUrl) {
-    console.warn("[rate/fetch] ⚠️ data-fetch-url 누락");
-    return;
-  }
+  const digits = s.replaceAll("-", "").replaceAll("/", "").replaceAll(".", "");
+  if (/^\d{6}$/.test(digits)) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
+  if (s.length >= 6) return `${s.slice(0, 4)}-${s.slice(-2)}`;
+  return s;
+}
 
-  // 🔹 month 파라미터 보정 (YYYY-MM)
-  let ym = (payload.ym || "").trim();
-  if (ym && !/^\d{4}-\d{2}$/.test(ym)) {
-    const y = ym.slice(0, 4);
-    const m = ym.slice(-2);
-    ym = `${y}-${m}`;
-  }
-
-  // 🔹 URL 생성
-  const url = new URL(baseUrl, window.location.origin);
-  url.searchParams.set("month", ym);
-  url.searchParams.set("branch", payload.branch || "");
-  url.searchParams.set("grade", payload.grade || "");
-  url.searchParams.set("level", payload.level || "");
-  url.searchParams.set("team_a", payload.team_a || "");
-  url.searchParams.set("team_b", payload.team_b || "");
-  url.searchParams.set("team_c", payload.team_c || "");
-
-  console.log("➡️ [rate/fetch] FETCH 호출:", url.toString());
-
-  showLoading("데이터를 불러오는 중입니다...");
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-    });
-
-    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
-
-    const data = await res.json();
-    const rows = Array.isArray(data?.rows) ? data.rows : [];
-
-    if (data.status !== "success") {
-      console.warn("[rate/fetch] ⚠️ 서버 응답 status != success", data);
-      renderInputSection([]);
-      renderMainSheet([]);
-      revealSections();
-      hideLoading();
-      return;
-    }
-
-    console.log(`✅ [rate/fetch] ${rows.length}건 수신 완료`);
-    renderInputSection(rows);
-    renderMainSheet(rows);
-  } catch (err) {
-    console.error("❌ [rate/fetch] 예외 발생:", err);
-    renderInputSection([]);
-    renderMainSheet([]);
-  } finally {
-    revealSections();
-    hideLoading();
-  }
+function escapeHtml(v) {
+  const s = String(v ?? "");
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+function escapeAttr(v) {
+  return escapeHtml(v);
 }
 
 /* ============================================================
-   ✅ UI 표시 제어 (항상 노출 보장)
+   UI helpers
 ============================================================ */
 function revealSections() {
   const inputSec = document.getElementById("inputSection");
   const mainSec = document.getElementById("mainSheet");
   if (inputSec) inputSec.hidden = false;
   if (mainSec) mainSec.hidden = false;
+
+  requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
+}
+
+function safeResetInput() {
+  try {
+    resetInputSection();
+  } catch (e) {
+    console.warn("[rate/fetch] resetInputSection 실패(무시):", e);
+  }
 }
 
 /* ============================================================
-   ✅ 내용입력 렌더링
+   CSRF
 ============================================================ */
-function renderInputSection(rows) {
-  if (!els.inputTable) return;
-  const tbody = els.inputTable.querySelector("tbody");
-  if (!tbody) return;
+function getCSRFToken() {
+  return window.csrfToken || "";
+}
 
-  tbody.innerHTML = "";
-  if (!rows.length) {
-    tbody.appendChild(createEmptyInputRow());
-    return;
+/* ============================================================
+   Server calls
+============================================================ */
+async function updateProcessDate(id, value) {
+  const url = getUpdateProcessDateUrl();
+  if (!url) throw new Error("update_process_date_url 누락 (data-update-process-date-url 확인)");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCSRFToken(),
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: JSON.stringify({
+      id,
+      process_date: value || "",
+      kind: "rate",
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.status !== "success") {
+    throw new Error(data.message || `처리일자 저장 실패 (${res.status})`);
+  }
+  return data;
+}
+
+async function deleteRateRow(id) {
+  const url = getDeleteUrl();
+  if (!url) throw new Error("delete_url 누락 (data-delete-url 확인)");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCSRFToken(),
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: JSON.stringify({ id }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.status !== "success") {
+    throw new Error(data.message || `삭제 실패 (${res.status})`);
+  }
+  return data;
+}
+
+/* ============================================================
+   Render helpers
+   - 변경후 강조(.cell-after)
+============================================================ */
+function renderAfterCell(val) {
+  const v = String(val ?? "").trim();
+  if (!v) return "";
+  return `<span class="cell-after">${escapeHtml(v)}</span>`;
+}
+
+/* ============================================================
+   Render cells
+============================================================ */
+function buildActionButtons(row) {
+  // ✅ sub_admin은 버튼 자체 미표시
+  if (!canDeleteRow()) return "";
+  return `
+    <button type="button"
+            class="btn btn-sm btn-outline-danger btnDeleteRow"
+            data-id="${escapeAttr(row.id || "")}">
+      삭제
+    </button>
+  `;
+}
+
+/**
+ * ✅ 처리일자 셀 렌더링
+ * - superuser/main_admin: date input (편집 가능)
+ * - sub_admin: 텍스트만 표시 (요청 반영: 박스/인풋 없음)
+ */
+function renderProcessDateCell(_value, _type, row) {
+  const grade = getUserGrade();
+  const val = (row.process_date || "").trim();
+
+  // ✅ sub_admin은 "텍스트-only" 표시
+  if (grade === "sub_admin") {
+    return `<span>${escapeHtml(val || "")}</span>`;
   }
 
-  rows.forEach((row) => tbody.appendChild(createInputRowFromData(row)));
+  // ✅ 그 외는 input date 유지
+  const editable = canEditProcessDate();
+  const disabledAttr = editable ? "" : "disabled";
+
+  return `
+    <input type="date"
+           class="form-control form-control-sm processDateInput"
+           data-id="${escapeAttr(row.id || "")}"
+           value="${escapeAttr(val)}"
+           ${disabledAttr} />
+  `;
 }
 
 /* ============================================================
-   ✅ 메인시트 렌더링
+   DataTables
 ============================================================ */
-function renderMainSheet(rows) {
-  const dt = ensureMainDT();
-  if (dt) {
-    dt.clear();
-    if (rows.length) {
-      const mapped = rows.map(normalizeRateRow).map((r) => [
-        r.requester_name,
-        r.requester_id,
-        r.requester_branch,
-        r.target_name,
-        r.target_id,
-        r.table_before,
-        r.table_after,
-        r.rate_before,
-        r.rate_after,
-        r.memo,
-        r.process_date,
-        buildActionButtons(r),
-      ]);
-      dt.rows.add(mapped).draw();
-    } else {
-      dt.draw();
+const MAIN_COLUMNS = [
+  { data: "requester_name", defaultContent: "", width: "50px" },
+  { data: "requester_id", defaultContent: "", width: "50px" },
+
+  { data: "target_name", defaultContent: "", width: "50px" },
+  { data: "target_id", defaultContent: "", width: "50px" },
+
+  { data: "before_ftable", defaultContent: "", width: "70px" },
+  { data: "before_frate", defaultContent: "", width: "70px" },
+
+  // ✅ 손보테이블(변경후) 강조
+  {
+    data: "after_ftable",
+    defaultContent: "",
+    width: "70px",
+    render: (val) => renderAfterCell(val),
+  },
+  { data: "after_frate", defaultContent: "", width: "70px" },
+
+  { data: "before_ltable", defaultContent: "", width: "70px" },
+  { data: "before_lrate", defaultContent: "", width: "70px" },
+
+  // ✅ 생보테이블(변경후) 강조
+  {
+    data: "after_ltable",
+    defaultContent: "",
+    width: "70px",
+    render: (val) => renderAfterCell(val),
+  },
+  { data: "after_lrate", defaultContent: "", width: "70px" },
+
+  { data: "memo", defaultContent: "", width: "150px" },
+
+  {
+    data: "process_date",
+    width: "120px",
+    orderable: false,
+    searchable: false,
+    render: renderProcessDateCell,
+    defaultContent: "",
+  },
+  {
+    data: "id",
+    width: "70px",
+    orderable: false,
+    searchable: false,
+    render: (_id, _type, row) => buildActionButtons(row),
+    defaultContent: "",
+  },
+];
+
+const MAIN_COLSPAN = MAIN_COLUMNS.length;
+
+function canUseDataTables() {
+  return !!(els.mainTable && window.jQuery && window.jQuery.fn?.DataTable);
+}
+
+function adjustDT() {
+  if (!mainDT) return;
+  try {
+    mainDT.columns.adjust().draw(false);
+  } catch (_) {}
+}
+
+function destroyIfExists() {
+  try {
+    if (els.mainTable && window.jQuery?.fn?.DataTable?.isDataTable?.(els.mainTable)) {
+      window.jQuery(els.mainTable).DataTable().clear().destroy();
     }
-    return;
-  }
+  } catch (_) {}
+}
 
-  // ⚙️ fallback: DataTables 미사용 시 수동 렌더링
+function ensureMainDT() {
+  if (!canUseDataTables()) return null;
+  if (mainDT) return mainDT;
+
+  destroyIfExists();
+
+  mainDT = window.jQuery(els.mainTable).DataTable({
+    paging: true,
+    searching: true,
+    info: true,
+    ordering: false,
+    pageLength: 10,
+    lengthChange: true,
+    autoWidth: false,
+    destroy: true,
+    language: {
+      emptyTable: "데이터가 없습니다.",
+      search: "검색:",
+      lengthMenu: "_MENU_개씩 보기",
+      info: "_TOTAL_건 중 _START_ ~ _END_",
+      infoEmpty: "0건",
+      paginate: { previous: "이전", next: "다음" },
+    },
+    columns: MAIN_COLUMNS,
+  });
+
+  return mainDT;
+}
+
+/* ============================================================
+   Fallback render (DataTables 미사용 환경)
+============================================================ */
+function renderMainSheetFallback(rows) {
   if (!els.mainTable) return;
   const tbody = els.mainTable.querySelector("tbody");
   if (!tbody) return;
+
   tbody.innerHTML = "";
 
-  if (!rows.length) {
+  if (!rows?.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="12" class="text-center text-muted">데이터가 없습니다.</td>`;
+    tr.innerHTML = `<td colspan="${MAIN_COLSPAN}" class="text-center text-muted">데이터가 없습니다.</td>`;
     tbody.appendChild(tr);
     return;
   }
 
-  rows.map(normalizeRateRow).forEach((r) => {
+  const grade = getUserGrade();
+
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
+    const proc = (r.process_date || "").trim();
+
     tr.innerHTML = `
-      <td>${r.requester_name}</td>
-      <td>${r.requester_id}</td>
-      <td>${r.requester_branch}</td>
-      <td>${r.target_name}</td>
-      <td>${r.target_id}</td>
-      <td>${r.table_before}</td>
-      <td>${r.table_after}</td>
-      <td>${r.rate_before}</td>
-      <td>${r.rate_after}</td>
-      <td>${r.memo}</td>
-      <td>${r.process_date}</td>
-      <td>${buildActionButtons(r)}</td>
+      <td>${escapeHtml(r.requester_name)}</td>
+      <td>${escapeHtml(r.requester_id)}</td>
+
+      <td>${escapeHtml(r.target_name)}</td>
+      <td>${escapeHtml(r.target_id)}</td>
+
+      <td>${escapeHtml(r.before_ftable)}</td>
+      <td class="text-center">${escapeHtml(r.before_frate)}</td>
+
+      <!-- ✅ 변경후 손보 테이블 강조 -->
+      <td>${renderAfterCell(r.after_ftable)}</td>
+      <td class="text-center">${escapeHtml(r.after_frate)}</td>
+
+      <td>${escapeHtml(r.before_ltable)}</td>
+      <td class="text-center">${escapeHtml(r.before_lrate)}</td>
+
+      <!-- ✅ 변경후 생보 테이블 강조 -->
+      <td>${renderAfterCell(r.after_ltable)}</td>
+      <td class="text-center">${escapeHtml(r.after_lrate)}</td>
+
+      <td>${escapeHtml(r.memo)}</td>
+
+      <td class="text-center">
+        ${
+          grade === "sub_admin"
+            ? `<span>${escapeHtml(proc)}</span>`
+            : `<input type="date"
+                      class="form-control form-control-sm processDateInput"
+                      data-id="${escapeAttr(r.id || "")}"
+                      value="${escapeAttr(proc)}"
+                      ${canEditProcessDate() ? "" : "disabled"} />`
+        }
+      </td>
+
+      <td class="text-center">${buildActionButtons(r)}</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
+function renderMainSheet(rows) {
+  const dt = ensureMainDT();
+  if (dt) {
+    dt.clear();
+    if (rows?.length) dt.rows.add(rows);
+    dt.draw();
+    requestAnimationFrame(() => adjustDT());
+    return;
+  }
+  renderMainSheetFallback(rows);
+}
+
 /* ============================================================
-   ✅ 데이터 정규화
+   Delegation (document, once)
+============================================================ */
+function bindDelegationOnce() {
+  if (delegationBound) return;
+  delegationBound = true;
+
+  // 처리일자 변경
+  document.addEventListener("change", async (e) => {
+    const t = e.target;
+    if (!t?.classList?.contains("processDateInput")) return;
+    if (!els.mainTable || !els.mainTable.contains(t)) return;
+    if (!canEditProcessDate()) return;
+
+    const id = String(t.dataset.id || "").trim();
+    const value = String(t.value || "").trim();
+    if (!id) return;
+
+    showLoading("처리일자 저장 중...");
+    try {
+      await updateProcessDate(id, value);
+    } catch (err) {
+      console.error(err);
+      alertBox?.(err?.message || "처리일자 저장 실패") ?? alert(err?.message || "처리일자 저장 실패");
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // 삭제 클릭
+  document.addEventListener("click", async (e) => {
+    const btn = e.target?.closest?.(".btnDeleteRow");
+    if (!btn) return;
+    if (!els.mainTable || !els.mainTable.contains(btn)) return;
+
+    if (!canDeleteRow()) return; // sub_admin 방어
+    const id = String(btn.dataset.id || "").trim();
+    if (!id) return;
+
+    if (!confirm("해당 행을 삭제할까요?")) return;
+
+    showLoading("삭제 중...");
+    try {
+      await deleteRateRow(id);
+      await fetchData(window.__lastRateFetchPayload || {});
+    } catch (err) {
+      console.error(err);
+      alertBox?.(err?.message || "삭제 실패") ?? alert(err?.message || "삭제 실패");
+    } finally {
+      hideLoading();
+    }
+  });
+}
+
+/* ============================================================
+   Normalize row
 ============================================================ */
 function normalizeRateRow(row = {}) {
   return {
     id: row.id || "",
+
     requester_name: row.requester_name || row.rq_name || "",
     requester_id: row.requester_id || row.rq_id || "",
+
     target_name: row.target_name || row.tg_name || "",
     target_id: row.target_id || row.tg_id || "",
+
     before_ftable: row.before_ftable || "",
     before_frate: row.before_frate || "",
     after_ftable: row.after_ftable || "",
     after_frate: row.after_frate || "",
+
     before_ltable: row.before_ltable || "",
-    before_lrate: row.before_lrate || "",    
+    before_lrate: row.before_lrate || "",
     after_ltable: row.after_ltable || "",
     after_lrate: row.after_lrate || "",
+
     memo: row.memo || "",
     process_date: row.process_date || "",
   };
 }
 
-
 /* ============================================================
-   ✅ 입력행 생성 (템플릿 구조와 완벽히 일치 — 15열)
+   Fetch
 ============================================================ */
-function createEmptyInputRow() {
-  const tr = document.createElement("tr");
-  tr.classList.add("input-row");
-  tr.innerHTML = `
-    <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
-    <td><input type="text" name="after_ftable" class="form-control form-control-sm"></td>
-    <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" readonly></td>
-    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" readonly></td>
-    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>    
-    <td><input type="text" name="after_ltable" class="form-control form-control-sm"></td>
-    <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" readonly></td>
-    <td><input type="text" name="memo" class="form-control form-control-sm" placeholder="상세하게 기재"></td>
-    <td class="text-center">
-      <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
-              data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-    </td>
-    <td class="text-center">
-      <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
-    </td>
-  `;
-  return tr;
-}
+export async function fetchData(payload = {}) {
+  if (!els.root) return;
 
+  // ✅ 삭제 후 재조회 재사용
+  window.__lastRateFetchPayload = payload;
 
-/* ============================================================
-   ✅ 데이터 기반 입력행 생성 (15열 일치)
-============================================================ */
-function createInputRowFromData(row) {
-  const r = normalizeRateRow(row);
-  const tr = document.createElement("tr");
-  tr.classList.add("input-row");
-  tr.innerHTML = `
-    <td><input type="text" name="rq_name" class="form-control form-control-sm readonly-field" value="${r.requester_name || ""}" readonly></td>
-    <td><input type="text" name="rq_id" class="form-control form-control-sm readonly-field" value="${r.requester_id || ""}" readonly></td>
-    <td><input type="text" name="tg_name" class="form-control form-control-sm readonly-field" value="${r.target_name || ""}" readonly></td>
-    <td><input type="text" name="tg_id" class="form-control form-control-sm readonly-field" value="${r.target_id || ""}" readonly></td>
-    <td><input type="text" name="before_ftable" class="form-control form-control-sm readonly-field" value="${r.before_ftable || ""}" readonly></td>
-    <td><input type="text" name="before_frate" class="form-control form-control-sm readonly-field text-center" value="${r.before_frate || ""}" readonly></td>
-    <td><input type="text" name="after_ftable" class="form-control form-control-sm" value="${r.after_ftable || ""}"></td>
-    <td><input type="text" name="after_frate" class="form-control form-control-sm readonly-field text-center" value="${r.after_frate || ""}" readonly></td>
-    <td><input type="text" name="before_ltable" class="form-control form-control-sm readonly-field" value="${r.before_ltable || ""}" readonly></td>
-    <td><input type="text" name="before_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.before_lrate || ""}" readonly></td>
-        <td><input type="text" name="after_ltable" class="form-control form-control-sm" value="${r.after_ltable || ""}"></td>
-    <td><input type="text" name="after_lrate" class="form-control form-control-sm readonly-field text-center" value="${r.after_lrate || ""}" readonly></td>
-    <td><input type="text" name="memo" class="form-control form-control-sm" value="${r.memo || ""}" placeholder="상세하게 기재"></td>
-    <td class="text-center">
-      <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
-              data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-    </td>
-    <td class="text-center">
-      <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
-    </td>
-  `;
-  return tr;
-}
+  bindDelegationOnce();
 
+  const baseUrl = getFetchBaseUrl();
+  if (!baseUrl) {
+    console.warn("[rate/fetch] fetchUrl 누락", els.root?.dataset);
+    revealSections();
+    safeResetInput();
+    renderMainSheet([]);
+    return;
+  }
 
-/* ============================================================
-   ✅ 액션 버튼
-============================================================ */
-function buildActionButtons(row) {
-  return `
-    <button type="button" class="btn btn-sm btn-outline-danger btnDeleteRow" data-id="${row.id || ""}">
-      삭제
-    </button>
-  `;
+  const ym = normalizeYM(payload.ym);
+  const url = new URL(baseUrl, window.location.origin);
+  url.searchParams.set("month", ym);
+  url.searchParams.set("branch", payload.branch || "");
+
+  showLoading("데이터를 불러오는 중입니다...");
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
+
+    const data = await res.json().catch(() => ({}));
+    const rawRows = Array.isArray(data?.rows) ? data.rows : [];
+
+    revealSections();
+
+    if (data.status !== "success") {
+      safeResetInput();
+      renderMainSheet([]);
+      return;
+    }
+
+    const rows = rawRows.map(normalizeRateRow);
+    safeResetInput();
+    renderMainSheet(rows);
+  } catch (err) {
+    console.error("❌ [rate/fetch] 예외:", err);
+    revealSections();
+    safeResetInput();
+    renderMainSheet([]);
+  } finally {
+    hideLoading();
+  }
 }
