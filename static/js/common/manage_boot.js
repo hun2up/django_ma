@@ -1,6 +1,7 @@
 // django_ma/static/js/common/manage_boot.js
 import { fetchData as fetchStructure } from "../partner/manage_structure/fetch.js";
 import { fetchData as fetchRate } from "../partner/manage_rate/fetch.js";
+import { pad2 } from "./manage/ym.js";
 
 /**
  * ✅ 공통 부트 로더 (Manage Structure / Rate 등 페이지 공용)
@@ -54,7 +55,6 @@ export function initManageBoot(contextName) {
       }
     };
 
-    // DOM 안정화 이후 실행
     window.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => loadPartsSafely(0), 600);
     });
@@ -65,21 +65,18 @@ export function initManageBoot(contextName) {
      → fetchData() 자동 실행 포함
   ============================================================ */
   window.addEventListener("DOMContentLoaded", () => {
-    if (!boot.autoLoad || !["main_admin", "sub_admin"].includes(user.grade))
-      return;
+    if (!boot.autoLoad || !["main_admin", "sub_admin"].includes(user.grade)) return;
 
     const year = document.getElementById("yearSelect")?.value;
     const month = document.getElementById("monthSelect")?.value;
-    const ym = `${year}-${String(month).padStart(2, "0")}`;
+    const ym = `${year}-${pad2(month)}`;
     const branch = user.branch?.trim() || "";
 
     console.log(`🟢 autoLoad 실행 (${contextName})`, { ym, branch });
 
     setTimeout(() => {
       const inputSection = document.getElementById("inputSection");
-      const mainTable =
-        document.getElementById("mainTable") ||
-        document.getElementById("mainSheet");
+      const mainTable = document.getElementById("mainTable") || document.getElementById("mainSheet");
 
       inputSection?.removeAttribute("hidden");
       mainTable?.removeAttribute("hidden");

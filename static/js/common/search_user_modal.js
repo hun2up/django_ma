@@ -17,7 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultsBox = modalEl.querySelector("#searchResults");
   const searchUrl = modalEl.dataset.searchUrl || "/api/accounts/search-user/";
 
-  // 🔍 검색
+  /* ---------------------------
+     🔍 검색
+  --------------------------- */
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -47,18 +49,18 @@ document.addEventListener("DOMContentLoaded", () => {
             <button type="button" class="list-group-item list-group-item-action search-result"
               data-id="${user.id}"
               data-name="${user.name}"
-              data-branch="${user.branch || ''}"
-              data-rank="${user.rank || ''}"
-              data-part="${user.part || ''}"
-              data-regist="${user.regist || ''}"
-              data-enter="${user.enter || ''}"
-              data-quit="${user.quit || '재직중'}">
+              data-branch="${user.branch || ""}"
+              data-rank="${user.rank || ""}"
+              data-part="${user.part || ""}"
+              data-regist="${user.regist || ""}"
+              data-enter="${user.enter || ""}"
+              data-quit="${user.quit || "재직중"}">
               <div class="d-flex justify-content-between">
-                <span><strong>${user.name}</strong> (${user.id}) (${user.regist || '-'})</span>
-                <small class="text-muted">${user.branch || ''}</small>
+                <span><strong>${user.name}</strong> (${user.id}) (${user.regist || "-"})</span>
+                <small class="text-muted">${user.branch || ""}</small>
               </div>
               <small class="text-muted">
-                입사일: ${user.enter || '-'} / 퇴사일: ${user.quit || '-'}
+                입사일: ${user.enter || "-"} / 퇴사일: ${user.quit || "-"}
               </small>
             </button>
           `
@@ -71,7 +73,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ✅ 결과 클릭 → userSelected
+  /* ---------------------------
+     ✅ 결과 클릭 → userSelected
+  --------------------------- */
   document.addEventListener("click", (e) => {
     const item = e.target.closest(".search-result");
     if (!item) return;
@@ -96,7 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (resultsBox) resultsBox.innerHTML = "";
   });
 
-  // 모달 닫힐 때 초기화
+  /* ---------------------------
+     모달 닫힐 때 초기화
+  --------------------------- */
   modalEl.addEventListener("hidden.bs.modal", () => {
     if (input) input.value = "";
     if (resultsBox) resultsBox.innerHTML = "";

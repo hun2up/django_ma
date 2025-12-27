@@ -463,3 +463,22 @@ table {
   width: 100%;
   margin: 0;
 }
+
+/* =======================================================
+   ✅ (추가) 변경후 데이터 강조 스타일 (편제/요율/지점효율 공용)
+   - input처럼 보이지 않게, 결과값처럼 보이게
+   ======================================================= */
+.cell-after {
+  color: #005BAC;
+  font-weight: 600;
+  background-color: #f1f7ff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: inline-block;
+  line-height: 1.4;
+}
+
+td .cell-after {
+  white-space: nowrap;
+  max-width: 100%;
+}

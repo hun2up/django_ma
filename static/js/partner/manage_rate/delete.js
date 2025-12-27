@@ -1,11 +1,15 @@
 // django_ma/static/js/partner/manage_rate/delete.js
 // ======================================================
-// 📘 요율변경 요청 페이지 - 삭제 로직 (dataset 키 통일 버전)
+// 📘 요율변경 요청 페이지 - 삭제 로직 (dataset 키 통일 + 공통화)
+// - 기능/동작 동일 (sub_admin 삭제 차단, 삭제 후 재조회)
 // ======================================================
 
 import { els } from "./dom_refs.js";
-import { showLoading, hideLoading, getCSRFToken, alertBox, selectedYM } from "./utils.js";
+import { showLoading, hideLoading, alertBox, selectedYM } from "./utils.js";
 import { fetchData } from "./fetch.js";
+
+import { getCSRFToken } from "../../common/manage/csrf.js";
+import { getDatasetUrl } from "../../common/manage/dataset.js";
 
 /* ==========================
    ✅ 공통: grade/branch/ym
@@ -34,6 +38,14 @@ function buildFetchPayload() {
 }
 
 /* ============================================================
+   ✅ 삭제 URL: 기존 dataset 키 호환 유지
+============================================================ */
+function getDeleteUrl() {
+  // manage_rate.html 템플릿이 어떤 키를 쓰든 호환
+  return getDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
+}
+
+/* ============================================================
    ✅ 삭제 이벤트 등록 (중복 방지)
 ============================================================ */
 export function attachDeleteHandlers() {
@@ -59,7 +71,7 @@ async function handleDeleteClick(e) {
 
   if (!confirm("해당 데이터를 삭제하시겠습니까?")) return;
 
-  const deleteUrl = (els.root.dataset.deleteUrl || "").trim(); // ✅ dataset 키 통일
+  const deleteUrl = getDeleteUrl();
   if (!deleteUrl) {
     alertBox("삭제 URL이 설정되어 있지 않습니다. (data-delete-url 확인)");
     return;
@@ -78,7 +90,7 @@ async function handleDeleteClick(e) {
       body: JSON.stringify({ id }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok || data.status !== "success") {
       throw new Error(data.message || `삭제 실패 (HTTP ${res.status})`);
