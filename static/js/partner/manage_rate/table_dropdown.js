@@ -1,4 +1,13 @@
 // django_ma/static/js/partner/manage_rate/table_dropdown.js
+// ======================================================
+// 📘 요율변경 페이지 - 테이블 드롭다운
+//  - dataset(data-table-fetch-url) 기반 조회
+//  - 캐시(Map) 관리
+//  - after_ftable/after_ltable input→select 교체
+//  - 옵션은 테이블명만 표시
+//  - 선택 시 after_frate/after_lrate 자동 동기화
+// ======================================================
+
 import { els } from "./dom_refs.js";
 
 const tableCache = new Map();
@@ -18,7 +27,7 @@ async function safeJson(res) {
 }
 
 /**
- * branch의 TableSetting 목록을 서버에서 가져옴
+ * ✅ branch의 TableSetting 목록을 서버에서 가져옴
  * return: [{ table, rate }, ...]
  */
 export async function fetchBranchTables(branch) {
@@ -27,8 +36,7 @@ export async function fetchBranchTables(branch) {
 
   if (tableCache.has(b)) return tableCache.get(b);
 
-  // ✅ 무조건 dataset URL 사용 (하드코딩 금지)
-  const base = String(els.root?.dataset?.tableFetchUrl || "").trim(); // manage_rate.html: data-table-fetch-url
+  const base = String(els.root?.dataset?.tableFetchUrl || "").trim(); // data-table-fetch-url
   if (!base) {
     console.warn("[rate] data-table-fetch-url 누락");
     tableCache.set(b, []);
@@ -63,13 +71,16 @@ export async function fetchBranchTables(branch) {
 }
 
 /**
- * after_ftable/after_ltable을 select로 교체하고
- * ✅ 옵션에는 "테이블명만" 표시
+ * ✅ after_ftable/after_ltable을 select로 교체하고
+ * 옵션에는 "테이블명만" 표시
  * 선택시 after_frate/after_lrate 자동 입력
  */
 export function applyTableDropdownToRow(rowEl, tables = []) {
   if (!rowEl) return;
 
+  /* ---------------------------
+     select 생성/교체
+  --------------------------- */
   const makeSelect = (name) => {
     const existing = rowEl.querySelector(`select[name="${name}"]`);
     if (existing) return existing;
@@ -91,14 +102,16 @@ export function applyTableDropdownToRow(rowEl, tables = []) {
   const afterFSelect = makeSelect("after_ftable");
   const afterLSelect = makeSelect("after_ltable");
 
-  // ✅ 옵션: 테이블명만
+  /* ---------------------------
+     옵션 채우기
+  --------------------------- */
   const fillOptions = (sel) => {
     const current = sel.value || "";
     sel.innerHTML = `<option value="">선택</option>`;
     for (const t of tables) {
       const opt = document.createElement("option");
       opt.value = t.table;
-      opt.textContent = t.table; // ⭐ 요율 표시 제거
+      opt.textContent = t.table; // ✅ 테이블명만
       sel.appendChild(opt);
     }
     if (current) sel.value = current;
@@ -107,6 +120,9 @@ export function applyTableDropdownToRow(rowEl, tables = []) {
   fillOptions(afterFSelect);
   fillOptions(afterLSelect);
 
+  /* ---------------------------
+     rate 동기화
+  --------------------------- */
   const rateMap = new Map(tables.map((t) => [t.table, t.rate]));
   const afterFRateInput = rowEl.querySelector(`[name="after_frate"]`);
   const afterLRateInput = rowEl.querySelector(`[name="after_lrate"]`);

@@ -22,17 +22,14 @@ function getDatasetUrl(root, keys = []) {
 }
 
 function getFetchBaseUrl() {
-  // template: data-fetch-url
   return getDatasetUrl(els.root, ["fetchUrl", "dataFetchUrl", "fetchURL", "dataFetchURL"]);
 }
 
 function getUpdateProcessDateUrl() {
-  // template: data-update-process-date-url
   return getDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
 }
 
 function getDeleteUrl() {
-  // template: data-delete-url
   return getDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
 }
 
@@ -154,6 +151,16 @@ async function deleteRateRow(id) {
 }
 
 /* ============================================================
+   Render helpers
+   - 변경후 강조(.cell-after)
+============================================================ */
+function renderAfterCell(val) {
+  const v = String(val ?? "").trim();
+  if (!v) return "";
+  return `<span class="cell-after">${escapeHtml(v)}</span>`;
+}
+
+/* ============================================================
    Render cells
 ============================================================ */
 function buildActionButtons(row) {
@@ -168,9 +175,22 @@ function buildActionButtons(row) {
   `;
 }
 
+/**
+ * ✅ 처리일자 셀 렌더링
+ * - superuser/main_admin: date input (편집 가능)
+ * - sub_admin: 텍스트만 표시 (요청 반영: 박스/인풋 없음)
+ */
 function renderProcessDateCell(_value, _type, row) {
-  const editable = canEditProcessDate();
+  const grade = getUserGrade();
   const val = (row.process_date || "").trim();
+
+  // ✅ sub_admin은 "텍스트-only" 표시
+  if (grade === "sub_admin") {
+    return `<span>${escapeHtml(val || "")}</span>`;
+  }
+
+  // ✅ 그 외는 input date 유지
+  const editable = canEditProcessDate();
   const disabledAttr = editable ? "" : "disabled";
 
   return `
@@ -194,12 +214,26 @@ const MAIN_COLUMNS = [
 
   { data: "before_ftable", defaultContent: "", width: "70px" },
   { data: "before_frate", defaultContent: "", width: "70px" },
-  { data: "after_ftable", defaultContent: "", width: "70px" },
+
+  // ✅ 손보테이블(변경후) 강조
+  {
+    data: "after_ftable",
+    defaultContent: "",
+    width: "70px",
+    render: (val) => renderAfterCell(val),
+  },
   { data: "after_frate", defaultContent: "", width: "70px" },
 
   { data: "before_ltable", defaultContent: "", width: "70px" },
   { data: "before_lrate", defaultContent: "", width: "70px" },
-  { data: "after_ltable", defaultContent: "", width: "70px" },
+
+  // ✅ 생보테이블(변경후) 강조
+  {
+    data: "after_ltable",
+    defaultContent: "",
+    width: "70px",
+    render: (val) => renderAfterCell(val),
+  },
   { data: "after_lrate", defaultContent: "", width: "70px" },
 
   { data: "memo", defaultContent: "", width: "150px" },
@@ -273,7 +307,7 @@ function ensureMainDT() {
 }
 
 /* ============================================================
-   Fallback render
+   Fallback render (DataTables 미사용 환경)
 ============================================================ */
 function renderMainSheetFallback(rows) {
   if (!els.mainTable) return;
@@ -289,11 +323,12 @@ function renderMainSheetFallback(rows) {
     return;
   }
 
-  rows.forEach((r) => {
-    const editable = canEditProcessDate();
-    const disabledAttr = editable ? "" : "disabled";
+  const grade = getUserGrade();
 
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
+    const proc = (r.process_date || "").trim();
+
     tr.innerHTML = `
       <td>${escapeHtml(r.requester_name)}</td>
       <td>${escapeHtml(r.requester_id)}</td>
@@ -303,22 +338,30 @@ function renderMainSheetFallback(rows) {
 
       <td>${escapeHtml(r.before_ftable)}</td>
       <td class="text-center">${escapeHtml(r.before_frate)}</td>
-      <td>${escapeHtml(r.after_ftable)}</td>
+
+      <!-- ✅ 변경후 손보 테이블 강조 -->
+      <td>${renderAfterCell(r.after_ftable)}</td>
       <td class="text-center">${escapeHtml(r.after_frate)}</td>
 
       <td>${escapeHtml(r.before_ltable)}</td>
       <td class="text-center">${escapeHtml(r.before_lrate)}</td>
-      <td>${escapeHtml(r.after_ltable)}</td>
+
+      <!-- ✅ 변경후 생보 테이블 강조 -->
+      <td>${renderAfterCell(r.after_ltable)}</td>
       <td class="text-center">${escapeHtml(r.after_lrate)}</td>
 
       <td>${escapeHtml(r.memo)}</td>
 
       <td class="text-center">
-        <input type="date"
-               class="form-control form-control-sm processDateInput"
-               data-id="${escapeAttr(r.id || "")}"
-               value="${escapeAttr((r.process_date || "").trim())}"
-               ${disabledAttr} />
+        ${
+          grade === "sub_admin"
+            ? `<span>${escapeHtml(proc)}</span>`
+            : `<input type="date"
+                      class="form-control form-control-sm processDateInput"
+                      data-id="${escapeAttr(r.id || "")}"
+                      value="${escapeAttr(proc)}"
+                      ${canEditProcessDate() ? "" : "disabled"} />`
+        }
       </td>
 
       <td class="text-center">${buildActionButtons(r)}</td>

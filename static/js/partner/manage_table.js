@@ -1,12 +1,13 @@
 /**
+ * django_ma/static/js/partner/manage_table.js
  * ✅ 테이블 관리 페이지 (v4.5)
  * ------------------------------------------------------------
- * - DataTables 완전 차단 (다른 페이지 영향 없음)
+ * - DataTables 완전 차단 (이 페이지 전용)
  * - 드래그앤드롭 제거 → ▲ / ▼ 버튼으로 순서 조정
  * - 요율 입력: 정수만 (0~100), 자동 %
  * - 빈칸은 저장 제외
  * - ✅ 요율현황 : superuser는 검색 클릭 시 / main_admin은 자동조회
- * - ✅ 엑셀 다운로드 + 엑셀 업로드 기능 완전 통합
+ * - ✅ 엑셀 다운로드 + 엑셀 업로드 기능 통합
  * ------------------------------------------------------------
  */
 
@@ -54,6 +55,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const userBranch = root.dataset.branch;
   let editMode = false;
 
+  /* ---------------------------------------------------------
+     공통 유틸 (이 파일 전용)
+  --------------------------------------------------------- */
   const showLoading = (msg = "처리 중...") => {
     const label = els.overlay?.querySelector(".mt-2");
     if (label) label.textContent = msg;
@@ -91,41 +95,29 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // ✅ 엑셀 다운로드 버튼
+    // ✅ 엑셀 다운로드
     if (els.btnDownloadExcel) {
       els.btnDownloadExcel.addEventListener("click", () => {
         const branch =
-          userGrade === "superuser"
-            ? els.branch.value?.trim()
-            : userBranch?.trim();
+          userGrade === "superuser" ? els.branch.value?.trim() : userBranch?.trim();
         if (!branch) return alertBox("지점을 먼저 선택해주세요.");
-        const url = `/partner/ajax/rate-userlist-excel/?branch=${encodeURIComponent(
-          branch
-        )}`;
+        const url = `/partner/ajax/rate-userlist-excel/?branch=${encodeURIComponent(branch)}`;
         window.location.href = url;
       });
     }
 
-    // ✅ 엑셀 업로드 버튼
+    // ✅ 엑셀 업로드
     if (els.btnUploadExcel && els.inputExcel) {
-      els.btnUploadExcel.addEventListener("click", () =>
-        els.inputExcel.click()
-      );
+      els.btnUploadExcel.addEventListener("click", () => els.inputExcel.click());
 
       els.inputExcel.addEventListener("change", async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (
-          !confirm(
-            "선택한 엑셀의 '업로드' 시트를 기준으로 요율현황을 갱신하시겠습니까?"
-          )
-        )
-          return;
+
+        if (!confirm("선택한 엑셀의 '업로드' 시트를 기준으로 요율현황을 갱신하시겠습니까?")) return;
 
         const branch =
-          userGrade === "superuser"
-            ? els.branch.value?.trim()
-            : userBranch?.trim();
+          userGrade === "superuser" ? els.branch.value?.trim() : userBranch?.trim();
         if (!branch) return alertBox("지점을 먼저 선택해주세요.");
 
         const formData = new FormData();
@@ -266,16 +258,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="order-cell">${order}</td>
         <td>${r.branch || branch}</td>
         <td class="editable" contenteditable="${editMode}">${r.table || ""}</td>
-        <td class="editable rate-cell" contenteditable="${editMode}">${
-        r.rate || ""
-      }</td>
+        <td class="editable rate-cell" contenteditable="${editMode}">${r.rate || ""}</td>
         <td>
-          <button class="btn btn-outline-secondary btn-sm btnMoveUp" ${
-            !editMode ? "disabled" : ""
-          }>▲</button>
-          <button class="btn btn-outline-secondary btn-sm btnMoveDown" ${
-            !editMode ? "disabled" : ""
-          }>▼</button>
+          <button class="btn btn-outline-secondary btn-sm btnMoveUp" ${!editMode ? "disabled" : ""}>▲</button>
+          <button class="btn btn-outline-secondary btn-sm btnMoveDown" ${!editMode ? "disabled" : ""}>▼</button>
         </td>
         <td>
           <button class="btn btn-sm btn-danger btnDeleteRow" ${
@@ -302,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---------------------------------------------------------
-     수정 모드
+     수정 모드 토글
   --------------------------------------------------------- */
   els.btnToggleEdit?.addEventListener("click", () => {
     editMode = !editMode;
@@ -314,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ---------------------------------------------------------
-     행 이동 / 추가 / 삭제 / 저장 / 초기화
+     행 이동 / 삭제 (이벤트 위임)
   --------------------------------------------------------- */
   document.addEventListener("click", (e) => {
     if (!editMode) return;
@@ -343,9 +329,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  /* ---------------------------------------------------------
+     행 추가
+  --------------------------------------------------------- */
   els.btnAdd?.addEventListener("click", () => {
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
     if (!branch) return alertBox("지점을 먼저 선택해주세요.");
+
     const order = els.tableBody.querySelectorAll("tr.data-row").length + 1;
     const tr = document.createElement("tr");
     tr.className = "data-row";
@@ -368,9 +358,13 @@ document.addEventListener("DOMContentLoaded", () => {
     updateOrderNumbers();
   });
 
+  /* ---------------------------------------------------------
+     저장
+  --------------------------------------------------------- */
   els.btnSave?.addEventListener("click", async () => {
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
     if (!branch) return alertBox("지점 정보가 없습니다.");
+
     const rows = Array.from(els.tableBody.querySelectorAll("tr.data-row"))
       .map((tr) => {
         const tds = tr.querySelectorAll("td");
@@ -409,6 +403,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  /* ---------------------------------------------------------
+     초기화
+  --------------------------------------------------------- */
   els.btnReset?.addEventListener("click", async () => {
     if (!confirm("테이블을 초기화하시겠습니까?")) return;
     const branch = userGrade === "superuser" ? els.branch.value : userBranch;
@@ -416,10 +413,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ------------------------------------------------------------
-  // ✅ 지점 내 사용자 요율현황 테이블 로드
+  // ✅ 지점 내 사용자 요율현황 테이블 로드 (DataTables 사용)
   // ------------------------------------------------------------
   async function loadRateUserTable(branch) {
     if (!branch) return;
+
     const table = $("#rateUserTable").DataTable({
       destroy: true,
       searching: true,
@@ -438,9 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     try {
-      const res = await fetch(
-        `/partner/ajax/rate-userlist/?branch=${encodeURIComponent(branch)}`
-      );
+      const res = await fetch(`/partner/ajax/rate-userlist/?branch=${encodeURIComponent(branch)}`);
       const data = await res.json();
       table.clear();
       data.data.forEach((u) => {
