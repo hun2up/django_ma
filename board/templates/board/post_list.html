@@ -1,15 +1,19 @@
-<!-- django_ma/board/templates/post_list.html -->
 {% extends 'base.html' %}
 {% load static %}
 
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
+
+<div id="postListBoot"
+     data-update-url="{% url 'ajax_update_post_field' %}"
+     class="d-none"></div>
+
 <div class="container mt-4 board-font">
-  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">업무요청 게시판</h3>
+  <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
   {% if messages %}
-    <div class="container mt-3">
+    <div class="mb-3">
       {% for message in messages %}
         <div class="alert alert-success alert-dismissible fade show text-center" role="alert">
           {{ message }}
@@ -25,27 +29,28 @@
 
   <div class="card p-4 shadow-sm rounded-4">
     <div class="table-responsive">
-      <table class="table table-hover align-middle text-center">
+      <table class="table table-hover align-middle text-center mb-0">
         <colgroup>
-          <col style="width: 10%">   <!-- 접수번호 -->
-          <col style="width: 10%">  <!-- 접수일자 -->
-          <col style="width: 8%">   <!-- 구분 -->
-          <col style="width: 27%">  <!-- 제목 -->
-          <col style="width: 5%">  <!-- 요청자 -->
-          <col style="width: 13%">  <!-- 담당자 -->
-          <col style="width: 13%">  <!-- 상태 -->
-          <col style="width: 14%">  <!-- 상태변경일 -->
+          <col style="width: 10%">
+          <col style="width: 10%">
+          <col style="width: 8%">
+          <col style="width: 27%">
+          <col style="width: 5%">
+          <col style="width: 13%">
+          <col style="width: 13%">
+          <col style="width: 14%">
         </colgroup>
+
         <thead class="table-light">
           <tr>
-            <th scope="col">접수번호</th>
-            <th scope="col">접수일자</th>
-            <th scope="col">구분</th>
-            <th scope="col" class="text-start">제목</th>
-            <th scope="col">요청자</th>
-            <th scope="col">담당자</th>
-            <th scope="col">상태</th>
-            <th scope="col">상태변경일</th>
+            <th>접수번호</th>
+            <th>접수일자</th>
+            <th>구분</th>
+            <th class="text-start">제목</th>
+            <th>요청자</th>
+            <th>담당자</th>
+            <th>상태</th>
+            <th>상태변경일</th>
           </tr>
         </thead>
 
@@ -62,10 +67,9 @@
             </td>
             <td>{{ post.user_name|default:"-" }}</td>
 
-            <!-- 담당자 -->
             <td>
               {% if is_superuser %}
-                <form method="post" class="d-inline-block inline-update-form">
+                <form class="d-inline-block inline-update-form">
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="handler">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
@@ -75,36 +79,32 @@
                       <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
                     {% endfor %}
                   </select>
-                  <button type="submit" class="btn btn-sm btn-outline-primary">변경</button>
                 </form>
               {% else %}
                 {{ post.handler|default:"-" }}
               {% endif %}
             </td>
 
-            <!-- 상태 -->
             <td>
               {% if is_superuser %}
-                <form method="post" class="d-inline-block inline-update-form">
+                <form class="d-inline-block inline-update-form">
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="status">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
-                  <select name="status"
-                          class="form-select form-select-sm status-select d-inline-block"
-                          style="width:auto;"
-                          data-current="{{ post.status }}">
+                  <select name="status" class="form-select form-select-sm d-inline-block" style="width:auto;">
                     {% for s in status_choices %}
                       <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
                     {% endfor %}
                   </select>
-                  <button type="submit" class="btn btn-sm btn-outline-primary">변경</button>
                 </form>
               {% else %}
-                <span class="fw-semibold status-text" data-status="{{ post.status }}">{{ post.status }}</span>
+                <span class="fw-semibold">{{ post.status }}</span>
               {% endif %}
             </td>
 
-            <td>{{ post.status_updated_at|date:"Y-m-d H:i" }}</td>
+            <td class="status-updated-at">
+              {{ post.status_updated_at|date:"Y-m-d H:i" }}
+            </td>
           </tr>
           {% empty %}
           <tr>
@@ -115,7 +115,6 @@
       </table>
     </div>
 
-    <!-- 페이지네이션 -->
     <div class="text-center mt-3">
       {% if posts.has_previous %}
         <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
@@ -127,11 +126,9 @@
     </div>
   </div>
 
-  <!-- ✅ 검색/필터 폼 -->
+  {# 검색/필터 #}
   <form method="get" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
     <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
-
-      <!-- 검색어 -->
       <div class="d-flex align-items-center gap-2">
         <select name="search_type" class="form-select form-select-sm select-filter">
           <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
@@ -144,9 +141,8 @@
                placeholder="검색어 입력" style="width:180px;">
       </div>
 
-      <!-- 담당자 -->
       <div class="d-flex align-items-center gap-2">
-        <label class="filter-label">담당자</label>
+        <label class="filter-label mb-0">담당자</label>
         <select name="handler" class="form-select form-select-sm" style="width:100px;">
           <option value="전체">전체</option>
           {% for h in handlers %}
@@ -155,9 +151,8 @@
         </select>
       </div>
 
-      <!-- 상태 -->
       <div class="d-flex align-items-center gap-2">
-        <label class="filter-label">상태</label>
+        <label class="filter-label mb-0">상태</label>
         <select name="status" class="form-select form-select-sm" style="width:100px;">
           <option value="전체">전체</option>
           {% for s in status_choices %}
@@ -166,28 +161,17 @@
         </select>
       </div>
 
-      <!-- 기간 -->
-      <div class="d-flex align-items-center gap-2">
-        <label class="filter-label">기간</label>
-        <select name="date_field" class="form-select form-select-sm select-filter" style="width:100px;">
-          <option value="created_at" {% if date_field == 'created_at' %}selected{% endif %}>접수일자</option>
-          <option value="status_updated_at" {% if date_field == 'status_updated_at' %}selected{% endif %}>상태변경일</option>
-        </select>
-        <input type="date" name="start_date" value="{{ start_date }}" class="form-control form-control-sm" style="width:120px;">
-        <span>~</span>
-        <input type="date" name="end_date" value="{{ end_date }}" class="form-control form-control-sm" style="width:120px;">
-      </div>
-
-      <!-- 버튼 -->
       <div class="d-flex align-items-center gap-2">
         <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
         <a href="{% url 'post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
       </div>
-
     </div>
   </form>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/post_list.js' %}"></script>
+{# ✅ 캐시로 옛 JS가 남아있을 수 있어서 v 파라미터 추천 #}
+<script src="{% static 'js/post_list.js' %}?v=20251229_1"></script>
 {% endblock %}

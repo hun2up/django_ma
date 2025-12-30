@@ -1,10 +1,11 @@
+# django_ma/board/models.py
 # ===========================================
 # 📂 django_ma/board/models.py — 업무요청 게시판 모델 정의
 # ===========================================
 
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 import mimetypes
 
@@ -20,19 +21,14 @@ class Post(models.Model):
     """
 
     # === 기본 정보 ===
-    receipt_number = models.CharField(
-        "접수번호",
-        max_length=20,
-        unique=True,
-        blank=True,
-        help_text="자동 생성 (예: 20251015001)"
-    )
+    receipt_number = models.CharField("접수번호", max_length=20, unique=True, blank=True)
     category = models.CharField("구분", max_length=10, blank=True, default="")
     fa = models.CharField("성명(대상자)", max_length=20, blank=True, default="")
     code = models.IntegerField(
         "사번(대상자)",
         validators=[MinValueValidator(1600000), MaxValueValidator(3000000)],
-        null=True, blank=True
+        null=True,
+        blank=True,
     )
 
     # === 게시글 본문 ===
@@ -47,13 +43,8 @@ class Post(models.Model):
     created_at = models.DateTimeField("최초등록일", auto_now_add=True)
 
     # === 담당자 및 상태 관리 ===
-    handler = models.CharField(
-        "담당자",
-        max_length=100,
-        blank=True,
-        default="",
-        help_text="담당자(슈퍼유저 이름)"
-    )
+    # ✅ handler는 문자열로만 관리: 미지정은 ""
+    handler = models.CharField("담당자", max_length=100, blank=True, default="")
 
     STATUS_CHOICES = [
         ("확인중", "확인중"),
@@ -64,35 +55,61 @@ class Post(models.Model):
     ]
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="확인중")
 
-    status_updated_at = models.DateTimeField(
-        "상태변경일",
-        blank=True, null=True,
-        help_text="상태나 담당자가 변경된 시점 자동기록"
-    )
+    status_updated_at = models.DateTimeField("상태변경일", blank=True, null=True)
 
-    # ===========================================
-    # 🧩 저장 로직 (자동 필드 갱신)
-    # ===========================================
     def save(self, *args, **kwargs):
-        """저장 시 접수번호 생성 및 상태변경일 자동 기록"""
+        """
+        저장 시:
+        - receipt_number 자동 생성
+        - status/handler 변경 감지 시 status_updated_at 갱신
+        - update_fields 사용 시 status_updated_at 누락 방지
+        """
         now = timezone.localtime()
+        update_fields = kwargs.get("update_fields")
+
+        # ✅ handler None 방지(혹시 코드에서 None 넣는 경우)
+        if self.handler is None:
+            self.handler = ""
 
         # ✅ 신규 접수번호 자동 생성 (YYYYMMDD###)
         if not self.receipt_number:
             today_str = now.strftime("%Y%m%d")
-            count_today = Post.objects.filter(created_at__date=now.date()).count() + 1
-            self.receipt_number = f"{today_str}{count_today:03d}"
+            last = (
+                Post.objects.filter(
+                    created_at__date=now.date(),
+                    receipt_number__startswith=today_str,
+                )
+                .order_by("-receipt_number")
+                .values_list("receipt_number", flat=True)
+                .first()
+            )
+            if last and len(last) >= 11:
+                seq = int(last[-3:]) + 1
+            else:
+                seq = 1
+            self.receipt_number = f"{today_str}{seq:03d}"
 
-        # ✅ 기존 레코드일 경우 상태/담당자 변경 감지
+        # ✅ 상태변경일 갱신
+        touch = False
         if self.pk:
-            previous = Post.objects.filter(pk=self.pk).only("status", "handler").first()
-            if previous and (
-                previous.status != self.status or previous.handler != self.handler
-            ):
-                self.status_updated_at = now
+            prev = Post.objects.filter(pk=self.pk).only("status", "handler").first()
+            if prev and (prev.status != self.status or prev.handler != self.handler):
+                touch = True
         else:
-            # 신규 생성 시 최초 상태기록
+            # 신규 생성
+            touch = True
+
+        if touch:
             self.status_updated_at = now
+
+            # ✅ update_fields로 저장될 때 누락 방지
+            if update_fields is not None:
+                uf = set(update_fields)
+                uf.add("status_updated_at")
+                # 신규 생성 + receipt_number 생성 케이스 보호
+                if not self.pk:
+                    uf.add("receipt_number")
+                kwargs["update_fields"] = list(uf)
 
         super().save(*args, **kwargs)
 
@@ -139,7 +156,7 @@ class Attachment(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.original_name or self.file.name
+        return self.original_name or getattr(self.file, "name", "")
 
     class Meta:
         verbose_name = "첨부파일"

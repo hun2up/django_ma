@@ -1,11 +1,16 @@
-# board/apps.py
+# django_ma/board/apps.py
 
 from django.apps import AppConfig
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BoardConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "board"
 
     def ready(self):
-        # ✅ signals.py 자동 로드
-        import board.signals
+        try:
+            import board.signals  # noqa
+        except Exception as e:
+            logger.exception("board.signals import failed: %s", e)

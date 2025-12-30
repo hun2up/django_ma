@@ -18,6 +18,7 @@
     data-selected-month="{% firstof selected_month current_month %}"
     data-fetch-url="{% url 'partner:rate_fetch' %}"
     data-save-url="{% url 'partner:rate_save' %}"
+    data-data-save-url="{% url 'partner:rate_save' %}"
     data-delete-url="{% url 'partner:rate_delete' %}"
     data-table-fetch-url="{% url 'partner:ajax_table_fetch' %}"
     data-target-detail-url="{% url 'partner:ajax_rate_user_detail' %}"
@@ -38,6 +39,7 @@
   <div class="card shadow p-3 border-0 rounded-4 mb-3">
     <form class="row g-2 align-items-end">
       {% csrf_token %}
+
       <div class="col-6 col-md-1">
         <label class="form-label mb-1">연도</label>
         <select id="yearSelect" class="form-select"></select>
@@ -67,7 +69,7 @@
       </div>
     </form>
     <div class="small text-muted mt-2">
-      ※ 과거 데이터는 존재하는 월도만 조회 가능하며, 미래는 최대 +1개월까지 조회 가능
+      ※ ※ 과거 시점은 데이터가 존재하는 월도만 선택 가능 (미래 시점은 현재월 기준 +1개월까지만 가능)
     </div>
   </div>
 

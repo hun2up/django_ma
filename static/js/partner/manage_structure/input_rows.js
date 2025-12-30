@@ -1,3 +1,5 @@
+// django_ma/static/js/partner/manage_structure/input_rows.js
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
 import { fetchData } from "./fetch.js";

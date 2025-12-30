@@ -13,4 +13,6 @@ urlpatterns = [
     path('generate-support/', views.generate_request_support, name='generate_request_support'),
     path('generate-states/', views.generate_request_states, name='generate_request_states'),
     path('sign/', views.manage_sign, name='manage_sign'),
+    path("ajax/update-post-field/", views.ajax_update_post_field, name="ajax_update_post_field"),
+    path("ajax/post/<int:pk>/update-field/", views.ajax_update_post_field_detail, name="ajax_update_post_field_detail"),
 ]

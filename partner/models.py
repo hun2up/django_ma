@@ -232,3 +232,47 @@ class RateTable(models.Model):
 
     def __str__(self):
         return f"{self.user.name} ({self.branch})"
+
+
+# ------------------------------------------------------------
+# 📘 지점효율 (EfficiencyChange)
+# - manage_efficiency/fetch.js (14열)과 1:1 매칭 스키마
+# ------------------------------------------------------------
+class EfficiencyChange(models.Model):
+    requester = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="efficiency_requests",
+    )
+    target = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="efficiency_targets",
+    )
+
+    part = models.CharField(max_length=50, default="-")
+    branch = models.CharField(max_length=50, default="-")
+    month = models.CharField(max_length=7, db_index=True)  # "YYYY-MM"
+
+    # 변경 전/후 소속/직급 (fetch.js가 기대)
+    target_branch = models.CharField(max_length=50, blank=True, default="")  # 변경전 소속
+    chg_branch = models.CharField(max_length=50, blank=True, default="")     # 변경후 소속
+    rank = models.CharField(max_length=20, blank=True, default="")           # 변경전 직급
+    chg_rank = models.CharField(max_length=20, blank=True, default="")       # 변경후 직급
+    or_flag = models.BooleanField(default=False)
+
+    memo = models.CharField(max_length=200, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    process_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["month", "branch"]),
+        ]
+
+    def __str__(self):
+        return f"{self.month} - {getattr(self.target, 'name', '-')}"

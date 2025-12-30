@@ -1,227 +1,302 @@
 // django_ma/static/js/common/manage_boot.js
-import { fetchData as fetchStructure } from "../partner/manage_structure/fetch.js";
-import { fetchData as fetchRate } from "../partner/manage_rate/fetch.js";
+// =========================================================
+// ✅ Manage Boot (Refactor - Single Fetch Owner)
+// - Context별 root/boot 자동 탐색
+// - Firefox select value set 안정화(옵션 보장 → value set)
+// - superuser 부서/지점 로더(loadPartsAndBranches) 대기/1회 보장
+// - ✅ fetch 실행은 하지 않는다 (index.js가 단독 실행)
+// - autoLoad payload(ym/branch)를 window.__manageBootAutoPayload에 저장
+// - 중복 초기화 방지
+// =========================================================
+
+console.log("✅ manage_boot.js LOADED", {
+  build: "2025-12-30-manageboot-single-fetch-owner",
+  url: import.meta?.url,
+});
+
 import { pad2 } from "./manage/ym.js";
 
-/**
- * ✅ 공통 부트 로더 (Manage Structure / Rate 공용)
- * - DOM 요소 초기화
- * - Boot 데이터(window.ManageStructureBoot / window.ManageRateBoot)
- * - superuser 부서/지점 자동 로드
- * - autoLoad 모드 자동 실행 (fetchData 자동 호출 포함)
- *
- * ✅ 근본 해결:
- * - year/month 초기화는 "여기에서만" 수행
- * - boot가 비어도 root.dataset/current date로 100% 초기화
- * - 다른 파일에서 연/월 채우는 로직은 제거 권장
- */
-export function initManageBoot(contextName) {
-  const isStructure = contextName === "structure";
-  const isRate = contextName === "rate";
+/* =========================================================
+   Global guards
+========================================================= */
+window.__manageBootInited = window.__manageBootInited || {};
+window.__manageBootCtx = window.__manageBootCtx || {};
+window.__manageBootPartsLoaded = window.__manageBootPartsLoaded || {};
+window.__manageBootAutoPayload = window.__manageBootAutoPayload || {};
 
-  const rootId = isStructure ? "manage-structure" : "manage-rate";
-  const root = document.getElementById(rootId);
+/* =========================================================
+   Ready helper
+========================================================= */
+function onReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+/* =========================================================
+   Small utils
+========================================================= */
+function toStr(v) {
+  return String(v ?? "").trim();
+}
+function readNumber(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function nowYM() {
+  const d = new Date();
+  return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+function getGrade(user, root) {
+  return toStr(user?.grade || root?.dataset?.userGrade);
+}
+function getBranch({ user, boot, root }) {
+  return (
+    toStr(user?.branch) ||
+    toStr(boot?.branch) ||
+    toStr(root?.dataset?.branch) ||
+    toStr(root?.dataset?.userBranch) ||
+    ""
+  );
+}
+
+/* =========================================================
+   Firefox-safe select init
+========================================================= */
+function ensureYearOptions(el, baseYear) {
+  if (!el) return;
+  if (el.options && el.options.length > 0) return;
+
+  const y = Number(baseYear) || new Date().getFullYear();
+  for (let yy = y - 2; yy <= y + 1; yy++) {
+    const opt = document.createElement("option");
+    opt.value = String(yy);
+    opt.textContent = `${yy}년`;
+    el.appendChild(opt);
+  }
+}
+function ensureMonthOptions(el) {
+  if (!el) return;
+  if (el.options && el.options.length > 0) return;
+
+  for (let mm = 1; mm <= 12; mm++) {
+    const opt = document.createElement("option");
+    opt.value = String(mm);
+    opt.textContent = `${mm}월`;
+    el.appendChild(opt);
+  }
+}
+function setSelectValueSafe(el, value) {
+  if (!el) return false;
+  const v = toStr(value);
+  if (!v) return false;
+
+  const has = Array.from(el.options || []).some((o) => o.value === v);
+  if (!has) return false;
+
+  el.value = v;
+  return true;
+}
+
+/* =========================================================
+   Desired YM (Boot 우선)
+========================================================= */
+function getDesiredYM({ root, boot }) {
+  const ds = root?.dataset || {};
+  const { y: ny, m: nm } = nowYM();
+
+  const y =
+    readNumber(boot?.selectedYear, NaN) ||
+    readNumber(boot?.currentYear, NaN) ||
+    readNumber(ds?.selectedYear, NaN) ||
+    readNumber(ds?.currentYear, NaN) ||
+    ny;
+
+  const m =
+    readNumber(boot?.selectedMonth, NaN) ||
+    readNumber(boot?.currentMonth, NaN) ||
+    readNumber(ds?.selectedMonth, NaN) ||
+    readNumber(ds?.currentMonth, NaN) ||
+    nm;
+
+  return { y, m };
+}
+
+function initYearMonthSelects({ root, boot }) {
+  const yearEl = document.getElementById("yearSelect");
+  const monthEl = document.getElementById("monthSelect");
+  if (!yearEl || !monthEl) return { ok: false, yearEl, monthEl };
+
+  const { y, m } = getDesiredYM({ root, boot });
+
+  ensureYearOptions(yearEl, y);
+  ensureMonthOptions(monthEl);
+
+  const okY = setSelectValueSafe(yearEl, y);
+  const okM = setSelectValueSafe(monthEl, m);
+
+  if (okY) yearEl.dispatchEvent(new Event("change", { bubbles: true }));
+  if (okM) monthEl.dispatchEvent(new Event("change", { bubbles: true }));
+
+  console.log("✅ [ManageBoot] year/month init:", {
+    desiredY: y,
+    desiredM: m,
+    yearValue: yearEl.value,
+    monthValue: monthEl.value,
+    okY,
+    okM,
+  });
+
+  return { ok: okY && okM, yearEl, monthEl };
+}
+
+function computeYMFromSelect({ root, boot }) {
+  const yearEl = document.getElementById("yearSelect");
+  const monthEl = document.getElementById("monthSelect");
+
+  const { y, m } = getDesiredYM({ root, boot });
+  const yy = toStr(yearEl?.value || y);
+  const mm = pad2(toStr(monthEl?.value || m));
+  return `${yy}-${mm}`;
+}
+
+/* =========================================================
+   Show sections (payload 준비용: 보여주기만)
+========================================================= */
+function showSections() {
+  document.getElementById("inputSection")?.removeAttribute("hidden");
+  document.getElementById("mainSheet")?.removeAttribute("hidden");
+}
+
+/* =========================================================
+   superuser parts/branches loader
+========================================================= */
+function loadPartsForSuperuserOnce(rootId) {
+  if (!rootId) return;
+  if (window.__manageBootPartsLoaded[rootId]) return;
+  window.__manageBootPartsLoaded[rootId] = true;
+
+  const tryLoad = async (retry = 0) => {
+    if (typeof window.loadPartsAndBranches !== "function") {
+      if (retry < 12) {
+        console.warn(`⏳ loadPartsAndBranches 대기중 (${retry + 1}/12)`);
+        return setTimeout(() => tryLoad(retry + 1), 250);
+      }
+      console.error("🚨 loadPartsAndBranches 함수가 정의되지 않았습니다.");
+      return;
+    }
+
+    try {
+      console.log("➡️ 부서/지점 목록 로드 시도:", rootId);
+      await window.loadPartsAndBranches(rootId);
+      console.log("✅ 부서/지점 목록 로드 완료:", rootId);
+    } catch (e) {
+      console.error("❌ 부서/지점 목록 로드 실패:", e);
+    }
+  };
+
+  setTimeout(() => tryLoad(0), 150);
+}
+
+/* =========================================================
+   Root/Boot resolver
+========================================================= */
+function resolveRootId(ctxName) {
+  if (ctxName === "structure") return "manage-structure";
+  if (ctxName === "rate") return "manage-rate";
+  if (ctxName === "efficiency") return "manage-efficiency";
+  return null;
+}
+
+function resolveBoot(ctxName) {
+  if (ctxName === "structure") return window.ManageStructureBoot || {};
+  if (ctxName === "rate") return window.ManageRateBoot || {};
+  if (ctxName === "efficiency") return window.ManageefficiencyBoot || {};
+  return {};
+}
+
+/* =========================================================
+   ✅ initManageBoot (NO FETCH)
+========================================================= */
+export function initManageBoot(contextName) {
+  const ctxName = toStr(contextName);
+  console.log("✅ initManageBoot called:", { contextName, ctxName });
+
+  if (!ctxName) return null;
+
+  // 컨텍스트별 1회만
+  if (window.__manageBootInited[ctxName]) {
+    return window.__manageBootCtx[ctxName] || {};
+  }
+  window.__manageBootInited[ctxName] = true;
+
+  const rootId = resolveRootId(ctxName);
+  const root = rootId ? document.getElementById(rootId) : null;
+
   if (!root) {
-    console.warn(`⚠️ ${rootId} 요소를 찾을 수 없습니다.`);
+    console.warn(`⚠️ ManageBoot root 없음: ${rootId || ctxName}`, { ctxName, rootId });
+    window.__manageBootCtx[ctxName] = {};
     return null;
   }
 
-  // ✅ boot/user는 있을 수도/없을 수도 있다. 없어도 동작해야 한다.
-  const boot = window.ManageStructureBoot || window.ManageRateBoot || {};
+  const boot = resolveBoot(ctxName);
   const user = window.currentUser || {};
+  const ctxObj = { root, boot, user };
 
-  console.group(`🔧 [ManageBoot] 초기화 (${contextName})`);
+  window.__manageBootCtx[ctxName] = ctxObj;
+
+  console.group(`🔧 [ManageBoot] 초기화 (${ctxName})`);
   console.log("ROOT:", root);
-  console.log("BOOT DATA:", boot);
+  console.log("BOOT:", boot);
   console.log("USER:", user);
 
-  // ---------- helpers ----------
-  const onReady = (fn) => {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", fn, { once: true });
-    } else {
-      fn();
-    }
-  };
-
-  const readNumber = (v, fallback) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
-  };
-
-  const getNowYM = () => {
-    const now = new Date();
-    return { y: now.getFullYear(), m: now.getMonth() + 1 };
-  };
-
-  /**
-   * ✅ 진짜 “정답” YM 결정 로직
-   * 우선순위:
-   * 1) boot.selectedYear/Month
-   * 2) boot.currentYear/Month
-   * 3) root.dataset.selectedYear/Month
-   * 4) root.dataset.currentYear/Month
-   * 5) Date()
-   */
-  const getDesiredYM = () => {
-    const { y: ny, m: nm } = getNowYM();
-
-    const ds = root.dataset || {};
-
-    const y =
-      readNumber(boot.selectedYear, NaN) ||
-      readNumber(boot.currentYear, NaN) ||
-      readNumber(ds.selectedYear, NaN) ||
-      readNumber(ds.currentYear, NaN) ||
-      ny;
-
-    const m =
-      readNumber(boot.selectedMonth, NaN) ||
-      readNumber(boot.currentMonth, NaN) ||
-      readNumber(ds.selectedMonth, NaN) ||
-      readNumber(ds.currentMonth, NaN) ||
-      nm;
-
-    return { y, m };
-  };
-
-  /**
-   * ✅ 연/월 옵션을 "무조건" 세팅한다.
-   * - 옵션이 있든 없든, 최종적으로 value는 항상 원하는 값으로 강제 세팅.
-   * - 브라우저별로 "value만 바꾸고 선택이 안 잡히는" 케이스 방지 위해 selected도 같이 처리.
-   */
-  const forceInitYearMonth = () => {
-    const yearSel = document.getElementById("yearSelect");
-    const monthSel = document.getElementById("monthSelect");
-    if (!yearSel || !monthSel) return false;
-
-    const { y: desiredY, m: desiredM } = getDesiredYM();
-    const now = new Date();
-    const thisY = now.getFullYear();
-
-    // Year options
-    yearSel.innerHTML = "";
-    for (let y = thisY - 2; y <= thisY + 1; y++) {
-      const opt = document.createElement("option");
-      opt.value = String(y);
-      opt.textContent = `${y}년`;
-      if (y === desiredY) opt.selected = true;
-      yearSel.appendChild(opt);
-    }
-
-    // Month options
-    monthSel.innerHTML = "";
-    for (let m = 1; m <= 12; m++) {
-      const opt = document.createElement("option");
-      opt.value = String(m);
-      opt.textContent = `${m}월`;
-      if (m === desiredM) opt.selected = true;
-      monthSel.appendChild(opt);
-    }
-
-    // ✅ value 강제 세팅(일부 브라우저에서 selected만으로 부족한 케이스 방지)
-    yearSel.value = String(desiredY);
-    monthSel.value = String(desiredM);
-
-    // ✅ change 이벤트 한 번 발생 (외부 로직이 select change를 기대할 때)
-    yearSel.dispatchEvent(new Event("change", { bubbles: true }));
-    monthSel.dispatchEvent(new Event("change", { bubbles: true }));
-
-    console.log("✅ [ManageBoot] year/month 강제 초기화 완료:", {
-      desiredY,
-      desiredM,
-      yearValue: yearSel.value,
-      monthValue: monthSel.value,
-    });
-
-    return true;
-  };
-
-  const computeYMFromSelect = () => {
-    const yearSel = document.getElementById("yearSelect");
-    const monthSel = document.getElementById("monthSelect");
-    const { y, m } = getDesiredYM();
-
-    const yy = (yearSel?.value || y).toString().trim();
-    const mm = (monthSel?.value || m).toString().trim();
-
-    return `${yy}-${pad2(mm)}`;
-  };
-
-  const showSections = () => {
-    const inputSection = document.getElementById("inputSection");
-    const mainSheet = document.getElementById("mainSheet");
-    const mainTable = document.getElementById("mainTable");
-    inputSection?.removeAttribute("hidden");
-    mainSheet?.removeAttribute("hidden");
-    mainTable?.removeAttribute("hidden");
-  };
-
-  /* ============================================================
-     🔹 Superuser용 부서/지점 로드 (공통)
-  ============================================================ */
-  if ((user.grade || root.dataset.userGrade || "").trim() === "superuser") {
-    const loadPartsSafely = async (retryCount = 0) => {
-      if (typeof window.loadPartsAndBranches !== "function") {
-        if (retryCount < 8) {
-          console.warn(`⏳ loadPartsAndBranches 대기중 (${retryCount + 1}/8)`);
-          return setTimeout(() => loadPartsSafely(retryCount + 1), 250);
-        }
-        console.error("🚨 loadPartsAndBranches 함수가 정의되지 않았습니다.");
-        return;
-      }
-
-      try {
-        console.log("➡️ 부서/지점 목록 로드 시도");
-        await window.loadPartsAndBranches(rootId);
-        console.log("✅ 부서 목록 로드 완료");
-      } catch (err) {
-        console.error("❌ 부서 목록 로드 실패:", err);
-      }
-    };
-
-    onReady(() => {
-      setTimeout(() => loadPartsSafely(0), 300);
-    });
-  }
-
-  /* ============================================================
-     ✅ 연/월 초기화는 여기서만 (근본 해결)
-  ============================================================ */
+  // superuser: parts/branches 로드
   onReady(() => {
-    const ok = forceInitYearMonth();
-    if (!ok) console.warn("⚠️ yearSelect/monthSelect을 찾지 못해 초기화 실패");
+    const grade = getGrade(user, root);
+    if (grade === "superuser") loadPartsForSuperuserOnce(rootId);
   });
 
-  /* ============================================================
-     🔹 AutoLoad 모드 (main_admin / sub_admin 공용)
-  ============================================================ */
-  onReady(async () => {
-    const grade = ((user.grade || root.dataset.userGrade) ?? "").toString().trim();
-    if (!boot.autoLoad || !["main_admin", "sub_admin"].includes(grade)) return;
+  // year/month init + autoload payload 준비
+  onReady(() => {
+    const grade = getGrade(user, root);
 
-    // ✅ autoLoad 전에 연/월을 무조건 확정
-    forceInitYearMonth();
+    const autoLoad =
+      typeof boot.autoLoad === "boolean"
+        ? boot.autoLoad
+        : ["main_admin", "sub_admin"].includes(grade);
 
-    const ym = computeYMFromSelect();
-    const branch = (user.branch || root.dataset.branch || "").trim();
+    initYearMonthSelects({ root, boot });
 
-    console.log(`🟢 autoLoad 실행 (${contextName})`, { ym, branch });
+    // ✅ payload는 main_admin/sub_admin만 자동 준비
+    if (!autoLoad || !["main_admin", "sub_admin"].includes(grade)) {
+      console.log("🟡 autoLoad payload skip:", { ctxName, grade, autoLoad });
+      console.groupEnd();
+      return;
+    }
 
+    const ym = computeYMFromSelect({ root, boot });
+    const branch = getBranch({ user, boot, root });
+
+    if (!branch) {
+      console.warn("⚠️ autoLoad payload 중단: branch 없음", { ctxName, grade, boot, ds: root.dataset });
+      console.groupEnd();
+      return;
+    }
+
+    // ✅ show는 해도 되지만, fetch는 index.js가 수행
     showSections();
 
-    try {
-      if (isStructure) {
-        await fetchStructure(ym, branch, user);
-      } else if (isRate) {
-        await fetchRate(ym, branch, user);
-      }
-      console.log("✅ autoLoad → fetchData() 실행 완료");
-    } catch (err) {
-      console.error("❌ autoLoad fetch 실패:", err);
-    }
+    window.__manageBootAutoPayload[ctxName] = { ym, branch };
+
+    console.log("🟢 autoLoad payload ready:", { ctxName, ym, branch });
+    console.groupEnd();
   });
 
-  console.groupEnd();
-  return { root, boot, user };
+  try {
+    console.groupEnd();
+  } catch (_) {}
+
+  return ctxObj;
 }

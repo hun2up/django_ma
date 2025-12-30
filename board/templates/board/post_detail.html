@@ -6,7 +6,16 @@
 {% block title %}업무요청 상세보기{% endblock %}
 
 {% block content %}
+
+{# ✅ 상세 인라인 업데이트용 Boot #}
+<div id="postDetailBoot"
+     data-update-url="{% url 'ajax_update_post_field_detail' post.pk %}"
+     class="d-none"></div>
+
 <div class="container mt-5">
+  {# ✅ AJAX 알림 영역 (post_list와 동일 패턴) #}
+  <div id="inlineUpdateAlertHost" class="mb-3"></div>
+
   {% if messages %}
   <div class="container mt-3">
     {% for message in messages %}
@@ -98,14 +107,16 @@
 
       <hr class="my-3">
 
-      <!-- ✅ 담당자 / 상태 -->
+      <!-- ✅ 담당자 / 상태 (버튼 제거 + 드롭다운 변경 즉시 반영) -->
       <div class="my-3">
         <div class="row align-items-center">
+
           <!-- 담당자 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
+
             {% if is_superuser %}
-              <form method="post" class="d-inline">
+              <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="handler">
                 <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
@@ -114,7 +125,6 @@
                     <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
                   {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-sm btn-primary">변경</button>
               </form>
             {% else %}
               {{ post.handler|default:"-" }}
@@ -124,8 +134,9 @@
           <!-- 상태 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
+
             {% if is_superuser %}
-              <form method="post" class="d-inline">
+              <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="status">
                 <select name="status" class="form-select form-select-sm status-select d-inline-block w-auto">
@@ -136,7 +147,6 @@
                     </option>
                   {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-sm btn-primary">변경</button>
               </form>
             {% else %}
               <span class="fw-semibold" style="color:
@@ -145,8 +155,7 @@
                 {% elif post.status == '보완요청' %}red
                 {% elif post.status == '완료' %}black
                 {% elif post.status == '반려' %}gray
-                {% endif %};
-              ">
+                {% endif %};">
                 {{ post.status }}
               </span>
             {% endif %}
@@ -155,7 +164,9 @@
           <!-- 상태변경일 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태변경</span>
-            <span class="small-text">{{ post.status_updated_at|date:"Y-m-d H:i" }}</span>
+            <span id="statusUpdatedAtText" class="small-text">
+              {{ post.status_updated_at|date:"Y-m-d H:i" }}
+            </span>
           </div>
         </div>
       </div>
@@ -190,7 +201,6 @@
           {% if user.id == post.user_id or is_superuser %}
             <a href="{% url 'post_edit' post.id %}" class="btn btn-outline-primary">수정하기</a>
 
-            <!-- 🔥 삭제하기 버튼 추가 -->
             <form method="post" style="display:inline;"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
@@ -208,6 +218,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- ✅ 댓글 수정 기능 분리 -->
-<script src="{% static 'js/post_detail.js' %}"></script>
+<script src="{% static 'js/post_detail.js' %}?v=20251229_1"></script>
 {% endblock %}

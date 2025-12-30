@@ -1,11 +1,16 @@
+<!-- django_ma/partner/templates/partner/manage_grades.html -->
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}권한관리{% endblock %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 
 {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
-  <div class="alert alert-danger">접근 권한이 없습니다.</div>
+  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% endif %}
 
 {% if messages %}
@@ -18,141 +23,267 @@
   </div>
 {% endif %}
 
-<h3 class="text-center fw-bold mb-4" style="color:#003f7d;">권한관리 페이지</h3>
+<form id="csrfForm">{% csrf_token %}</form>
 
-<!-- ✅ 부서 선택 (Superuser 전용) -->
-{% if user.grade == 'superuser' %}
-<div class="card shadow p-3 border-0 rounded-4 mb-3">
-  <form id="controlsForm" class="d-flex align-items-end justify-content-between flex-wrap gap-2" method="get">
-    <div class="d-flex align-items-end gap-2 flex-wrap">
-      <div>
-        <label class="form-label mb-1">부서</label>
-        <select id="partSelect" name="part" class="form-select form-select-sm" style="width:140px;">
-          <option value="" disabled {% if not selected_part %}selected{% endif %} hidden>선택</option>
-          {% for p in parts %}
-            <option value="{{ p }}" {% if selected_part == p %}selected{% endif %}>{{ p }}</option>
-          {% endfor %}
+<div id="manage-grades"
+     data-user-grade="{{ user.grade }}"
+     data-branch="{{ user.branch }}">
+
+  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">권한관리 페이지</h3>
+
+  <!-- ✅ superuser: 부서 + 지점 선택 -->
+  {% if user.grade == 'superuser' %}
+  <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
+    <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3" method="get">
+      <div style="flex:0 0 220px;">
+        <label for="partSelect" class="form-label fw-semibold">부서</label>
+        <select id="partSelect" name="part" class="form-select form-select-sm">
+          <option value="">불러오는 중...</option>
         </select>
       </div>
-      <div>
-        <label class="form-label mb-1 d-none d-md-block">&nbsp;</label>
-        <button type="submit" class="btn btn-outline-primary btn-sm px-3">조회</button>
+
+      <div style="flex:0 0 300px;">
+        <label for="branchSelect" class="form-label fw-semibold">지점</label>
+        <select id="branchSelect" name="branch" class="form-select form-select-sm" disabled>
+          <option value="">부서를 먼저 선택하세요</option>
+        </select>
       </div>
-    </div>
+
+      <div style="flex:0 0 120px;">
+        <button type="submit" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
+      </div>
+
+      <!-- ✅ 초기값: view에서 내려주는 값(JS가 우선 사용) -->
+      <input type="hidden" id="selectedPartInit" value="{{ selected_part|default:'' }}">
+      <input type="hidden" id="selectedBranchInit" value="{{ selected_branch|default:'' }}">
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ✅ 숨겨진 업로드 폼 -->
+  <form id="excelUploadForm"
+        method="post"
+        enctype="multipart/form-data"
+        action="{% url 'partner:upload_grades_excel' %}">
+    {% csrf_token %}
+    <input type="file" name="excel_file" id="excelFile" accept=".xlsx,.xls" hidden>
   </form>
-</div>
-{% endif %}
 
-<!-- ✅ 숨겨진 업로드 폼 -->
-<form id="excelUploadForm" method="post" enctype="multipart/form-data" action="{% url 'partner:upload_grades_excel' %}">
-  {% csrf_token %}
-  <input type="file" name="excel_file" id="excelFile" accept=".xlsx,.xls" hidden>
-</form>
-
-<!-- ✅ 상단: 중간관리자 명단 -->
-<div class="card shadow p-3 border-0 rounded-4 mb-5">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h5 class="fw-bold mb-0" style="color:#003f7d;">중간관리자 명단</h5>
-    <span class="text-muted small" style="white-space: nowrap;">※ 중간관리자 추가/제외는 부서장에게 문의바랍니다.</span>
-  </div>
-  <div class="table-responsive">
-    <table class="table table-striped align-middle" id="subAdminTable">
-      <thead class="table-light">
-        <tr>
-          <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
-          <th>레벨</th><th>팀A</th><th>팀B</th><th>팀C</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if selected_part %}
-          {% for u in users_subadmin %}
-          <tr data-user-id="{{ u.user.id }}">
-            <td>{{ u.part|default:"-" }}</td>
-            <td>{{ u.branch|default:"-" }}</td>
-            <td>{{ u.name|default:"-" }}</td>
-            <td>{{ u.user.id|default:"-" }}</td>
-            <td>{{ u.position|default:"-" }}</td>
-            <td>
-              <select class="form-select form-select-sm level-select">
-                {% for lv in levels %}
-                  <option value="{{ lv }}" {% if u.level == lv %}selected{% endif %}>{{ lv }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td>{{ u.team_a|default:"-" }}</td>
-            <td>{{ u.team_b|default:"-" }}</td>
-            <td>{{ u.team_c|default:"-" }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="8" class="text-center text-muted py-3">해당 부서의 중간관리자가 없습니다.</td></tr>
-          {% endfor %}
-        {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-3">부서를 선택하세요.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ✅ 하단: 전체 사용자 목록 -->
-<div class="card shadow p-3 border-0 rounded-4">
-  <h5 class="fw-bold mb-3" style="color:#003f7d;">전체설계사 명단</h5>
-  <div class="table-responsive">
-    <table id="allUserTable" class="table table-striped align-middle"
-      data-ajax-url="{% url 'partner:ajax_users_data' %}?part={{ selected_part|default:'' }}">
-      <thead class="table-light">
-        <tr>
-          <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
-          <th>팀A</th><th>팀B</th><th>팀C</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-</div>
-
-<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
-  <div id="statusToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="toast-header">
-      <strong class="me-auto" id="toastTitle">처리 결과</strong>
-      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+  <!-- ✅ 상단: 중간관리자 명단 -->
+  <div class="card shadow p-3 border-0 rounded-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0" style="color:#003f7d;">중간관리자 명단</h5>
+      <span class="text-muted small" style="white-space: nowrap;">※ 중간관리자 추가/제외는 부서장에게 문의바랍니다.</span>
     </div>
-    <div class="toast-body" id="toastBody">
-      </div>
+
+    <div class="table-responsive">
+      <table class="table table-striped align-middle" id="subAdminTable">
+        <thead class="table-light">
+          <tr>
+            <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
+            <th>레벨</th><th>팀A</th><th>팀B</th><th>팀C</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if selected_part and selected_branch %}
+            {% for u in users_subadmin %}
+              <tr data-user-id="{{ u.user.id }}">
+                <td>{{ u.part|default:"-" }}</td>
+                <td>{{ u.branch|default:"-" }}</td>
+                <td>{{ u.name|default:"-" }}</td>
+                <td>{{ u.user.id|default:"-" }}</td>
+                <td>{{ u.position|default:"-" }}</td>
+                <td>
+                  <select class="form-select form-select-sm level-select">
+                    {% for lv in levels %}
+                      <option value="{{ lv }}" {% if u.level == lv %}selected{% endif %}>{{ lv }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>{{ u.team_a|default:"-" }}</td>
+                <td>{{ u.team_b|default:"-" }}</td>
+                <td>{{ u.team_c|default:"-" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="text-center text-muted py-3">해당 부서/지점의 중간관리자가 없습니다.</td></tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="9" class="text-center text-muted py-3">부서와 지점을 선택하세요.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
   </div>
+
+  <!-- ✅ 하단: 전체 사용자 목록 -->
+  <div class="card shadow p-3 border-0 rounded-4">
+    <h5 class="fw-bold mb-3" style="color:#003f7d;">전체설계사 명단</h5>
+    <div class="table-responsive">
+      <table id="allUserTable"
+             class="table table-striped align-middle"
+             data-ajax-base="{% url 'partner:ajax_users_data' %}">
+        <thead class="table-light">
+          <tr>
+            <th>부서</th><th>지점</th><th>성명</th><th>사번</th><th>직급</th>
+            <th>팀A</th><th>팀B</th><th>팀C</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="statusToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <strong class="me-auto" id="toastTitle">처리 결과</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body" id="toastBody"></div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const selectedPart = "{{ selected_part|default:'' }}";
-  const subTable = $("#subAdminTable");
-  const allTable = $("#allUserTable");
+<!-- ✅ jQuery (DataTables 필수) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+        crossorigin="anonymous"></script>
 
-  // ✅ 부서 미선택(superuser 첫 접속 시) — DataTable 미초기화
-  if (!selectedPart) {
-    console.log("부서 미선택 상태 — DataTables 초기화 생략");
+<!-- ✅ DataTables core -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+
+<!-- ✅ Buttons (너 템플릿에서 buttons: [...] 쓰고 있음) -->
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+
+<!-- (선택) Buttons가 DOM에 버튼 렌더링할 때 종종 필요 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<!-- ✅ 공용: 부서/지점 셀렉터 -->
+<script type="module" src="{% static 'js/common/part_branch_selector.js' %}?v=20251229_2"></script>
+
+<!-- ✅ XLSX (너 코드에서 XLSX.writeFile 사용) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+/* =========================================================
+   CSRF (cookie)
+========================================================= */
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return "";
+}
+function getCSRFToken() {
+  return getCookie("csrftoken");
+}
+
+/* =========================================================
+   Toast
+========================================================= */
+function showToast(message, isSuccess) {
+  const toastElement = document.getElementById('statusToast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastBody = document.getElementById('toastBody');
+
+  if (isSuccess) {
+    toastTitle.textContent = '✅ 저장 성공';
+    toastElement.classList.remove('text-bg-danger');
+    toastElement.classList.add('text-bg-success');
+  } else {
+    toastTitle.textContent = '❌ 저장 실패';
+    toastElement.classList.remove('text-bg-success');
+    toastElement.classList.add('text-bg-danger');
+  }
+
+  toastBody.textContent = message;
+  new bootstrap.Toast(toastElement, { delay: 3000 }).show();
+}
+
+/* =========================================================
+   Helpers
+========================================================= */
+function buildUrlWithParams(base, params) {
+  const url = new URL(base, window.location.origin);
+  Object.entries(params || {}).forEach(([k, v]) => {
+    url.searchParams.set(k, v ?? "");
+  });
+  return url.toString();
+}
+
+function safeDestroyDataTable($table) {
+  if (!$table || !$table.length) return;
+  if ($.fn.DataTable && $.fn.DataTable.isDataTable($table)) {
+    $table.DataTable().clear().destroy(true);
+  }
+}
+
+function isAllowedGrade(grade) {
+  return grade === "superuser" || grade === "main_admin";
+}
+
+/* =========================================================
+   DataTables init (one-shot)
+========================================================= */
+function initTables() {
+  const userGrade = "{{ user.grade }}";
+  const selectedPart = "{{ selected_part|default:'' }}";
+  const selectedBranch = "{{ selected_branch|default:'' }}";
+
+  if (!isAllowedGrade(userGrade)) return;
+
+  // ✅ superuser는 둘 다 있어야 초기화
+  if (userGrade === "superuser" && (!selectedPart || !selectedBranch)) {
+    console.log("superuser: 부서/지점 미선택 — DataTables 초기화 생략");
     return;
   }
 
+  // ✅ main_admin도 둘 중 하나라도 없으면 초기화 생략
+  if (!selectedPart || !selectedBranch) {
+    console.log("부서/지점 정보 부족 — DataTables 초기화 생략");
+    return;
+  }
+
+  const $subTable = $("#subAdminTable");
+  const $allTable = $("#allUserTable");
+  const ajaxBase = String($allTable.data("ajax-base") || "").trim();
+  if (!ajaxBase) {
+    console.warn("ajax-base 누락 — allUserTable 초기화 불가");
+    return;
+  }
+
+  const ajaxUrl = buildUrlWithParams(ajaxBase, {
+    part: selectedPart,
+    branch: selectedBranch,
+  });
+
+  // ✅ BFCache/재진입 대비
+  safeDestroyDataTable($subTable);
+  safeDestroyDataTable($allTable);
+
   /* ✅ 중간관리자 명단 */
-  subTable.DataTable({
+  $subTable.DataTable({
     paging: true,
     searching: true,
     info: true,
     pageLength: 10,
     autoWidth: false,
     columnDefs: [
-      { width: "8%", targets: 0 },  // 부서
-      { width: "12%", targets: 1 }, // 지점
-      { width: "12%", targets: 2 }, // 성명
-      { width: "8%", targets: 3 }, // 사번
-      { width: "10%", targets: 4 }, // 직급
-      { width: "14%", targets: 5 }, // 레벨
-      { width: "12%", targets: 6 }, // 팀A
-      { width: "12%", targets: 7 }, // 팀B
-      { width: "12%", targets: 8 }, // 팀C
+      { width: "8%", targets: 0 },
+      { width: "12%", targets: 1 },
+      { width: "12%", targets: 2 },
+      { width: "8%", targets: 3 },
+      { width: "10%", targets: 4 },
+      { width: "14%", targets: 5 },
+      { width: "12%", targets: 6 },
+      { width: "12%", targets: 7 },
+      { width: "12%", targets: 8 },
     ],
     lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
     language: {
@@ -172,10 +303,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ✅ 전체 사용자 목록 (Ajax) */
-  allTable.DataTable({
+  $allTable.DataTable({
     serverSide: true,
     processing: true,
-    ajax: { url: allTable.data("ajax-url"), type: "GET" },
+    ajax: { url: ajaxUrl, type: "GET" },
     columns: [
       { data: "part" },
       { data: "branch" },
@@ -189,14 +320,14 @@ document.addEventListener("DOMContentLoaded", () => {
     pageLength: 10,
     autoWidth: false,
     columnDefs: [
-      { width: "8%", targets: 0 },  // 부서
-      { width: "15%", targets: 1 }, // 지점
-      { width: "12%", targets: 2 }, // 성명
-      { width: "10%", targets: 3 }, // 사번
-      { width: "10%", targets: 4 }, // 직급
-      { width: "15%", targets: 5 }, // 팀A
-      { width: "15%", targets: 6 }, // 팀B
-      { width: "15%", targets: 7 }, // 팀C
+      { width: "8%", targets: 0 },
+      { width: "15%", targets: 1 },
+      { width: "12%", targets: 2 },
+      { width: "10%", targets: 3 },
+      { width: "10%", targets: 4 },
+      { width: "15%", targets: 5 },
+      { width: "15%", targets: 6 },
+      { width: "15%", targets: 7 },
     ],
     lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
     language: {
@@ -217,9 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
         text: "<i class='bi bi-download'></i> 엑셀 다운로드",
         className: "btn btn-success btn-sm",
         action: function () {
-          const baseUrl = allTable.data("ajax-url");
-          const connector = baseUrl.includes("?") ? "&" : "?";
-          const url = `${baseUrl}${connector}length=999999`;
+          const url = buildUrlWithParams(ajaxUrl, { length: 999999 });
 
           fetch(url)
             .then(res => {
@@ -240,17 +369,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 팀C: u.team_c || "",
               }));
 
-              if (rows.length === 0) {
+              if (!rows.length) {
                 alert("다운로드할 데이터가 없습니다.");
                 return;
               }
 
-              // ✅ XLSX 생성
               const wb = XLSX.utils.book_new();
               const ws = XLSX.utils.json_to_sheet(rows);
               XLSX.utils.book_append_sheet(wb, ws, "전체설계사명단");
-
-              // ✅ 파일 다운로드
               XLSX.writeFile(wb, "전체설계사명단.xlsx");
             })
             .catch(err => {
@@ -269,92 +395,68 @@ document.addEventListener("DOMContentLoaded", () => {
     ],
   });
 
-  /* ✅ 엑셀 업로드 자동 제출 + 로딩 오버레이 표시 */
+  // ✅ 엑셀 업로드
   const excelFile = document.getElementById("excelFile");
   const excelForm = document.getElementById("excelUploadForm");
 
-  excelFile.addEventListener("change", function () {
-    if (!this.files.length) return;
-    const fileName = this.files[0].name;
+  if (excelFile && excelForm && !excelFile.dataset.bound) {
+    excelFile.dataset.bound = "1";
+    excelFile.addEventListener("change", function () {
+      if (!this.files.length) return;
+      const fileName = this.files[0].name;
 
-    if (confirm(`"${fileName}" 파일을 업로드하시겠습니까?`)) {
-      excelForm.submit();
-    } else {
-      this.value = "";
-    }
-  });
-});
-</script>
-
-
-<script>
-// ✅ 토스트 메시지 표시 함수
-function showToast(message, isSuccess) {
-    const toastElement = document.getElementById('statusToast');
-    const toastTitle = document.getElementById('toastTitle');
-    const toastBody = document.getElementById('toastBody');
-    
-    // 제목 및 색상 설정
-    if (isSuccess) {
-        toastTitle.textContent = '✅ 저장 성공';
-        toastElement.classList.remove('text-bg-danger');
-        toastElement.classList.add('text-bg-success');
-    } else {
-        toastTitle.textContent = '❌ 저장 실패';
-        toastElement.classList.remove('text-bg-success');
-        toastElement.classList.add('text-bg-danger');
-    }
-    
-    toastBody.textContent = message;
-    
-    // 부트스트랩 Toast 객체 생성 및 표시
-    const toast = new bootstrap.Toast(toastElement, {
-        delay: 3000 // 3초 후 자동 사라짐
+      if (confirm(`"${fileName}" 파일을 업로드하시겠습니까?`)) {
+        excelForm.submit();
+      } else {
+        this.value = "";
+      }
     });
-    toast.show();
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const subTable = $("#subAdminTable");
+  }
 
   // ✅ 레벨 변경 이벤트
-  subTable.on("change", ".level-select", function () {
-    const row = $(this).closest("tr");
-    const userId = row.data("user-id");
-    const newLevel = $(this).val();
+  if (!$subTable.data("levelBound")) {
+    $subTable.data("levelBound", "1");
 
-    fetch("{% url 'partner:ajax_update_level' %}", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRFToken": "{{ csrf_token }}",
-      },
-      body: new URLSearchParams({
-        user_id: userId,
-        level: newLevel,
-      }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          console.log(`✅ user ${userId} → ${newLevel} 저장 성공`);
-          // 👇 alert 대신 showToast 호출
-          showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
-        } else {
-          // 👇 alert 대신 showToast 호출
-          showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
-        }
+    $subTable.on("change", ".level-select", function () {
+      const row = $(this).closest("tr");
+      const userId = row.data("user-id");
+      const newLevel = $(this).val();
+
+      fetch("{% url 'partner:ajax_update_level' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": getCSRFToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new URLSearchParams({ user_id: userId, level: newLevel }),
       })
-      .catch(err => {
-        console.error("요청 실패:", err);
-        // 👇 alert 대신 showToast 호출
-        showToast("서버 요청 중 오류가 발생했습니다.", false);
-      });
-  });
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
+          } else {
+            showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
+          }
+        })
+        .catch(err => {
+          console.error("요청 실패:", err);
+          showToast("서버 요청 중 오류가 발생했습니다.", false);
+        });
+    });
+  }
+}
+
+/* =========================================================
+   Boot
+   - 일반 DOMContentLoaded
+   - BFCache(back/forward) 복귀 시 pageshow에서도 재시도
+========================================================= */
+document.addEventListener("DOMContentLoaded", initTables);
+window.addEventListener("pageshow", (e) => {
+  // BFCache로 복귀하면 DataTables가 깨질 수 있어 재시도
+  if (e.persisted) initTables();
 });
 </script>
-
-<!-- ✅ XLSX 라이브러리 추가 -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 {% endblock %}

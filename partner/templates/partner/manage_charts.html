@@ -165,9 +165,9 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
       <div class="small text-muted" id="sheetNotice"></div>
-    </div>    
+    </div>
     <div class="table-responsive">
-      <table class="table table-striped align-middle" id="mainTable">
+      <table class="table table-striped align-middle main-table-fixed" id="mainTable">
         <colgroup>
           <col style="width: 4%"> <!-- 성명(요청자) -->
           <col style="width: 5%"> <!-- 사번(요청자) -->
@@ -250,13 +250,13 @@
   window.csrfToken = "{{ csrf_token }}";
 </script>
 
+<script>window.STATIC_VERSION = "{% now 'U' %}";</script>
+
 <!-- ✅ 공통 부서/지점 로더 -->
 <script src="{% static 'js/common/part_branch_selector.js' %}?v={% now 'U' %}"></script>
 
-<!-- ✅ 공통 부트 로더 -->
-<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={% now 'U' %}"></script>
-
 <!-- ✅ 페이지별 메인 스크립트 -->
+<script type="module" src="{% static 'js/common/manage_boot.js' %}?v={% now 'U' %}"></script>
 <script type="module" src="{% static 'js/partner/manage_structure/index.js' %}?v={% now 'U' %}"></script>
 
 {% include 'components/search_user_modal.html' with search_url=search_user_url|default:'/api/accounts/search-user/' %}
