@@ -7,32 +7,30 @@
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
-    <!-- ✅ 제목 -->
+
     <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 작성</h3>
 
-    <!-- ✅ 본문 카드 -->
+    <!-- ✅ AJAX endpoint 주입 (대상자 검색) -->
+    <div id="postCreateBoot"
+         data-search-url="{% url 'search_user' %}"
+         class="d-none"></div>
+
+    <!-- ✅ 모달/알림 표시 영역 -->
+    <div id="inlineTargetAlertHost" class="mb-3"></div>
+
     <div class="card shadow p-4 border-0 rounded-4">
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <!-- ✅ 게시글 작성 폼 -->
       <form method="post" enctype="multipart/form-data" id="postForm" novalidate>
         {% csrf_token %}
 
         <!-- 구분 / 대상자 -->
-        <div class="row mb-3">
+        <div class="row mb-3 align-items-end">
           <div class="col-md-4">
             <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">구분</label>
             {{ form.category }}
-          </div>
-          <div class="col-md-4">
-            <label for="{{ form.fa.id_for_label }}" class="form-label fw-semibold">대상자(성명)</label>
-            {{ form.fa }}
-          </div>
-          <div class="col-md-4">
-            <label for="{{ form.code.id_for_label }}" class="form-label fw-semibold">대상자(사번)</label>
-            {{ form.code }}
           </div>
         </div>
 
@@ -69,7 +67,6 @@
       </form>
     </div>
 
-    <!-- ✅ 메인으로 돌아가기 -->
     <div class="text-center mt-4">
       <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">메인으로 돌아가기</a>
     </div>
@@ -79,7 +76,6 @@
 <!-- ✅ 업로드 유틸 -->
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
 
-<!-- ✅ 중복 클릭 방지 및 초기화 -->
+<!-- ✅ 글작성 페이지 스크립트(모달 검색 + 중복 클릭 방지 포함) -->
 <script src="{% static 'js/post_create.js' %}"></script>
-
 {% endblock %}

@@ -23,7 +23,9 @@
      data-user-grade="{{ user.grade }}"
      data-branch="{{ user.branch }}"
      data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
-     data-save-url="{% url 'partner:ajax_table_save' %}">
+     data-save-url="{% url 'partner:ajax_table_save' %}"
+     data-rate-template-url="{% static 'excel/양식_테이블관리.xlsx' %}"
+     >
 
   {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
       <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
@@ -111,6 +113,9 @@
           <button id="btnDownloadExcel" class="btn btn-success btn-sm">
             <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
           </button>
+          <button type="button" id="btnDownloadTemplate" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-file-earmark-arrow-down"></i> 양식 다운로드
+          </button>
         </div>
       </div>
 
@@ -177,6 +182,23 @@
 {% endblock %}
 
 {% block extra_js %}
+
+<!-- ✅ jQuery (rateUserTable DataTables용) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+        crossorigin="anonymous"></script>
+
+<!-- ✅ DataTables (하단 rateUserTable 전용으로만 사용) -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+
+<!-- (선택) 만약 rateUserTable에서 버튼/엑셀 기능(DataTables Buttons)을 쓴다면 -->
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 <script type="module" src="{% static 'js/common/part_branch_selector.js' %}"></script>
-<script type="module" src="{% static 'js/partner/manage_table.js' %}"></script>
+<script type="module" src="{% static 'js/partner/manage_table.js' %}?v=20251230_1"></script>
+
 {% endblock %}

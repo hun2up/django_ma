@@ -1,39 +1,44 @@
 // django_ma/static/js/partner/manage_rate/index.js
+// =========================================================
+// ✅ Manage Rate - Index (Final Refactor)
+// - dataset/key 안전화
+// - requester autofill 안정화
+// - superuser parts/branches loader 대기
+// - table check modal 안전화
+// - ✅ autoload 중복 방지(manage_boot vs index)
+// =========================================================
+
 import { els } from "./dom_refs.js";
 import { fetchData } from "./fetch.js";
 import { pad2, alertBox } from "./utils.js";
 import { initInputRowEvents } from "./input_rows.js";
 
 const AUTOLOAD_GRADES = new Set(["main_admin", "sub_admin"]);
+let autoLoaded = false;
 
-/* ==========================
+/* =========================================================
    dataset helpers
-========================== */
+========================================================= */
 function ds(key, fallback = "") {
-  return (els.root?.dataset?.[key] ?? fallback).toString().trim();
+  return String(els.root?.dataset?.[key] ?? fallback).trim();
 }
-
 function getGrade() {
   return ds("userGrade", window.currentUser?.grade || "");
 }
-
 function getDefaultBranch() {
   return ds("defaultBranch", window.currentUser?.branch || "");
 }
-
 function getEffectiveBranch() {
   const grade = getGrade();
-  if (grade === "superuser") return (els.branchSelect?.value || "").trim();
+  if (grade === "superuser") return String(els.branchSelect?.value || "").trim();
   return getDefaultBranch();
 }
-
 function getYMFromSelectors() {
-  const y = (els.yearSelect?.value || "").trim();
-  const m = (els.monthSelect?.value || "").trim();
+  const y = String(els.yearSelect?.value || "").trim();
+  const m = String(els.monthSelect?.value || "").trim();
   if (!y || !m) return "";
   return `${y}-${pad2(m)}`;
 }
-
 function buildFetchPayload(ym) {
   return {
     ym,
@@ -46,9 +51,9 @@ function buildFetchPayload(ym) {
   };
 }
 
-/* ==========================
+/* =========================================================
    requester autofill
-========================== */
+========================================================= */
 function fillRequesterRow(row) {
   const u = window.currentUser || {};
   const set = (name, val) => {
@@ -58,16 +63,17 @@ function fillRequesterRow(row) {
   set("rq_name", u.name || "");
   set("rq_id", u.id || "");
 }
-
 function fillRequesterAllRows() {
   document
     .querySelectorAll("#inputTable tbody tr.input-row")
     .forEach((row) => fillRequesterRow(row));
 }
 
-/* ==========================
-   period dropdown
-========================== */
+/* =========================================================
+   period dropdown (Boot 우선)
+   - manage_boot.js가 이미 year/month를 세팅할 수 있으나,
+     페이지 단독 실행 대비하여 유지
+========================================================= */
 function fillDropdown(el, start, end, selected, suffix) {
   if (!el) return;
   el.innerHTML = "";
@@ -79,31 +85,38 @@ function fillDropdown(el, start, end, selected, suffix) {
   }
   el.value = String(selected);
 }
-
+function getBootPeriod() {
+  const boot = window.ManageRateBoot || {};
+  const now = new Date();
+  const y = Number(boot.selectedYear || boot.currentYear || now.getFullYear());
+  const m = Number(boot.selectedMonth || boot.currentMonth || (now.getMonth() + 1));
+  return { y, m };
+}
 function initPeriodDropdowns() {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  fillDropdown(els.yearSelect, y - 1, y + 1, y, "년");
-  fillDropdown(els.monthSelect, 1, 12, m, "월");
+  const { y: selectedY, m: selectedM } = getBootPeriod();
+  const baseY = now.getFullYear();
+  fillDropdown(els.yearSelect, baseY - 1, baseY + 1, selectedY, "년");
+  fillDropdown(els.monthSelect, 1, 12, selectedM, "월");
 }
 
-/* ==========================
+/* =========================================================
    search
-========================== */
+========================================================= */
 async function runSearch({ ym, branch } = {}) {
   const finalYM = ym || getYMFromSelectors();
   const finalBranch = branch || getEffectiveBranch();
 
-  if (!finalYM || !finalBranch) {
-    alertBox("연도·월도 및 지점을 선택해주세요.");
-    return;
-  }
+  if (!finalYM) return alertBox("연도·월도를 선택해주세요.");
+
+  const grade = getGrade();
+  if (grade === "superuser" && !finalBranch) return alertBox("부서/지점을 선택해주세요.");
+  if (!finalBranch) return alertBox("지점 정보가 없습니다.");
 
   try {
     await fetchData(buildFetchPayload(finalYM));
   } catch (err) {
-    console.error("❌ [fetchData] 실패:", err);
+    console.error("❌ [rate/index] fetchData 실패:", err);
     alertBox("데이터 조회 중 오류가 발생했습니다.");
   }
 }
@@ -113,20 +126,28 @@ function initSearchButton() {
   els.btnSearch.addEventListener("click", () => runSearch());
 }
 
-/* ==========================
-   superuser part/branch loader
-========================== */
-function initSuperuserPartsBranches() {
+/* =========================================================
+   superuser part/branch loader (대기형)
+========================================================= */
+function initSuperuserPartsBranchesWait() {
   if (getGrade() !== "superuser") return;
-  if (typeof window.loadPartsAndBranches !== "function") return;
-  window.loadPartsAndBranches("manage-rate");
+
+  const tryLoad = (retry = 0) => {
+    if (typeof window.loadPartsAndBranches !== "function") {
+      if (retry < 12) return setTimeout(() => tryLoad(retry + 1), 250);
+      return;
+    }
+    window.loadPartsAndBranches("manage-rate");
+  };
+
+  tryLoad(0);
 }
 
-/* ==========================
+/* =========================================================
    table check modal
-========================== */
+========================================================= */
 function getTableFetchUrl(branch) {
-  const base = ds("tableFetchUrl"); // data-table-fetch-url
+  const base = ds("tableFetchUrl");
   if (!base) return "";
   const url = new URL(base, window.location.origin);
   url.searchParams.set("branch", branch);
@@ -186,55 +207,79 @@ function initTableCheckModal() {
     new bootstrap.Modal(modalEl).show();
 
     try {
-      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
       if (data.status !== "success") throw new Error(data.message || "조회 실패");
 
       const rows = Array.isArray(data.rows) ? data.rows : [];
-      if (!rows.length) {
-        modalBody.innerHTML = `<div class="py-4 text-muted">등록된 테이블이 없습니다.</div>`;
-        return;
-      }
-      modalBody.innerHTML = renderTableCheckHTML(rows);
+      modalBody.innerHTML = rows.length
+        ? renderTableCheckHTML(rows)
+        : `<div class="py-4 text-muted">등록된 테이블이 없습니다.</div>`;
     } catch (err) {
-      console.error("❌ [테이블 확인] 실패:", err);
+      console.error("❌ [rate/index] 테이블 확인 실패:", err);
       modalBody.innerHTML = `<div class="py-4 text-danger">테이블 정보를 불러오지 못했습니다.</div>`;
     }
   });
 }
 
-/* ==========================
-   autoload
-========================== */
+/* =========================================================
+   autoload (중복 방지)
+   - manage_boot.js가 이미 autoLoad를 수행할 수 있으므로,
+     index.js autoload는 "보조"로만 동작하도록 설계
+========================================================= */
 function initAutoLoad() {
-  const grade = getGrade();
-  if (!AUTOLOAD_GRADES.has(grade)) return;
+  if (autoLoaded) return;
 
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+  // ✅ manage_boot가 먼저 실행했으면 중복 실행 금지
+  if (window.__manageBootInited?.rate) {
+    // 단, manage_boot가 rate 컨텍스트 init을 못 했을 수도 있으니
+    // root가 있고 main_admin/sub_admin이면 1회 보조 실행은 가능
+    // 여기서는 충돌 방지를 위해 기본적으로 종료
+    return;
+  }
+
+  const boot = window.ManageRateBoot || {};
+  const grade = getGrade();
+
+  const shouldAuto =
+    boot.autoLoad === true || (boot.autoLoad == null && AUTOLOAD_GRADES.has(grade));
+
+  if (!shouldAuto) return;
+  if (!AUTOLOAD_GRADES.has(grade) && grade !== "superuser") return;
+
   const branch = getEffectiveBranch();
   if (!branch) return;
 
-  // manage_boot.js와 충돌 방지: 아주 짧게만 지연
+  const ym =
+    getYMFromSelectors() ||
+    (() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+    })();
+
+  autoLoaded = true;
   setTimeout(() => runSearch({ ym, branch }), 250);
 }
 
-/* ==========================
+/* =========================================================
    init
-========================== */
+========================================================= */
 function init() {
   if (!els.root) return;
 
-  initPeriodDropdowns();
-  initInputRowEvents();
-  fillRequesterAllRows();
+  initPeriodDropdowns();     // 단독 실행 대비
+  initInputRowEvents();      // 입력 이벤트
+  fillRequesterAllRows();    // 요청자 자동입력
 
-  initSuperuserPartsBranches();
+  initSuperuserPartsBranchesWait();
   initSearchButton();
-  initAutoLoad();
   initTableCheckModal();
+  initAutoLoad();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

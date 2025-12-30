@@ -4,37 +4,50 @@ import { showLoading, hideLoading, alertBox } from "./utils.js";
 import { resetInputSection } from "./input_rows.js";
 
 let mainDT = null;
-
-// 1회만 바인딩
 let delegationBound = false;
+let resizeBound = false;
 
-/* ============================================================
-   Dataset helpers
-============================================================ */
-function getDatasetUrl(root, keys = []) {
-  const ds = root?.dataset;
-  if (!ds) return "";
+/* =========================================================
+   Dataset/URL helpers (키 변화/오타 대응)
+========================================================= */
+function toDashed(camel) {
+  return String(camel || "").replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
+
+function pickDatasetUrl(root, keys = []) {
+  if (!root) return "";
+
+  const ds = root.dataset || {};
   for (const k of keys) {
-    const v = ds[k];
+    const v = ds?.[k];
     if (v && String(v).trim()) return String(v).trim();
   }
+
+  // data-xxx attribute fallback
+  for (const k of keys) {
+    const attr = `data-${toDashed(k)}`;
+    const v = root.getAttribute?.(attr);
+    if (v && String(v).trim()) return String(v).trim();
+  }
+
   return "";
 }
 
 function getFetchBaseUrl() {
-  return getDatasetUrl(els.root, ["fetchUrl", "dataFetchUrl", "fetchURL", "dataFetchURL"]);
+  // 템플릿: data-fetch-url => dataset.fetchUrl
+  return pickDatasetUrl(els.root, ["fetchUrl", "dataFetchUrl", "fetchURL", "dataFetchURL"]);
 }
 
 function getUpdateProcessDateUrl() {
-  return getDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
+  return pickDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
 }
 
 function getDeleteUrl() {
-  return getDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
+  return pickDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
 }
 
 function getUserGrade() {
-  return String(els.root?.dataset?.userGrade || "").trim();
+  return String(els.root?.dataset?.userGrade || window.currentUser?.grade || "").trim();
 }
 
 function canEditProcessDate() {
@@ -47,9 +60,9 @@ function canDeleteRow() {
   return g === "superuser" || g === "main_admin";
 }
 
-/* ============================================================
+/* =========================================================
    Normalizers / Escapes
-============================================================ */
+========================================================= */
 function normalizeYM(ym) {
   const s = String(ym || "").trim();
   if (!s) return "";
@@ -70,19 +83,21 @@ function escapeHtml(v) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 function escapeAttr(v) {
   return escapeHtml(v);
 }
 
-/* ============================================================
+/* =========================================================
    UI helpers
-============================================================ */
+========================================================= */
 function revealSections() {
   const inputSec = document.getElementById("inputSection");
   const mainSec = document.getElementById("mainSheet");
   if (inputSec) inputSec.hidden = false;
   if (mainSec) mainSec.hidden = false;
 
+  // 표시 직후 DT 폭 재계산
   requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
 }
 
@@ -94,16 +109,16 @@ function safeResetInput() {
   }
 }
 
-/* ============================================================
+/* =========================================================
    CSRF
-============================================================ */
+========================================================= */
 function getCSRFToken() {
   return window.csrfToken || "";
 }
 
-/* ============================================================
+/* =========================================================
    Server calls
-============================================================ */
+========================================================= */
 async function updateProcessDate(id, value) {
   const url = getUpdateProcessDateUrl();
   if (!url) throw new Error("update_process_date_url 누락 (data-update-process-date-url 확인)");
@@ -115,6 +130,7 @@ async function updateProcessDate(id, value) {
       "X-CSRFToken": getCSRFToken(),
       "X-Requested-With": "XMLHttpRequest",
     },
+    credentials: "same-origin",
     body: JSON.stringify({
       id,
       process_date: value || "",
@@ -140,6 +156,7 @@ async function deleteRateRow(id) {
       "X-CSRFToken": getCSRFToken(),
       "X-Requested-With": "XMLHttpRequest",
     },
+    credentials: "same-origin",
     body: JSON.stringify({ id }),
   });
 
@@ -150,21 +167,16 @@ async function deleteRateRow(id) {
   return data;
 }
 
-/* ============================================================
+/* =========================================================
    Render helpers
-   - 변경후 강조(.cell-after)
-============================================================ */
+========================================================= */
 function renderAfterCell(val) {
   const v = String(val ?? "").trim();
   if (!v) return "";
   return `<span class="cell-after">${escapeHtml(v)}</span>`;
 }
 
-/* ============================================================
-   Render cells
-============================================================ */
 function buildActionButtons(row) {
-  // ✅ sub_admin은 버튼 자체 미표시
   if (!canDeleteRow()) return "";
   return `
     <button type="button"
@@ -175,24 +187,15 @@ function buildActionButtons(row) {
   `;
 }
 
-/**
- * ✅ 처리일자 셀 렌더링
- * - superuser/main_admin: date input (편집 가능)
- * - sub_admin: 텍스트만 표시 (요청 반영: 박스/인풋 없음)
- */
 function renderProcessDateCell(_value, _type, row) {
   const grade = getUserGrade();
   const val = (row.process_date || "").trim();
 
-  // ✅ sub_admin은 "텍스트-only" 표시
   if (grade === "sub_admin") {
     return `<span>${escapeHtml(val || "")}</span>`;
   }
 
-  // ✅ 그 외는 input date 유지
-  const editable = canEditProcessDate();
-  const disabledAttr = editable ? "" : "disabled";
-
+  const disabledAttr = canEditProcessDate() ? "" : "disabled";
   return `
     <input type="date"
            class="form-control form-control-sm processDateInput"
@@ -202,9 +205,9 @@ function renderProcessDateCell(_value, _type, row) {
   `;
 }
 
-/* ============================================================
+/* =========================================================
    DataTables
-============================================================ */
+========================================================= */
 const MAIN_COLUMNS = [
   { data: "requester_name", defaultContent: "", width: "50px" },
   { data: "requester_id", defaultContent: "", width: "50px" },
@@ -215,25 +218,13 @@ const MAIN_COLUMNS = [
   { data: "before_ftable", defaultContent: "", width: "70px" },
   { data: "before_frate", defaultContent: "", width: "70px" },
 
-  // ✅ 손보테이블(변경후) 강조
-  {
-    data: "after_ftable",
-    defaultContent: "",
-    width: "70px",
-    render: (val) => renderAfterCell(val),
-  },
+  { data: "after_ftable", defaultContent: "", width: "70px", render: (v) => renderAfterCell(v) },
   { data: "after_frate", defaultContent: "", width: "70px" },
 
   { data: "before_ltable", defaultContent: "", width: "70px" },
   { data: "before_lrate", defaultContent: "", width: "70px" },
 
-  // ✅ 생보테이블(변경후) 강조
-  {
-    data: "after_ltable",
-    defaultContent: "",
-    width: "70px",
-    render: (val) => renderAfterCell(val),
-  },
+  { data: "after_ltable", defaultContent: "", width: "70px", render: (v) => renderAfterCell(v) },
   { data: "after_lrate", defaultContent: "", width: "70px" },
 
   { data: "memo", defaultContent: "", width: "150px" },
@@ -265,7 +256,9 @@ function canUseDataTables() {
 function adjustDT() {
   if (!mainDT) return;
   try {
-    mainDT.columns.adjust().draw(false);
+    mainDT.columns.adjust();
+    // draw(false)로 페이징 유지
+    mainDT.draw(false);
   } catch (_) {}
 }
 
@@ -290,7 +283,11 @@ function ensureMainDT() {
     ordering: false,
     pageLength: 10,
     lengthChange: true,
+
+    // ✅ 반응형/폭 고정 방지 핵심
     autoWidth: false,
+    scrollX: true,
+
     destroy: true,
     language: {
       emptyTable: "데이터가 없습니다.",
@@ -306,9 +303,9 @@ function ensureMainDT() {
   return mainDT;
 }
 
-/* ============================================================
-   Fallback render (DataTables 미사용 환경)
-============================================================ */
+/* =========================================================
+   Fallback render
+========================================================= */
 function renderMainSheetFallback(rows) {
   if (!els.mainTable) return;
   const tbody = els.mainTable.querySelector("tbody");
@@ -339,14 +336,12 @@ function renderMainSheetFallback(rows) {
       <td>${escapeHtml(r.before_ftable)}</td>
       <td class="text-center">${escapeHtml(r.before_frate)}</td>
 
-      <!-- ✅ 변경후 손보 테이블 강조 -->
       <td>${renderAfterCell(r.after_ftable)}</td>
       <td class="text-center">${escapeHtml(r.after_frate)}</td>
 
       <td>${escapeHtml(r.before_ltable)}</td>
       <td class="text-center">${escapeHtml(r.before_lrate)}</td>
 
-      <!-- ✅ 변경후 생보 테이블 강조 -->
       <td>${renderAfterCell(r.after_ltable)}</td>
       <td class="text-center">${escapeHtml(r.after_lrate)}</td>
 
@@ -382,9 +377,9 @@ function renderMainSheet(rows) {
   renderMainSheetFallback(rows);
 }
 
-/* ============================================================
-   Delegation (document, once)
-============================================================ */
+/* =========================================================
+   Delegation + Resize (once)
+========================================================= */
 function bindDelegationOnce() {
   if (delegationBound) return;
   delegationBound = true;
@@ -405,7 +400,7 @@ function bindDelegationOnce() {
       await updateProcessDate(id, value);
     } catch (err) {
       console.error(err);
-      alertBox?.(err?.message || "처리일자 저장 실패") ?? alert(err?.message || "처리일자 저장 실패");
+      alertBox(err?.message || "처리일자 저장 실패");
     } finally {
       hideLoading();
     }
@@ -417,7 +412,7 @@ function bindDelegationOnce() {
     if (!btn) return;
     if (!els.mainTable || !els.mainTable.contains(btn)) return;
 
-    if (!canDeleteRow()) return; // sub_admin 방어
+    if (!canDeleteRow()) return;
     const id = String(btn.dataset.id || "").trim();
     if (!id) return;
 
@@ -429,16 +424,30 @@ function bindDelegationOnce() {
       await fetchData(window.__lastRateFetchPayload || {});
     } catch (err) {
       console.error(err);
-      alertBox?.(err?.message || "삭제 실패") ?? alert(err?.message || "삭제 실패");
+      alertBox(err?.message || "삭제 실패");
     } finally {
       hideLoading();
     }
   });
 }
 
-/* ============================================================
+function bindResizeOnce() {
+  if (resizeBound) return;
+  resizeBound = true;
+
+  window.addEventListener(
+    "resize",
+    () => {
+      // 리사이즈 시 DT 폭 재계산
+      requestAnimationFrame(() => adjustDT());
+    },
+    { passive: true }
+  );
+}
+
+/* =========================================================
    Normalize row
-============================================================ */
+========================================================= */
 function normalizeRateRow(row = {}) {
   return {
     id: row.id || "",
@@ -451,11 +460,13 @@ function normalizeRateRow(row = {}) {
 
     before_ftable: row.before_ftable || "",
     before_frate: row.before_frate || "",
+
     after_ftable: row.after_ftable || "",
     after_frate: row.after_frate || "",
 
     before_ltable: row.before_ltable || "",
     before_lrate: row.before_lrate || "",
+
     after_ltable: row.after_ltable || "",
     after_lrate: row.after_lrate || "",
 
@@ -464,16 +475,16 @@ function normalizeRateRow(row = {}) {
   };
 }
 
-/* ============================================================
+/* =========================================================
    Fetch
-============================================================ */
+========================================================= */
 export async function fetchData(payload = {}) {
   if (!els.root) return;
 
-  // ✅ 삭제 후 재조회 재사용
   window.__lastRateFetchPayload = payload;
 
   bindDelegationOnce();
+  bindResizeOnce();
 
   const baseUrl = getFetchBaseUrl();
   if (!baseUrl) {
@@ -485,14 +496,17 @@ export async function fetchData(payload = {}) {
   }
 
   const ym = normalizeYM(payload.ym);
+  const branch = String(payload.branch || "").trim();
+
   const url = new URL(baseUrl, window.location.origin);
   url.searchParams.set("month", ym);
-  url.searchParams.set("branch", payload.branch || "");
+  url.searchParams.set("branch", branch);
 
   showLoading("데이터를 불러오는 중입니다...");
   try {
     const res = await fetch(url.toString(), {
       headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
     });
     if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
 
@@ -510,6 +524,9 @@ export async function fetchData(payload = {}) {
     const rows = rawRows.map(normalizeRateRow);
     safeResetInput();
     renderMainSheet(rows);
+
+    // 렌더 직후 한 번 더(숨김→표시 타이밍 보정)
+    setTimeout(() => adjustDT(), 0);
   } catch (err) {
     console.error("❌ [rate/fetch] 예외:", err);
     revealSections();

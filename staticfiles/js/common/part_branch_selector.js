@@ -1,95 +1,175 @@
 // django_ma/static/js/common/part_branch_selector.js
+(function () {
+  const ROOT_IDS = [
+    "manage-structure",
+    "manage-rate",
+    "manage-table",
+    "manage-efficiency",
+    "manage-grades",
+  ];
 
-/**
- * ✅ 공용 부서/지점 선택기 (superuser 전용)
- * - 편제변경 / 요율변경 / 테이블관리 페이지 공용
- * - main_admin/sub_admin은 자동조회 흐름이라 보통 실행하지 않음
- */
-document.addEventListener("DOMContentLoaded", async () => {
-  // ✅ 세 페이지 중 하나라도 있으면 실행
-  const root =
-    document.getElementById("manage-structure") ||
-    document.getElementById("manage-rate") ||
-    document.getElementById("manage-table");
-  if (!root) return;
-
-  const userGrade = root.dataset.userGrade;
-  if (userGrade !== "superuser") return;
-
-  const partSelect = document.getElementById("partSelect");
-  const branchSelect = document.getElementById("branchSelect");
-
-  // 페이지별 검색 버튼 id가 다를 수 있어 후보 탐색
-  const btnSearch =
-    document.getElementById("btnSearch") ||
-    document.getElementById("btnSearchPeriod");
-
-  if (!partSelect || !branchSelect) return;
-
-  /* =======================================================
-     📘 부서 목록 불러오기
-  ======================================================= */
-  try {
-    partSelect.innerHTML = `<option>불러오는 중...</option>`;
-    const res = await fetch("/partner/ajax/fetch-parts/");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    if (data.parts && data.parts.length > 0) {
-      partSelect.innerHTML =
-        `<option value="">부서 선택</option>` +
-        data.parts.map((p) => `<option value="${p}">${p}</option>`).join("");
-    } else {
-      partSelect.innerHTML = `<option value="">부서 없음</option>`;
+  function findRootById(ids) {
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) return el;
     }
-
-    console.log("✅ [part_branch_selector] 부서 목록 로드 완료");
-  } catch (err) {
-    console.error("❌ [part_branch_selector] 부서 목록 로드 오류:", err);
-    partSelect.innerHTML = `<option value="">로드 실패</option>`;
+    return null;
   }
 
-  /* =======================================================
-     📘 부서 선택 → 지점 목록 불러오기
-  ======================================================= */
-  partSelect.addEventListener("change", async () => {
-    const part = partSelect.value;
-    branchSelect.innerHTML = `<option>불러오는 중...</option>`;
-    branchSelect.disabled = true;
-    if (btnSearch) btnSearch.disabled = true;
+  const $ = (id) => document.getElementById(id);
 
-    if (!part) return;
+  function getGradeFromRoot(root) {
+    return String(root?.dataset?.userGrade || "").trim();
+  }
+
+  function getBtnSearch() {
+    return $("btnSearchPeriod") || $("btnSearch");
+  }
+
+  function getUrlParam(name) {
+    try {
+      const url = new URL(window.location.href);
+      return String(url.searchParams.get(name) || "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function getInitValueFromHidden(id) {
+    const el = $(id);
+    return String(el?.value || "").trim();
+  }
+
+  async function fetchJson(url) {
+    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  async function loadParts() {
+    const partSelect = $("partSelect");
+    if (!partSelect) return [];
+
+    partSelect.innerHTML = `<option value="">불러오는 중...</option>`;
+    partSelect.disabled = true;
 
     try {
-      const res2 = await fetch(
-        `/partner/ajax/fetch-branches/?part=${encodeURIComponent(part)}`
-      );
-      if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
-      const data2 = await res2.json();
+      const data = await fetchJson("/partner/ajax/fetch-parts/");
+      const parts = Array.isArray(data.parts) ? data.parts : [];
 
-      if (data2.branches && data2.branches.length > 0) {
-        branchSelect.innerHTML =
-          `<option value="">지점 선택</option>` +
-          data2.branches.map((b) => `<option value="${b}">${b}</option>`).join("");
-      } else {
-        branchSelect.innerHTML = `<option value="">지점 없음</option>`;
-      }
+      partSelect.innerHTML =
+        `<option value="">부서 선택</option>` +
+        parts.map((p) => `<option value="${p}">${p}</option>`).join("");
+
+      if (!parts.length) partSelect.innerHTML = `<option value="">부서 없음</option>`;
+
+      partSelect.disabled = false;
+      console.log("✅ [part_branch_selector] 부서 목록 로드 완료", parts.length);
+      return parts;
+    } catch (e) {
+      console.error("❌ [part_branch_selector] 부서 목록 로드 실패:", e);
+      partSelect.innerHTML = `<option value="">로드 실패</option>`;
+      partSelect.disabled = false;
+      return [];
+    }
+  }
+
+  async function loadBranches(part) {
+    const branchSelect = $("branchSelect");
+    if (!branchSelect) return [];
+
+    branchSelect.innerHTML = `<option value="">불러오는 중...</option>`;
+    branchSelect.disabled = true;
+
+    const p = String(part || "").trim();
+    if (!p) {
+      branchSelect.innerHTML = `<option value="">부서를 먼저 선택하세요</option>`;
+      return [];
+    }
+
+    try {
+      const data = await fetchJson(`/partner/ajax/fetch-branches/?part=${encodeURIComponent(p)}`);
+      const branches = Array.isArray(data.branches) ? data.branches : [];
+
+      branchSelect.innerHTML =
+        `<option value="">지점 선택</option>` +
+        branches.map((b) => `<option value="${b}">${b}</option>`).join("");
+
+      if (!branches.length) branchSelect.innerHTML = `<option value="">지점 없음</option>`;
 
       branchSelect.disabled = false;
-      console.log("✅ [part_branch_selector] 지점 목록 로드 완료");
-    } catch (err) {
-      console.error("❌ [part_branch_selector] 지점 로드 오류:", err);
+      console.log("✅ [part_branch_selector] 지점 목록 로드 완료", branches.length);
+      return branches;
+    } catch (e) {
+      console.error("❌ [part_branch_selector] 지점 목록 로드 실패:", e);
       branchSelect.innerHTML = `<option value="">로드 실패</option>`;
+      branchSelect.disabled = false;
+      return [];
     }
-  });
+  }
 
-  /* =======================================================
-     📘 지점 선택 시 → 검색 버튼 활성화
-  ======================================================= */
-  branchSelect.addEventListener("change", () => {
-    if (btnSearch) btnSearch.disabled = !branchSelect.value;
-    if (branchSelect.value) {
-      console.log(`🔹 [part_branch_selector] 지점 선택됨: ${branchSelect.value}`);
+  function setBtnEnabledByBranch(branchSelect, btnSearch) {
+    if (!btnSearch) return;
+    btnSearch.disabled = !String(branchSelect?.value || "").trim();
+  }
+
+  // ✅ manage_boot.js 호환 전역
+  window.loadPartsAndBranches = async function (rootIdOrEl) {
+    const root = typeof rootIdOrEl === "string" ? $(rootIdOrEl) : rootIdOrEl;
+    if (!root) return;
+
+    const grade = getGradeFromRoot(root);
+    if (grade !== "superuser") return;
+
+    const partSelect = $("partSelect");
+    const branchSelect = $("branchSelect");
+    const btnSearch = getBtnSearch();
+    if (!partSelect || !branchSelect) return;
+
+    // ✅ 중복 바인딩 방지
+    if (root.dataset.partBranchBound === "1") {
+      // 혹시 로드가 안 된 상태면 parts만이라도 로드
+      if (!partSelect.options.length || partSelect.options[0]?.textContent?.includes("불러오는 중")) {
+        await loadParts();
+      }
+      return;
     }
+    root.dataset.partBranchBound = "1";
+
+    if (btnSearch) btnSearch.disabled = true;
+
+    // 1) parts 로드
+    await loadParts();
+
+    // 2) 초기값 복원 우선순위: hidden -> URL
+    const initPart = getInitValueFromHidden("selectedPartInit") || getUrlParam("part");
+    const initBranch = getInitValueFromHidden("selectedBranchInit") || getUrlParam("branch");
+
+    if (initPart) {
+      partSelect.value = initPart;
+      await loadBranches(initPart);
+
+      if (initBranch) {
+        branchSelect.value = initBranch;
+        setBtnEnabledByBranch(branchSelect, btnSearch);
+      }
+    }
+
+    // 3) 이벤트
+    partSelect.addEventListener("change", async () => {
+      if (btnSearch) btnSearch.disabled = true;
+      await loadBranches(partSelect.value);
+    });
+
+    branchSelect.addEventListener("change", () => {
+      setBtnEnabledByBranch(branchSelect, btnSearch);
+    });
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const root = findRootById(ROOT_IDS);
+    if (!root) return;
+
+    window.loadPartsAndBranches(root).catch((e) => console.error(e));
   });
-});
+})();

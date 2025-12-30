@@ -1,4 +1,3 @@
-<!-- django_ma/templates/base.html-->
 {% load static %}
 <!DOCTYPE html>
 <html lang="ko">
@@ -6,170 +5,176 @@
   <meta charset="UTF-8">
   <title>{% block title %}업무시스템{% endblock %}</title>
 
-  <!-- ✅ 공통 CSS 라이브러리 -->
+  <!-- =====================================================
+       ✅ Core CSS
+  ====================================================== -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-  
   <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
 
-  <!-- ✅ 공통 스타일 -->
-  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <!-- ✅ Project base style (cache-buster) -->
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v={% now 'U' %}">
+
+  <!-- ✅ Page extra head (필요한 페이지에서만 추가 로드) -->
+  {% block extra_head %}{% endblock %}
+
+  <!-- =====================================================
+       ✅ DataTables CSS (옵션)
+       - 페이지에서 `enable_datatables`를 block으로 켜면 로드
+  ====================================================== -->
+  {% block enable_datatables %}{% endblock %}
 </head>
 
 <body style="padding-top: 50px;">
 
-<!-- ✅ 로그인한 경우에만 네비게이션 출력 -->
 {% if user.is_authenticated %}
-<!-- ✅ 네비게이션 바 -->
-<nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-white">
-  <div class="container-fluid position-relative">
-    <!-- 🔹 로고 (좌측 고정) -->
-    <a class="navbar-brand" href="{% url 'home' %}">
-      <img src="{% static 'images/logo.png' %}" alt="인카 로고" style="height: 40px;">
-    </a>
+  <!-- =====================================================
+       ✅ Navbar
+  ====================================================== -->
+  <nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-white">
+    <div class="container-fluid position-relative">
 
-    <!-- 🔹 모바일 토글 -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+      <!-- 🔹 Logo -->
+      <a class="navbar-brand" href="{% url 'home' %}">
+        <img src="{% static 'images/logo.png' %}" alt="인카 로고" style="height: 40px;">
+      </a>
 
-    <!-- 🔹 중앙 메뉴 -->
-    <div class="collapse navbar-collapse justify-content-center position-absolute start-50 translate-middle-x" id="navbarContent" style="width: fit-content;">
-      <ul class="navbar-nav mb-2 mb-lg-0"> 
+      <!-- 🔹 Mobile toggler -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-        {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
-          <!-- ✅ 대시보드 -->
+      <!-- 🔹 Center menu -->
+      <div class="collapse navbar-collapse justify-content-center position-absolute start-50 translate-middle-x"
+           id="navbarContent" style="width: fit-content;">
+        <ul class="navbar-nav mb-2 mb-lg-0">
+
+          {% if user.grade in 'superuser main_admin sub_admin' %}
+            <!-- ✅ Dashboard -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}"
+                 href="#" id="dashMenu" data-bs-toggle="dropdown">대시보드</a>
+              <ul class="dropdown-menu" aria-labelledby="dashMenu">
+                <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
+                <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
+                <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
+              </ul>
+            </li>
+          {% endif %}
+
+          <!-- ✅ Board -->
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}" href="#" id="dashMenu" data-bs-toggle="dropdown">대시보드</a>
-            <ul class="dropdown-menu" aria-labelledby="dashMenu">
-              <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
-              <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
-              <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
-            </ul>
-          </li>
-        {% endif %}
-
-        <!-- ✅ 업무요청 -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
-          <ul class="dropdown-menu" aria-labelledby="boardMenu">
-            <li><a class="dropdown-item" href="{% url 'post_list' %}">요청게시판</a></li>
-            {% if user.grade != 'inactive' %}
-              <li><a class="dropdown-item" href="{% url 'support_form' %}">업무요청서</a></li>
-            {% endif %}
-            {% if user.grade != 'inactive' %}
-              <li><a class="dropdown-item" href="{% url 'states_form' %}">FA소명서</a></li>
-            {% endif %}
-            {% if user.grade == 'superuser' %}
-              <li><a class="dropdown-item" href="{% url 'manage_sign' %}">결재관리</a></li>
-            {% endif %}
-          </ul>
-        </li>
-
-        {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
-          <!-- ✅ 조직관리 -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}" href="#" id="boardMenu" data-bs-toggle="dropdown">조직관리</a>
-            <ul class="dropdown-menu" aria-labelledby="boardMenu">              
-              <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
-              <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
-              <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
-              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
-                <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+            <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}"
+               href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
+            <ul class="dropdown-menu" aria-labelledby="boardMenu">
+              <li><a class="dropdown-item" href="{% url 'post_list' %}">요청게시판</a></li>
+              {% if user.grade != 'inactive' %}
+                <li><a class="dropdown-item" href="{% url 'support_form' %}">업무요청서</a></li>
+                <li><a class="dropdown-item" href="{% url 'states_form' %}">FA소명서</a></li>
               {% endif %}
-              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
-                <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
+              {% if user.grade == 'superuser' %}
+                <li><a class="dropdown-item" href="{% url 'manage_sign' %}">결재관리</a></li>
               {% endif %}
             </ul>
           </li>
-        {% endif %}
 
-        {% if user.grade == 'superuser' %}
-          <!-- ✅ 관리자 메뉴 -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}" href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
-            <ul class="dropdown-menu" aria-labelledby="commissionMenu">
-              <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
-              <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
-              <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
-            </ul>
-          </li>
-        {% endif %}
+          {% if user.grade in 'superuser main_admin sub_admin' %}
+            <!-- ✅ Partner -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
+                 href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
+              <ul class="dropdown-menu" aria-labelledby="partnerMenu">
+                <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
+                <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
+                <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
+                {% if user.grade in 'superuser main_admin' %}
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
 
-        {% if user.grade != 'inactive' %}
-          <!-- ✅ 매뉴얼 -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}" href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
-            <ul class="dropdown-menu" aria-labelledby="joinMenu">
-              <li><a class="dropdown-item" href="{% url 'join:manual_basic' %}">업무매뉴얼</a></li>
-              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
-                <li><a class="dropdown-item" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a></li>
-              {% endif %}
-              <li><a class="dropdown-item" href="{% url 'join:rules_basic' %}">영업기준안</a></li>
-              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
-                <li><a class="dropdown-item" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a></li>
-              {% endif %}
-            </ul>
-          </li>
-        {% endif %}
+          {% if user.grade == 'superuser' %}
+            <!-- ✅ Commission -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}"
+                 href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
+              <ul class="dropdown-menu" aria-labelledby="commissionMenu">
+                <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
+                <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
+                <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
+              </ul>
+            </li>
+          {% endif %}
 
-        {% if user.grade == 'superuser' %}
-          <li class="nav-item">
-            <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}" href="{% url 'home' %}admin/">관리자</a>
-          </li>
-        {% endif %}
-      </ul>
-    </div>
+          {% if user.grade != 'inactive' %}
+            <!-- ✅ Manual -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}"
+                 href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
+              <ul class="dropdown-menu" aria-labelledby="joinMenu">
+                <li><a class="dropdown-item" href="{% url 'join:manual_basic' %}">업무매뉴얼</a></li>
+                {% if user.grade in 'superuser main_admin' %}
+                  <li><a class="dropdown-item" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a></li>
+                {% endif %}
+                <li><a class="dropdown-item" href="{% url 'join:rules_basic' %}">영업기준안</a></li>
+                {% if user.grade in 'superuser main_admin' %}
+                  <li><a class="dropdown-item" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a></li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
 
-    <!-- 🔹 우측 사용자 정보 + 로그아웃 -->
-    <div class="d-none d-lg-flex align-items-center ms-auto">
-      <div class="me-3" style="font-weight:500; color:#333;">
-        {{ user.branch }}&nbsp;<strong>{{ user.name }}({{ user.id }})</strong>
+          {% if user.grade == 'superuser' %}
+            <li class="nav-item">
+              <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}"
+                 href="{% url 'home' %}admin/">관리자</a>
+            </li>
+          {% endif %}
+
+        </ul>
       </div>
-      <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-logout">로그아웃</button>
-      </form>
+
+      <!-- 🔹 Right user info + logout -->
+      <div class="d-none d-lg-flex align-items-center ms-auto">
+        <div class="me-3" style="font-weight:500; color:#333;">
+          {{ user.branch }}&nbsp;<strong>{{ user.name }}({{ user.id }})</strong>
+        </div>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-logout">로그아웃</button>
+        </form>
+      </div>
+
     </div>
-  </div>
-</nav>
+  </nav>
 {% endif %}
 
-<!-- ✅ 페이지 본문 -->
+<!-- =====================================================
+     ✅ Content wrapper
+     - 기본: container
+     - 페이지에서 override 가능
+====================================================== -->
+{% block content_wrapper %}
 <div class="container my-5">
   {% block content %}{% endblock %}
 </div>
+{% endblock %}
 
-<!-- ✅ 공통 JS 라이브러리 -->
+<!-- =====================================================
+     ✅ Core JS
+====================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/base_ui.js' %}?v={% now 'U' %}"></script>
 
-<!-- ✅ 공통 UI 동작 (별도 파일) -->
-<script src="{% static 'js/base_ui.js' %}"></script>
+<!-- =====================================================
+     ✅ DataTables JS (옵션)
+     - enable_datatables 블록에서 CSS/JS/설정 로드
+====================================================== -->
+{% block datatables_bundle %}{% endblock %}
 
-<!-- ✅ DataTables + Export Buttons CDN -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
-<link rel="stylesheet" href="{% static 'css/datatable_custom.css' %}">
-
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-
-<!-- ✅ Export Buttons -->
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
-
-<!-- ✅ 공용 초기화 JS -->
-<script src="{% static 'js/datatable_config.js' %}"></script>
-
-<script src="{% static 'js/excel_upload.js' %}"></script>
-
-<!-- ✅ 페이지별 추가 스크립트 로딩 영역 -->
+<!-- ✅ page extra scripts -->
 {% block extra_js %}{% endblock %}
 
 </body>

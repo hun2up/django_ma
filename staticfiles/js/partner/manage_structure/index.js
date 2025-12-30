@@ -1,77 +1,126 @@
 // django_ma/static/js/partner/manage_structure/index.js
-import { fetchData } from "./fetch.js";
-import { initInputRowEvents } from "./input_rows.js";
+
 import { initManageBoot } from "../../common/manage_boot.js";
+import { pad2 } from "../../common/manage/ym.js";
 
-/**
- * ✅ Firefox 안정화 핵심:
- * - initManageBoot("structure") 반환값을 바로 구조분해하면
- *   파폭에서 undefined일 때 즉시 TypeError로 스크립트가 죽음
- * - 따라서 safe ctx 패턴으로 처리
- */
-const ctx = initManageBoot("structure") || {};
-const root = ctx.root || document.getElementById("manage-structure");
-const boot = ctx.boot || window.ManageStructureBoot || {};
-const user = ctx.user || window.currentUser || {};
-
-function onReady(fn) {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", fn, { once: true });
-  } else {
-    fn();
-  }
+function getStaticV() {
+  const v = String(window.STATIC_VERSION || "").trim();
+  return v ? `?v=${encodeURIComponent(v)}` : "";
 }
 
-onReady(() => {
-  if (!root) {
-    console.error("⚠️ manage-structure root 요소를 찾을 수 없습니다.");
-    return;
+async function loadPageModules() {
+  const v = getStaticV();
+  const [{ fetchData }, { initInputRowEvents }] = await Promise.all([
+    import(`./fetch.js${v}`),
+    import(`./input_rows.js${v}`),
+  ]);
+  return { fetchData, initInputRowEvents };
+}
+
+function safeNum(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function buildYM(y, m) {
+  return `${y}-${pad2(m)}`;
+}
+
+function getBranchForFetch(ctx, boot) {
+  // superuser는 branchSelect 값이 있으면 우선
+  if (boot?.userGrade === "superuser") {
+    const bs = document.getElementById("branchSelect");
+    const v = String(bs?.value || "").trim();
+    return v || "";
   }
+  // 그 외는 currentUser.branch 우선
+  const cu = window.currentUser || {};
+  return String(cu.branch || "").trim();
+}
 
-  const els = {
-    year: document.getElementById("yearSelect"),
-    month: document.getElementById("monthSelect"),
-    branch: document.getElementById("branchSelect"),
-    btnSearch: document.getElementById("btnSearchPeriod"),
-    inputSection: document.getElementById("inputSection"),
-    mainSheet: document.getElementById("mainSheet"),
-    inputTable: document.getElementById("inputTable"),
-  };
+function showSections() {
+  document.getElementById("inputSection")?.removeAttribute("hidden");
+  document.getElementById("mainSheet")?.removeAttribute("hidden");
+}
 
-  if (!els.year || !els.month) {
-    console.error("⚠️ yearSelect/monthSelect 요소 누락");
-    return;
-  }
+function bindSearchButton(fetchData, boot) {
+  const btn = document.getElementById("btnSearchPeriod") || document.getElementById("btnSearch");
+  if (!btn || btn.__bound) return;
+  btn.__bound = true;
 
-  // ✅ 요청자 자동입력 초기화
-  if (els.inputTable) {
-    try {
-      initInputRowEvents();
-      console.log("✅ 요청자 정보 자동입력 초기화 완료");
-    } catch (e) {
-      console.error("❌ initInputRowEvents 오류:", e);
+  btn.addEventListener("click", async () => {
+    const ySel = document.getElementById("yearSelect");
+    const mSel = document.getElementById("monthSelect");
+
+    const y = safeNum(ySel?.value, safeNum(boot?.currentYear, new Date().getFullYear()));
+    const m = safeNum(mSel?.value, safeNum(boot?.currentMonth, new Date().getMonth() + 1));
+
+    const ym = buildYM(y, m);
+    const branch = getBranchForFetch(null, boot);
+
+    if (boot?.userGrade === "superuser" && !branch) {
+      alert("지점을 먼저 선택하세요.");
+      return;
     }
-  }
 
-  // ✅ 검색 버튼
-  els.btnSearch?.addEventListener("click", () => {
-    const y = els.year.value;
-    const m = String(els.month.value).padStart(2, "0");
-    const ym = `${y}-${m}`;
-
-    const branch = els.branch?.value?.trim() || user.branch?.trim() || "";
-
-    els.inputSection?.removeAttribute("hidden");
-    els.mainSheet?.removeAttribute("hidden");
-
-    console.log("🔍 검색 클릭 → fetchData", { ym, branch });
-    fetchData(ym, branch);
+    showSections();
+    await fetchData(ym, branch);
   });
+}
 
-  // ✅ autoLoad fetch 자체는 manage_boot.js에서 하므로
-  // 여기서는 화면 표시만 보조
-  if (boot.autoLoad && ["main_admin", "sub_admin"].includes((user.grade || "").trim())) {
-    els.inputSection?.removeAttribute("hidden");
-    els.mainSheet?.removeAttribute("hidden");
+async function runAutoLoadOnce(fetchData, boot) {
+  if (window.__structureAutoLoaded) return;
+  window.__structureAutoLoaded = true;
+
+  // ✅ payload 우선 사용 (manage_boot에서 준비한 값)
+  const payload = window.__manageBootAutoPayload?.structure;
+  let ym = payload?.ym || "";
+  let branch = payload?.branch || "";
+
+  // payload가 없으면 현재 select 값으로 계산
+  if (!ym) {
+    const ySel = document.getElementById("yearSelect");
+    const mSel = document.getElementById("monthSelect");
+    const y = safeNum(ySel?.value, safeNum(boot?.selectedYear || boot?.currentYear, new Date().getFullYear()));
+    const m = safeNum(mSel?.value, safeNum(boot?.selectedMonth || boot?.currentMonth, new Date().getMonth() + 1));
+    ym = buildYM(y, m);
   }
-});
+
+  if (!branch) {
+    branch = getBranchForFetch(null, boot);
+  }
+
+  // superuser는 지점 선택 전엔 자동조회 보류
+  if (boot?.userGrade === "superuser" && !branch) return;
+  if (!branch) return;
+
+  showSections();
+  await fetchData(ym, branch);
+}
+
+/* =========================================================
+   Init
+========================================================= */
+(async function init() {
+  const ctx = initManageBoot("structure") || {};
+  const boot = ctx.boot || window.ManageStructureBoot || {};
+
+  const { fetchData, initInputRowEvents } = await loadPageModules();
+
+  // 입력행 이벤트
+  try {
+    initInputRowEvents();
+  } catch (e) {
+    console.error("❌ initInputRowEvents error:", e);
+  }
+
+  // 검색 버튼 바인딩 (항상 최신 fetchData 사용)
+  bindSearchButton(fetchData, boot);
+
+  // ✅ 자동조회 (index.js 단독)
+  try {
+    await runAutoLoadOnce(fetchData, boot);
+  } catch (e) {
+    console.error("❌ autoLoad fetch error:", e);
+  }
+})();

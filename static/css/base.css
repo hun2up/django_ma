@@ -1,119 +1,120 @@
 /* =======================================================
-   🎨 base.css — 공통 스타일 시트
-   전역 폰트, 버튼, 입력폼, 카드, 레이아웃, 유틸리티 포함
-   ======================================================= */
+   🎨 base.css — 공통 스타일 시트 (REFAC v2)
+   - 전역 UI(폰트/배경/네비/버튼/폼)
+   - 공용 유틸(로딩/readonly/검색결과/Info)
+   - Partner 관리페이지(편제/요율/지점효율) 레이아웃
+   - 테이블/DataTables/Firefox 보정
+======================================================= */
 
-/* ✅ 기본 폰트 및 배경 */
-html {
-  font-size: 16px; /* 전체 폰트 한 단계 축소 (기본 16px → 14px) */
+/* =======================================================
+   0) Tokens / Base
+======================================================= */
+:root {
+  --inka-blue: #005BAC;
+  --inka-blue2: #0074D9;
+  --inka-blue-dark: #004B93;
+
+  --bg-app: #f9fbfd;
+  --border-soft: #d2ddec;
+
+  --shadow-card: 0 6px 15px rgba(0, 0, 0, 0.1);
+  --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+  --radius-card: 15px;
+  --radius-soft: 10px;
 }
+
+html { font-size: 16px; }
 
 html, body, button, input, textarea, select {
-  font-family: 'Noto Sans KR', sans-serif;
-  background-color: #f9fbfd;
+  font-family: "Noto Sans KR", sans-serif;
 }
+
+body { background-color: var(--bg-app); }
 
 /* =======================================================
-   🔷 Navbar
-   ======================================================= */
-
-/* ✅ 상단 메뉴 폰트 강조 */
-.nav-link {
-  font-size: 1.1rem;     /* 기본 대비 약 15.4px → 살짝 큼 */
-  font-weight: 600;
-}
-
-.nav-link.active {
-  font-size: 1.1rem;     /* active 상태에서도 동일 크기 유지 */
-  font-weight: 700;
-}
-
-   .navbar {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
+   1) Navbar
+======================================================= */
+.navbar { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); }
 
 .nav-link {
+  font-size: 1.1rem;
   font-weight: 600;
   color: #333 !important;
+  margin: 0 10px;
 }
+
+.nav-link:hover { color: var(--inka-blue) !important; }
 
 .nav-link.active {
-  color: #005BAC !important;
+  font-size: 1.1rem;
   font-weight: 700;
+  color: var(--inka-blue) !important;
 }
 
-.nav-link.inactive {
-  color: #aaa !important;
-}
-
-.nav-link.inactive:hover {
-  color: #005BAC !important;
-}
+.nav-link.inactive { color: #aaa !important; }
+.nav-link.inactive:hover { color: var(--inka-blue) !important; }
 
 /* =======================================================
-   🔹 버튼 스타일
-   ======================================================= */
-
-/* 기본 파란 버튼 */
+   2) Buttons
+======================================================= */
 .btn-primary {
-  background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+  background: linear-gradient(135deg, var(--inka-blue) 0%, var(--inka-blue2) 100%);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-soft);
   font-weight: 600;
   transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #004B93 0%, #0069C2 100%);
+  background: linear-gradient(135deg, var(--inka-blue-dark) 0%, #0069C2 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4);
 }
 
-/* 로그아웃 버튼 */
 .btn-logout {
   background-color: #dc3545;
-  color: white;
+  color: #fff;
   border-radius: 8px;
   padding: 6px 14px;
   border: none;
 }
+.btn-logout:hover { background-color: #b02a37; }
 
-.btn-logout:hover {
-  background-color: #b02a37;
-}
-
-/* 검색 / 제거 버튼 */
 .btn-search,
 .btn-remove {
   white-space: nowrap;
-  width: auto;
-  height: auto;
   padding: 6px 12px;
   font-size: 0.9rem;
   border-radius: 8px;
 }
 
+.btn[disabled],
+button[disabled] {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+
 /* =======================================================
-   🧾 카드 / 폼 / 인풋
-   ======================================================= */
+   3) Cards / Forms / Inputs
+======================================================= */
 .card {
   border: none;
-  border-radius: 15px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .form-control {
-  border-radius: 10px;
-  border: 1px solid #d2ddec;
+  border-radius: var(--radius-soft);
+  border: 1px solid var(--border-soft);
   transition: all 0.25s ease;
 }
 
 .form-control:focus {
-  border-color: #005BAC;
+  border-color: var(--inka-blue);
   box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
 }
 
-/* 셀렉트 */
 .status-select {
   font-weight: 600;
   border-radius: 6px;
@@ -121,8 +122,8 @@ html, body, button, input, textarea, select {
 }
 
 /* =======================================================
-   💬 댓글 / 코멘트
-   ======================================================= */
+   4) Comment UI
+======================================================= */
 .comment-empty,
 .comment-login {
   font-size: 13px;
@@ -138,16 +139,26 @@ html, body, button, input, textarea, select {
 .comment-content {
   flex: 1 1 auto;
   background-color: #f8f9fa;
-  border: 1px solid #d2ddec;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 10px 12px;
   position: relative;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-soft);
 }
 
 /* =======================================================
-   📋 Info Label / Value (게시판 공용)
-   ======================================================= */
+   5) Info Label / Value
+======================================================= */
+.info-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 150px;
+}
+
 .info-label {
   font-size: 0.8rem;
   font-weight: 500;
@@ -173,27 +184,12 @@ html, body, button, input, textarea, select {
   color: #222;
 }
 
-.info-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1 1 auto;
-  min-width: 150px;
-}
-
 /* =======================================================
-   ⏳ 로딩 오버레이
-   ======================================================= */
+   6) Loading Overlay
+======================================================= */
 .loading-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100vw;
   height: 100vh;
   background-color: rgba(255, 255, 255, 0.8);
@@ -207,35 +203,35 @@ html, body, button, input, textarea, select {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%); /* 정확한 화면 중앙 배치 */
+  transform: translate(-50%, -50%);
   text-align: center;
 }
 
 /* =======================================================
-   🔍 대상자 검색 결과 스타일
-   ======================================================= */
+   7) Search Result UI
+======================================================= */
 #searchResults .list-group-item.search-result {
-  margin-bottom: 10px;      /* 항목 간 간격 */
-  padding-top: 11px;        /* 내부 위 여백 */
-  padding-bottom: 11px;     /* 내부 아래 여백 */
-  border-radius: 8px;       /* 둥근 모서리 */
+  margin-bottom: 10px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-radius: 8px;
   transition: all 0.2s ease;
 }
 
 #searchResults .list-group-item.search-result:hover {
-  background-color: #f0f8ff; /* 연한 파란색 배경 */
+  background-color: #f0f8ff;
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 91, 172, 0.15);
 }
 
 /* =======================================================
-   🔒 요청대상 입력칸 (검색 전용, 직접 입력 불가)
-   ======================================================= */
+   8) Readonly Fields
+======================================================= */
 .readonly-field[readonly] {
-  background-color: #f1f1f1;   /* 회색 음영 */
+  background-color: #f1f1f1;
   color: #666;
   cursor: not-allowed;
-  opacity: 1;                  /* Bootstrap이 투명하게 만드는 것 방지 */
+  opacity: 1;
 }
 
 .readonly-field[readonly]:focus {
@@ -243,40 +239,31 @@ html, body, button, input, textarea, select {
   border-color: #ccc;
 }
 
-/* =======================================================
-   💰 보험료 입력칸 (검색 전용, 직접 입력 불가)
-   ======================================================= */
-input[name^="premium_"] {
-  text-align: right;
-}
+input[name^="premium_"] { text-align: right; }
 
-/* 로그인 / 등록 등 버튼 로딩 상태 */
-.btn[disabled] {
-  opacity: 0.85;
-  cursor: not-allowed;
-}
+/* =======================================================
+   9) Controls Form (Partner 공용)
+======================================================= */
+#controlsForm { align-items: flex-end; }
 
 #controlsForm .form-label {
   font-weight: 600;
   font-size: 0.9rem;
 }
 
-#controlsForm .form-select-sm, 
+#controlsForm .form-select-sm,
 #controlsForm .btn-sm {
   height: 34px;
   font-size: 0.9rem;
 }
 
-#controlsForm {
-  align-items: flex-end;
-}
-
-/* =============================
-   📘 편제변경 - 비활성화 상태 스타일
-   ============================= */
+/* =======================================================
+   10) Disabled Mode
+======================================================= */
 .disabled-mode {
   opacity: 0.6;
   pointer-events: none;
+  filter: grayscale(0.8);
   position: relative;
   transition: all 0.3s ease;
 }
@@ -293,129 +280,150 @@ input[name^="premium_"] {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 0 4px rgba(0,0,0,0.1);
-}
-
-/* 비활성화된 입력 섹션 */
-.disabled-mode {
-  opacity: 0.6;
-  pointer-events: none;
-  filter: grayscale(0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
 }
 
 /* =======================================================
-   ✅ 편제변경 페이지 카드 전체 폭 확장
-   ======================================================= */
-#manage-structure {
+   11) Partner 관리페이지 레이아웃 확장
+======================================================= */
+/* base.html이 .container로 감싸도 "중앙 기준 확장" */
+#manage-structure,
+#manage-rate,
+#manage-efficiency {
   width: 86vw !important;
   max-width: none !important;
   margin-left: calc(-43vw + 50%) !important;
   border-radius: 14px;
 }
 
-/* 카드 전체를 화면 폭에 맞게 확장 */
-#manage-structure .card {
+#manage-structure .card,
+#manage-rate .card,
+#manage-efficiency .card {
   width: 100%;
-  max-width: none;   /* ✅ 1600px 제한 제거 */
+  max-width: none;
   margin: 0 auto 1.5rem auto;
   border-radius: 14px;
 }
 
-/* 내부 테이블이 카드 폭을 꽉 채우도록 */
-#manage-structure .table-responsive {
+/* ✅ 기본 table-responsive는 visible(입력 테이블/카드 레이아웃 유지) */
+#manage-structure .table-responsive,
+#manage-rate .table-responsive,
+#manage-efficiency .table-responsive {
   width: 100%;
   max-width: 100%;
-  overflow-x: visible; /* ✅ 스크롤 강제 방지 */
+  overflow-x: visible;
 }
 
-/* 테이블 셀 폰트 균형 */
-#manage-structure table th,
-#manage-structure table td {
+/* ✅ 메인시트(DataTables)만 auto로: 반응형/리사이즈 폭 계산 안정화 */
+#manage-structure #mainSheet .table-responsive,
+#manage-rate #mainSheet .table-responsive,
+#manage-efficiency #mainSheet .table-responsive {
+  overflow-x: auto !important;
+}
+
+/* Partner 테이블 기본 */
+#manage-structure :where(table th, table td),
+#manage-rate :where(table th, table td),
+#manage-efficiency :where(table th, table td) {
   font-size: 13px;
   white-space: nowrap;
 }
+
+/* 지점효율 금액 우측정렬 */
+#manage-efficiency input[name="amount"] { text-align: right; }
 
 /* =======================================================
-   ✅ 요율변경 페이지 카드 전체 폭 확장
-   ======================================================= */
-#manage-rate {
-  width: 86vw !important;
-  max-width: none !important;
-  margin-left: calc(-43vw + 50%) !important;
-  border-radius: 14px;
-}
-
-/* 카드 전체를 화면 폭에 맞게 확장 */
-#manage-rate .card {
+   12) Partner 입력/메인 테이블(스코프 적용)
+   - 전역 table 규칙 제거, Partner 테이블에만 적용
+======================================================= */
+#manage-structure table,
+#manage-rate table,
+#manage-efficiency table {
   width: 100%;
-  max-width: none;   /* ✅ 1600px 제한 제거 */
-  margin: 0 auto 1.5rem auto;
-  border-radius: 14px;
+  table-layout: fixed;
 }
 
-/* 내부 테이블이 카드 폭을 꽉 채우도록 */
-#manage-rate .table-responsive {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: visible; /* ✅ 스크롤 강제 방지 */
-}
-
-/* 테이블 셀 폰트 균형 */
-#manage-rate table th,
-#manage-rate table td {
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-/* =============================
-   📘 조직관리 - 테이블 스타일
-   ============================= */
-/* 🎯 대상자 입력 테이블 */
-#inputTable th {
-  font-size: 12px;       /* 헤더 폰트 */
+/* 입력 테이블 */
+#manage-structure #inputTable th,
+#manage-rate #inputTable th,
+#manage-efficiency #inputTable th {
+  font-size: 12px;
   font-weight: 600;
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
-#inputTable td, 
-#inputTable input, 
-#inputTable select {
-  font-size: 12px;       /* 데이터 폰트 */
+#manage-structure #inputTable :where(td, input, select),
+#manage-rate #inputTable :where(td, input, select),
+#manage-efficiency #inputTable :where(td, input, select) {
+  font-size: 12px;
 }
 
-/* 🎯 메인시트 테이블 */
-#mainTable th {
+/* 메인시트 */
+#manage-structure #mainTable th,
+#manage-rate #mainTable th,
+#manage-efficiency #mainTable th {
   font-size: 12px;
   font-weight: 600;
 }
 
-#mainTable td {
+#manage-structure #mainTable td,
+#manage-rate #mainTable td,
+#manage-efficiency #mainTable td {
   font-size: 12px;
   max-width: 200px;
-  white-space: nowrap;     /* 줄바꿈 방지 */
-  text-overflow: ellipsis; /* ... 처리 */
+  white-space: nowrap;
+  text-overflow: ellipsis;
   overflow: hidden;
 }
 
-table {
-  table-layout: fixed; /* 고정 폭 기반 레이아웃 */
-  width: 100%;         /* 부모 컨테이너에 맞춤 */
+/* =======================================================
+   ✅ MainSheet: 테이블 고정폭 + 가로 스크롤 정책
+   - 화면이 줄면 테이블이 찌그러지지 않도록 min-width 유지
+   ======================================================= */
+
+/* 메인시트 테이블에 붙일 공용 클래스 */
+#manage-structure .main-table-fixed,
+#manage-rate .main-table-fixed,
+#manage-efficiency .main-table-fixed {
+  /* ✅ 여기 값을 페이지별로 조정 가능 */
+  min-width: 1350px;
 }
 
+/* DataTables scrollX 사용 시 wrapper가 가로 스크롤을 들고 있도록 */
+#manage-structure #mainTable_wrapper,
+#manage-rate #mainTable_wrapper,
+#manage-efficiency #mainTable_wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 강조 색상 */
 .text-blue {
-  color: #005BAC !important;
+  color: var(--inka-blue) !important;
   font-weight: 600;
 }
 
-#inputTable th {
-  text-align: center !important;
-  vertical-align: middle !important;  /* 세로 중앙 정렬 */
+/* =======================================================
+   ✅ MainSheet OR 표시용 체크박스(읽기전용)
+======================================================= */
+#manage-structure #mainTable .or-checkbox {
+  width: 1.05rem;
+  height: 1.05rem;
+  pointer-events: none; /* 클릭 불가(읽기전용) */
+  cursor: default;
 }
 
-/* =============================
-   📘 요율관리 - 테이블 확인 모달팝업 스타일
-   ============================= */
-#tableCheckModal table th,
-#tableCheckModal table td {
+#manage-structure #mainTable td.or-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+
+/* =======================================================
+   13) 요율관리 - 테이블 확인 모달
+======================================================= */
+#tableCheckModal table :where(th, td) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -427,51 +435,39 @@ table {
   background-color: #f8f9fa;
 }
 
-#tableCheckModal table td {
-  font-size: 0.9rem;
-}
+#tableCheckModal table td { font-size: 0.9rem; }
 
 #tableCheckModal table td.text-center {
   font-weight: 500;
-  color: #003f7d; /* 인카 블루톤으로 강조 */
+  color: #003f7d;
 }
 
+/* =======================================================
+   14) DataTables / Firefox Layout Fix
+======================================================= */
+#mainSheet { min-width: 0; }
 
-/* ===============================
-   Firefox DataTables Layout Fix
-================================ */
-
-/* flex 컨테이너 안 테이블 깨짐 방지 */
-#mainSheet {
-  min-width: 0;
-}
-
-/* DataTables wrapper 폭 고정 */
 #mainTable_wrapper {
   width: 100%;
   max-width: 100%;
 }
 
-/* table 폭 강제 */
 #mainTable {
   width: 100% !important;
   table-layout: fixed;
 }
 
-/* bootstrap row 영향 제거 */
 #mainTable_wrapper .row {
   width: 100%;
   margin: 0;
 }
 
 /* =======================================================
-   ✅ (추가) 변경후 데이터 강조 스타일 (편제/요율/지점효율 공용)
-   - input처럼 보이지 않게, 결과값처럼 보이게
-   ======================================================= */
+   15) 변경후 강조(공용)
+======================================================= */
 .cell-after {
-  color: #005BAC;
+  color: var(--inka-blue);
   font-weight: 600;
-  background-color: #f1f7ff;
   border-radius: 6px;
   padding: 2px 6px;
   display: inline-block;
