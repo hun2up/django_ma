@@ -101,9 +101,9 @@
               <a class="nav-link dropdown-toggle {% if '/commission' in request.path %}active{% else %}inactive{% endif %}"
                  href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
               <ul class="dropdown-menu" aria-labelledby="commissionMenu">
-                <li><a class="dropdown-item" href="{% url 'deposit_home' %}">채권관리</a></li>
-                <li><a class="dropdown-item" href="{% url 'support_home' %}">지원신청서</a></li>
-                <li><a class="dropdown-item" href="{% url 'approval_home' %}">수수료결재</a></li>
+                <li><a class="dropdown-item" href="{% url 'commission:deposit_home' %}">채권관리</a></li>
+                <li><a class="dropdown-item" href="{% url 'commission:support_home' %}">지원신청서</a></li>
+                <li><a class="dropdown-item" href="{% url 'commission:approval_home' %}">수수료결재</a></li>
               </ul>
             </li>
           {% endif %}

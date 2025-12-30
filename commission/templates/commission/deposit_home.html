@@ -1,7 +1,8 @@
-<!-- django_ma/commission/templates/commission/deposit_home.html -->
+{# django_ma/commission/templates/commission/deposit_home.html #}
+
 {% extends 'base.html' %}
-{% load static %}
 {% load humanize %}
+{% load commission_extras %}
 
 {% block title %}채권관리{% endblock %}
 
@@ -10,226 +11,276 @@
   <div class="mx-auto" style="max-width: 1100px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <!-- 제목 -->
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#searchUserModal">
             대상자검색
           </button>
-          <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">
-            초기화
-          </button>
+          <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
         </div>
       </div>
 
       <!-- ✅ 인적사항 -->
-      <div class="info-section my-3">
-        <div class="info-box">인적사항</div>
-        <div class="info-row">
-          <div class="info-item">
-            <span class="info-label">사번</span>
-            <span class="info-value">
-              {% if target %}{{ target.id }}{% else %}-{% endif %}
-            </span>
+      <div class="card shadow-sm border-0 rounded-4 my-3">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">인적사항</div>
           </div>
-          <div class="info-item">
-            <span class="info-label">성명</span>
-            <span class="info-value">
-              {% if target %}{{ target.name }}{% else %}-{% endif %}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">소속</span>
-            <span class="info-value">
-              {% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">입사일</span>
-            <span class="info-value">
-              {% if target %}{{ target.join_date_display }}{% else %}-{% endif %}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">퇴사일</span>
-            <span class="info-value">
-              {% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}
-            </span>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th class="text-nowrap">사번</th>
+                  <th class="text-nowrap">성명</th>
+                  <th class="text-nowrap">소속</th>
+                  <th class="text-nowrap">입사일</th>
+                  <th class="text-nowrap">퇴사일</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap"><span id="target_emp_id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap fw-semibold"><span id="target_name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_join_date">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_retire_date">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-
-      <!-- 주요지표 -->
-      <div class="info-section my-3">
-        <div class="info-box">주요지표</div>
-
-          <div class="info-row">
-            <div class="info-item">
-              <span class="info-label">최종지급액</span>
-              <span class="info-value">
-                {% if payment %}
-                  {{ payment|floatformat:0|intcomma }}원
-                {% else %}
-                  -
-                {% endif %}
-              </span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">환수예상</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">지급예상</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">필요채권</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">최종초과금액</span>
-              <span class="info-value">제작중</span>
-            </div>
+      <!-- ✅ 주요지표 -->
+      <div class="card shadow-sm border-0 rounded-4 my-3">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">주요지표</div>
           </div>
-          <div class="info-row">
-            <div class="info-item">
-              <span class="info-label">총채권합계</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">보증합계</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">기타합계</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">25회손보통산</span>
-              <span class="info-value">제작중</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">25회생보통산</span>
-              <span class="info-value">제작중</span>
-            </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">최종지급액</th>
+                  <th scope="col" class="text-nowrap">환수예상</th>
+                  <th scope="col" class="text-nowrap">지급예상</th>
+                  <th scope="col" class="text-nowrap">25회손보통산</th>
+                  <th scope="col" class="text-nowrap">25회생보통산</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">
+                    <span id="metric_final_payment">
+                      {% if payment %}{{ payment|intcomma }}{% else %}-{% endif %}
+                    </span>
+                  </td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-      </div>
 
-      <!-- ✅ 수수료 현황 -->
-      <div class="info-section my-3">
-        <div class="info-box">수수료현황</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">보증합계</th>
+                  <th scope="col" class="text-nowrap">기타합계</th>
+                  <th scope="col" class="text-nowrap">채권합계</th>
+                  <th scope="col" class="text-nowrap">필요채권</th>
+                  <th scope="col" class="text-nowrap">최종초과금액</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">
+                    <span id="metric_debt_total">
+                      {% if debt_total %}{{ debt_total|intcomma }}{% else %}-{% endif %}
+                    </span>
+                  </td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <!-- 라밸 (환수예상수수료) -->
-        <div class="info-row-label mt-3">
-          <div class="info-cell"><span class="info-label">환수손보</span></div>
-          <div class="info-cell"><span class="info-label">환수생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)환수생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)환수생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)환수합계</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)환수손보</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)환수생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)환수합계</span></div>
-        </div>
-
-        <!-- 밸류 (환수예상수수료) -->
-        <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-        </div>
-
-        <!-- 라밸 (지급예상수수료) -->
-        <div class="info-row-label mt-3">
-          <div class="info-cell"><span class="info-label">지급손보</span></div>
-          <div class="info-cell"><span class="info-label">지급생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)지급손보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)지급생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(O)지급합계</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)지급손보</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)지급생보</span></div>
-          <div class="info-cell"><span class="info-label">보증(X)지급합계</span></div>
-        </div>
-
-        <!-- 밸류 (지급예상수수료) -->
-        <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-        </div>
-
-        <hr class="my-3">
-
-        <!-- 라밸 (채권증액) -->
-        <div class="info-row-label mt-3">
-          <div class="info-cell"><span class="info-label">3개월장기총</span></div>
-          <div class="info-cell"><span class="info-label">3개월초과</span></div>
-          <div class="info-cell"><span class="info-label">6개월장기총</span></div>
-          <div class="info-cell"><span class="info-label">6개월초과</span></div>
-          <div class="info-cell"><span class="info-label">9개월장기총</span></div>
-          <div class="info-cell"><span class="info-label">9개월초과</span></div>
-          <div class="info-cell"><span class="info-label">12개월장기총</span></div>
-          <div class="info-cell"><span class="info-label">12개월초과</span></div>
-        </div>
-
-        <!-- 밸류 (채권증액) -->
-        <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
         </div>
       </div>
 
-      <!-- ✅ 유지율&수금율 현황 -->
-      <div class="info-section my-3">
-        <div class="info-box">수수료현황</div>
+      <!-- ✅ 수수료현황 -->
+      <div class="card shadow-sm border-0 rounded-4 my-3">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">수수료현황</div>
+          </div>
 
-        <!-- 라밸 (유지율&수금율) -->
-        <div class="info-row-label mt-3">
-          <div class="info-cell"><span class="info-label">13회손보통산</span></div>
-          <div class="info-cell"><span class="info-label">18회손보통산</span></div>
-          <div class="info-cell"><span class="info-label">13회생보통산</span></div>
-          <div class="info-cell"><span class="info-label">18회생보통산</span></div>
-          <div class="info-cell"><span class="info-label">2-6회손보응당</span></div>
-          <div class="info-cell"><span class="info-label">2-13회손보응당</span></div>
-          <div class="info-cell"><span class="info-label">2-6회생보응당</span></div>
-          <div class="info-cell"><span class="info-label">2-13회생보응당</span></div>
-        </div>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">환수손보</th>
+                  <th scope="col" class="text-nowrap">환수생보</th>
+                  <th scope="col" class="text-nowrap">지급손보</th>
+                  <th scope="col" class="text-nowrap">지급생보</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <!-- 밸류 (유지율&수금율) -->
-        <div class="info-row-value mt-2">
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
-          <div class="info-cell"><span class="info-value">제작중</span></div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">3개월총수수료</th>
+                  <th scope="col" class="text-nowrap">6개월총수수료</th>
+                  <th scope="col" class="text-nowrap">9개월총수수료</th>
+                  <th scope="col" class="text-nowrap">12개월총수수료</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
         </div>
       </div>
 
-      <!-- 채권지표 -->
-      <div class="info-section my-3">
-        <div class="info-box">채권현황</div>
-        <span class="info-value">보증보험</span>
-        <span class="info-value">기타채권</span>
+      <!-- ✅ 유지율/수금율 -->
+      <div class="card shadow-sm border-0 rounded-4 my-3">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">유지율/수금율</div>
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">18회손보통산</th>
+                  <th scope="col" class="text-nowrap">25회손보통산</th>
+                  <th scope="col" class="text-nowrap">18손보통산</th>
+                  <th scope="col" class="text-nowrap">25회생보통산</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">2-6회손보응당</th>
+                  <th scope="col" class="text-nowrap">2-13회손보응당</th>
+                  <th scope="col" class="text-nowrap">2-6회생보응당</th>
+                  <th scope="col" class="text-nowrap">2-13회생보응당</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ✅ 채권현황 -->
+      <div class="card shadow-sm border-0 rounded-4 my-3">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">보증보험</div>
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">상품명</th>
+                  <th scope="col" class="text-nowrap">가입금액</th>
+                  <th scope="col" class="text-nowrap">상태</th>
+                  <th scope="col" class="text-nowrap">보험가입일</th>
+                  <th scope="col" class="text-nowrap">보험종료일</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-bold" style="color:#000000;">기타채권</div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">상품명</th>
+                  <th scope="col" class="text-nowrap">가입금액</th>
+                  <th scope="col" class="text-nowrap">채권번호</th>
+                  <th scope="col" class="text-nowrap">가입일</th>
+                  <th scope="col" class="text-nowrap">비고</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap">제작중</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -238,20 +289,51 @@
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 1100px;">
     <div class="card shadow p-4 border-0 rounded-4">
-
-    <!-- 제목 -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="fw-bold mb-0" style="color:#003f7d;">데이터 업데이트</h5>
-      <div class="d-flex gap-2 align-items-center">
-        <!-- ✅ 엑셀 업로드 버튼 -->
-        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
-          엑셀업로드
-        </button>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0" style="color:#003f7d;">데이터 업데이트</h5>
+        <div class="d-flex gap-2 align-items-center">
+          <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
+            엑셀업로드
+          </button>
+        </div>
       </div>
-    </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 info-table" id="depositUpdateSummaryTable">
+          <thead>
+            <tr>
+              <th class="text-nowrap">구분</th>
+              {% for p in parts %}
+                <th class="text-nowrap">{{ p }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for c in categories %}
+              <tr>
+                <td class="text-nowrap fw-semibold">{{ c }}</td>
+
+                {% for p in parts %}
+                  <td class="text-nowrap text-center">
+                    {% if c == "최종지급액" %}
+                      <span class="upload-date" data-key="{{ c }}" data-part="{{ p }}">
+                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
+                      </span>
+                    {% else %}
+                      <span data-key="{{ c }}" data-part="{{ p }}">-</span>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
   </div>
 </div>
-
 
 <!-- ✅ 엑셀 업로드 모달 -->
 <div class="modal fade" id="excelUploadModal" tabindex="-1" aria-labelledby="excelUploadModalLabel" aria-hidden="true">
@@ -263,10 +345,19 @@
       </div>
 
       <div class="modal-body">
-        <form id="excelUploadForm" method="POST" enctype="multipart/form-data">
+        <form id="excelUploadForm" method="POST" enctype="multipart/form-data" action="{% url 'commission:upload_excel' %}">
           {% csrf_token %}
 
-          <!-- ✅ 업로드 구분 (드롭다운으로 변경) -->
+          <div class="mb-3">
+            <label class="form-label small fw-bold">부서 선택</label>
+            <select id="uploadPartSelect" name="part" class="form-select form-select-sm" required>
+              <option value="">-- 선택 --</option>
+              {% for p in parts %}
+                <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
           <div class="mb-3">
             <label class="form-label small fw-bold">업로드 구분</label>
             <select id="uploadTypeSelect" name="upload_type" class="form-select form-select-sm" required>
@@ -283,7 +374,6 @@
             </select>
           </div>
 
-          <!-- ✅ 파일 선택 -->
           <div class="mb-3">
             <label for="excelFile" class="form-label small fw-bold">엑셀 파일 선택</label>
             <input class="form-control form-control-sm" type="file" id="excelFile" name="excel_file" accept=".xlsx,.xls" required>
@@ -295,7 +385,6 @@
           </div>
         </form>
 
-        <!-- 결과 메시지 -->
         <div id="uploadResult" class="mt-3 small text-center"></div>
       </div>
     </div>
@@ -312,144 +401,367 @@
   </div>
 </div>
 
+{# ============================================================
+   ✅ 1) 대상자 선택 + 주요지표(최종지급액/채권합계) 연동 (REFactor)
+============================================================ #}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const searchForm = document.getElementById('searchUserForm');
-  const searchInput = document.getElementById('searchKeyword');
-  const resultsBox = document.getElementById('searchResults');
+(function () {
+  "use strict";
 
-  // ✅ 폼 기본 제출 방지 + AJAX 검색
-  searchForm.addEventListener('submit', async function(e) {
-    e.preventDefault();
+  const DEBUG = true;
 
-    const keyword = searchInput.value.trim();
-    if (!keyword) {
-      resultsBox.innerHTML = `<div class="text-danger fw-bold mt-2">검색어를 입력해주세요.</div>`;
+  const API = {
+    userDetail: (userId) => `/commission/api/user-detail/?user=${encodeURIComponent(userId)}`,
+    depositSummary: (userId) => `/commission/api/deposit-summary/?user=${encodeURIComponent(userId)}`, // ✅ 추가 API
+  };
+
+  const els = {
+    // 인적사항
+    empId: document.getElementById("target_emp_id"),
+    name: document.getElementById("target_name"),
+    branch: document.getElementById("target_branch"),
+    joinDate: document.getElementById("target_join_date"),
+    retireDate: document.getElementById("target_retire_date"),
+
+    // 주요지표
+    finalPayment: document.getElementById("metric_final_payment"),
+    debtTotal: document.getElementById("metric_debt_total"),
+
+    // 버튼/모달
+    resetBtn: document.getElementById("resetUserBtn"),
+    searchModal: document.getElementById("searchUserModal"),
+    excelModal: document.getElementById("excelUploadModal"),
+  };
+
+  function log(...args) { if (DEBUG) console.log("[DepositHome]", ...args); }
+  function warn(...args) { if (DEBUG) console.warn("[DepositHome]", ...args); }
+
+  function setTextEl(el, value, fallback="-") {
+    if (!el) return;
+    const v = (value === undefined || value === null) ? "" : String(value);
+    el.textContent = v.trim() ? v : fallback;
+  }
+
+  function formatNumber(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "-";
+    return new Intl.NumberFormat("ko-KR").format(n) +"원";
+  }
+
+  function setNumberEl(el, value) {
+    if (!el) return;
+    el.textContent = formatNumber(value);
+  }
+
+  function hideModal(modalEl) {
+    if (!modalEl || !window.bootstrap) return;
+    const inst = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
+    inst.hide();
+  }
+
+  async function safeJson(res) {
+    const text = await res.text().catch(() => "");
+    try { return JSON.parse(text); } catch (_) { return {}; }
+  }
+
+  async function fetchJson(url) {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin",
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${t.slice(0, 200)}`);
+    }
+
+    const data = await res.json().catch(() => ({}));
+    return data || {};
+  }
+
+  async function fetchUserDetail(userId) {
+    const url = API.userDetail(userId);
+    log("fetchUserDetail ->", url);
+
+    const data = await fetchJson(url);
+    if (!data.ok || !data.user) throw new Error("invalid user-detail response");
+    return data.user;
+  }
+
+  async function fetchDepositSummary(userId) {
+    const url = API.depositSummary(userId);
+    log("fetchDepositSummary ->", url);
+
+    const data = await fetchJson(url);
+    if (!data.ok || !data.summary) throw new Error("invalid deposit-summary response");
+    return data.summary;
+  }
+
+  function renderUser(u) {
+    setTextEl(els.empId, u.id);
+    setTextEl(els.name, u.name);
+    setTextEl(els.branch, u.branch);
+    setTextEl(els.joinDate, u.join_date_display);
+    setTextEl(els.retireDate, (u.retire_date_display || "").trim() || "재직중");
+  }
+
+  function renderSummary(s) {
+    // ✅ 최종지급액 / 채권합계 반영
+    setNumberEl(els.finalPayment, s.final_payment);
+    setNumberEl(els.debtTotal, s.debt_total);
+  }
+
+  function clearUserAndSummary() {
+    renderUser({
+      id: "-",
+      name: "-",
+      branch: "-",
+      join_date_display: "-",
+      retire_date_display: "-",
+    });
+    // 숫자는 "-" 로
+    if (els.finalPayment) els.finalPayment.textContent = "-";
+    if (els.debtTotal) els.debtTotal.textContent = "-";
+  }
+
+  // ✅ 중복 호출 방지(이벤트/클릭이 동시에 들어오는 케이스)
+  let lastSelectedUserId = "";
+  let inflight = null;
+
+  async function applySelection(userId, { closeModal = true } = {}) {
+    const uid = String(userId || "").trim();
+    if (!uid) return;
+
+    if (uid === lastSelectedUserId && inflight) {
+      log("skip duplicated selection while inflight:", uid);
       return;
     }
 
+    lastSelectedUserId = uid;
+    inflight = (async () => {
+      const [u, s] = await Promise.all([
+        fetchUserDetail(uid),
+        fetchDepositSummary(uid),
+      ]);
+
+      log("user:", u);
+      log("summary:", s);
+
+      renderUser(u);
+      renderSummary(s);
+
+      if (closeModal) hideModal(els.searchModal);
+    })();
+
     try {
-      const response = await fetch(`/commission/search-user/?q=${encodeURIComponent(keyword)}`);
-      const data = await response.json();
-
-      if (data.results && data.results.length > 0) {
-        resultsBox.innerHTML = data.results.map(u => `
-          <div class="search-card shadow-sm p-3 mb-2 rounded-3 d-flex justify-content-between align-items-center">
-            <div class="card-info text-truncate">
-              <span class="fw-bold text-dark">${u.name}</span>
-              <small class="text-secondary">(${u.id})</small>
-              <span class="text-muted">| ${u.branch || '-'}</span>
-            </div>
-            <a href="/commission/deposit/?user=${u.id}" class="btn btn-sm btn-primary px-3">선택</a>
-          </div>
-        `).join('');
-      } else {
-        resultsBox.innerHTML = `<div class="text-muted mt-2 text-center">검색 결과가 없습니다.</div>`;
-      }
-
-    } catch (error) {
-      console.error("검색 오류:", error);
-      resultsBox.innerHTML = `<div class="text-danger mt-2 text-center">⚠️ 검색 중 오류가 발생했습니다.</div>`;
+      await inflight;
+    } catch (err) {
+      console.error(err);
+      alert("대상자 정보를 불러오지 못했습니다.");
+    } finally {
+      inflight = null;
     }
-  });
-
-  // ✅ 엔터키 입력 시에도 동일 동작
-  searchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      searchForm.dispatchEvent(new Event('submit'));
-    }
-  });
-});
-</script>
-
-<script>
-const searchInput = document.getElementById('searchKeyword');
-
-// ✅ 엔터키로도 검색 가능하게 처리
-searchInput.addEventListener('keypress', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault(); // 폼 기본 제출 방지
-    document.querySelector('#searchUserForm button[type="submit"]').click(); // 검색 버튼 클릭 실행
   }
-});
+
+  // ✅ userId 추출(모달 구현 차이 흡수)
+  function extractUserIdFromElement(el) {
+    if (!el) return "";
+
+    const ds = el.dataset || {};
+    const candidates = [
+      ds.userId, ds.userid, ds.userPK, ds.userPk, ds.pk, ds.id, ds.empId, ds.empid
+    ].filter(Boolean).map(v => String(v).trim());
+    if (candidates[0]) return candidates[0];
+
+    const href = el.getAttribute && el.getAttribute("href");
+    if (href) {
+      try {
+        const u = new URL(href, window.location.origin);
+        const q = (u.searchParams.get("user") || u.searchParams.get("id") || "").trim();
+        if (q) return q;
+      } catch (_) {}
+    }
+
+    const val = (el.value || "").trim();
+    if (val) return val;
+
+    const onclick = el.getAttribute && (el.getAttribute("onclick") || "");
+    if (onclick) {
+      const m = onclick.match(/(\d{4,})/);
+      if (m && m[1]) return m[1];
+    }
+
+    const text = (el.textContent || "").trim();
+    if (text) {
+      const m2 = text.match(/\((\d{4,})\)/);
+      if (m2 && m2[1]) return m2[1];
+    }
+
+    return "";
+  }
+
+  function findUserIdFromClickTarget(target) {
+    let el = target;
+    for (let i = 0; i < 8 && el; i++) {
+      const id = extractUserIdFromElement(el);
+      if (id) return id;
+      el = el.parentElement;
+    }
+    return "";
+  }
+
+  function isInsideSearchModal(target) {
+    return !!(els.searchModal && target && els.searchModal.contains(target));
+  }
+
+  function looksLikeSelectAction(target) {
+    const el = target.closest ? (target.closest("a,button,[role='button'],div,span") || target) : target;
+    const txt = (el.textContent || "").trim();
+    if (txt === "선택" || txt === "적용" || txt === "확인") return true;
+
+    if (el.classList) {
+      if (el.classList.contains("btn-select-user")) return true;
+      if (el.classList.contains("select-user")) return true;
+    }
+
+    if (el.getAttribute) {
+      if (el.getAttribute("data-action") === "select") return true;
+      if (el.getAttribute("data-select") === "1") return true;
+    }
+    return false;
+  }
+
+  // ✅ 1) 이벤트(userSelected) 수신
+  function onUserSelectedEvent(e) {
+    const detail = e?.detail || {};
+    const u = detail.user || detail.selected || detail.data || detail.payload || detail;
+    const uid = String(u.id || u.user_id || u.pk || u.emp_id || u.userid || "").trim();
+    if (!uid) {
+      warn("userSelected but cannot extract userId:", detail);
+      return;
+    }
+    applySelection(uid, { closeModal: true });
+  }
+
+  window.addEventListener("userSelected", onUserSelectedEvent);
+  document.addEventListener("userSelected", onUserSelectedEvent);
+
+  // ✅ 2) 클릭 캡처(모달 내부 선택 버튼)
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t) return;
+    if (!isInsideSearchModal(t)) return;
+    if (!looksLikeSelectAction(t)) return;
+
+    const userId = findUserIdFromClickTarget(t);
+    log("modal click captured. extracted userId =", userId);
+
+    if (!userId) {
+      warn("Select-like click, but userId not found.");
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    applySelection(userId, { closeModal: true });
+  }, true);
+
+  // ✅ 초기화 버튼
+  if (els.resetBtn) {
+    els.resetBtn.addEventListener("click", () => {
+      // 서버 렌더 상태까지 초기화하려면 redirect
+      window.location.href = "/commission/deposit/";
+      // SPA 느낌으로만 지우려면 아래로 대체 가능:
+      // clearUserAndSummary();
+    });
+  }
+
+  // ✅ 엑셀 업로드 모달 열릴 때 입력 초기화
+  if (els.excelModal) {
+    els.excelModal.addEventListener("show.bs.modal", () => {
+      const partSel = document.getElementById("uploadPartSelect");
+      const typeSel = document.getElementById("uploadTypeSelect");
+      const fileInp = document.getElementById("excelFile");
+      const result = document.getElementById("uploadResult");
+      if (partSel) partSel.value = "";
+      if (typeSel) typeSel.value = "";
+      if (fileInp) fileInp.value = "";
+      if (result) result.textContent = "";
+    });
+  }
+
+})();
 </script>
 
+{# ============================================================
+   ✅ 2) 엑셀 업로드(fetch) (REFactor: 내성 강화)
+============================================================ #}
 <script>
-document.getElementById('resetUserBtn').addEventListener('click', function() {
-  // 기본 페이지(대상자 미선택 상태)로 이동
-  window.location.href = '/commission/deposit/';
-});
+(function () {
+  "use strict";
+
+  const form = document.getElementById("excelUploadForm");
+  if (!form) return;
+
+  async function safeJson(res) {
+    const text = await res.text().catch(() => "");
+    try { return JSON.parse(text); } catch (_) { return {}; }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const fd = new FormData(form);
+    const res = await fetch(form.action || window.location.href, {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+    });
+
+    const data = await safeJson(res);
+    const resultEl = document.getElementById("uploadResult");
+
+    if (!res.ok || !data.ok) {
+      if (resultEl) resultEl.textContent = data.message || "업로드 실패";
+      return;
+    }
+
+    if (resultEl) resultEl.textContent = data.message || "업로드 완료";
+
+    // ✅ 업로드 날짜를 해당 part / 최종지급액 셀에 반영
+    if (data.upload_type === "최종지급액") {
+      const selector = `.upload-date[data-key="최종지급액"][data-part="${CSS.escape(data.part || "")}"]`;
+      const cell = document.querySelector(selector);
+      if (cell) cell.textContent = data.uploaded_date || "-";
+    }
+
+    // 토스트(있으면)
+    if (window.bootstrap) {
+      const toastEl = document.getElementById("uploadToast");
+      if (toastEl) new bootstrap.Toast(toastEl).show();
+    }
+  });
+})();
 </script>
 
 <style>
-  /* ✅ 대상자 검색 결과 폰트 크기 축소 */
-  #searchResults div {
+  .info-table thead th{
     font-size: 0.85rem;
-    line-height: 1.3;
+    font-weight: 700;
+    color: #5b6b7a;
+    background: #f6f8fb;
+    border-bottom: 1px solid #e6edf5;
+    padding: 10px 12px;
   }
-
-  #searchResults .btn {
-    font-size: 0.85rem;
-    padding: 3px 10px;
+  .info-table tbody td{
+    font-size: 0.9rem;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eef2f7;
   }
-
-  /* ✅ 드롭다운 버튼 스타일 */
-  #uploadTypeDropdown {
-    min-width: 160px;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis; /* 긴 텍스트는 … 처리 */
-  }
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const excelModal = document.getElementById('excelUploadModal');
-  const uploadForm = document.getElementById('excelUploadForm');
-  const resultBox = document.getElementById('uploadResult');
-
-  // ✅ 모달이 닫힐 때 자동 초기화
-  excelModal.addEventListener('hidden.bs.modal', () => {
-    uploadForm.reset(); // form 초기화 (드롭다운 + 파일)
-    resultBox.innerHTML = ''; // 결과 메시지 초기화
-  });
-});
-</script>
-
-<style>
-/* 💳 검색결과 카드 스타일 */
-.search-card {
-  border: 1px solid #e0e6ed;
-  background-color: #fff;
-  transition: all 0.25s ease;
-}
-
-.search-card:hover {
-  background-color: #f8faff;
-  border-color: #007bff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.15);
-}
-
-.search-card .card-info {
-  flex-grow: 1;
-}
-
-.search-card .fw-bold {
-  font-size: 0.95rem;
-}
-
-.search-card small {
-  font-size: 0.8rem;
-}
-
-.search-card .text-muted {
-  font-size: 0.8rem;
-}
 </style>
 
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
-
 {% endblock %}
