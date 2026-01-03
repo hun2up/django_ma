@@ -45,20 +45,50 @@
       <!-- ✅ 댓글 -->
       <div class="my-3">
         <span class="info-value">댓글</span>
+
+        {# ✅ (중요) JS가 동적 수정폼에 넣을 CSRF 토큰을 여기서 확보 #}
+        <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
+
+        {# ✅ 댓글 수정 UI 스타일 (버튼 줄바꿈 방지 + textarea 기본 높이 개선) #}
+        <style>
+          .comment-edit-form {
+            display: flex;
+            align-items: flex-start;   /* textarea 높이 커져도 버튼 상단 정렬 */
+            flex-wrap: nowrap;         /* ✅ 줄바꿈 금지 */
+            gap: 8px;
+            width: 100%;
+          }
+          .comment-edit-textarea {
+            flex: 1 1 auto;
+            min-width: 0;              /* flex overflow 방지 */
+            max-width: 82%;            /* ✅ 버튼 공간 확보(줄바꿈 방지 핵심) */
+            resize: vertical;
+          }
+          .comment-edit-actions {
+            flex: 0 0 auto;
+            display: flex;
+            gap: 6px;
+            white-space: nowrap;
+          }
+        </style>
+
         <div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
           {% for comment in comments %}
           <div class="mb-3 position-relative">
             <small class="text-muted d-block mb-1" style="font-size:12px;">
               {{ comment.created_at|date:"Y-m-d H:i" }}
             </small>
+
             <div class="comment-box">
-              <div class="comment-content position-relative">
-                <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.content }}</p>
+              <div class="comment-content position-relative" data-comment-id="{{ comment.id }}">
+                <p class="mb-0 small comment-text" style="white-space: pre-wrap;">{{ comment.content }}</p>
 
                 {% if user == comment.author %}
                 <div class="position-absolute top-0 end-0 mt-1 me-2 edit-delete-btns">
-                  <button type="button" class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
-                          data-id="{{ comment.id }}" style="font-size:12px;">수정</button>
+                  <button type="button"
+                          class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
+                          data-id="{{ comment.id }}"
+                          style="font-size:12px;">수정</button>
 
                   <form method="post" style="display:inline;">
                     {% csrf_token %}
@@ -69,6 +99,7 @@
                 </div>
                 {% endif %}
               </div>
+
               <span class="info-label">{{ comment.author.name }}</span>
             </div>
           </div>
@@ -107,7 +138,7 @@
 
       <hr class="my-3">
 
-      <!-- ✅ 담당자 / 상태 (버튼 제거 + 드롭다운 변경 즉시 반영) -->
+      <!-- ✅ 담당자 / 상태 -->
       <div class="my-3">
         <div class="row align-items-center">
 
@@ -218,5 +249,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/post_detail.js' %}?v=20251229_1"></script>
+<script src="{% static 'js/post_detail.js' %}?v=20260103_1"></script>
 {% endblock %}

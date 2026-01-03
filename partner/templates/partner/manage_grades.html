@@ -156,7 +156,7 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 
-<!-- ✅ Buttons (너 템플릿에서 buttons: [...] 쓰고 있음) -->
+<!-- ✅ Buttons -->
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
@@ -167,30 +167,57 @@
 <!-- ✅ 공용: 부서/지점 셀렉터 -->
 <script type="module" src="{% static 'js/common/part_branch_selector.js' %}?v=20251229_2"></script>
 
-<!-- ✅ XLSX (너 코드에서 XLSX.writeFile 사용) -->
+<!-- ✅ XLSX -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
 /* =========================================================
-   CSRF (cookie)
+   Manage Grades (Refactor)
+   - CSRF robust (hidden input 우선 + cookie fallback)
+   - DataTables 재진입/BFCache 안전
+   - Level update: 빈 CSRF 헤더 방지 (중요)
 ========================================================= */
+
+/* -------------------------
+   0) tiny utils
+------------------------- */
+function str(v) { return String(v ?? "").trim(); }
+function qs(sel, root) { return (root || document).querySelector(sel); }
+function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+/* -------------------------
+   1) CSRF (robust)
+------------------------- */
 function getCookie(name) {
-  const value = `; ${document.cookie}`;
+  const value = `; ${document.cookie || ""}`;
   const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
+  if (parts.length === 2) return parts.pop().split(";").shift();
   return "";
 }
+
 function getCSRFToken() {
-  return getCookie("csrftoken");
+  const input =
+    qs('#csrfForm input[name="csrfmiddlewaretoken"]') ||
+    qs('input[name="csrfmiddlewaretoken"]');
+  const fromInput = str(input?.value);
+  if (fromInput) return fromInput;
+
+  const fromCookie = str(getCookie("csrftoken"));
+  return fromCookie;
 }
 
-/* =========================================================
-   Toast
-========================================================= */
+/* -------------------------
+   2) Toast
+------------------------- */
 function showToast(message, isSuccess) {
   const toastElement = document.getElementById('statusToast');
   const toastTitle = document.getElementById('toastTitle');
   const toastBody = document.getElementById('toastBody');
+
+  if (!toastElement || !toastTitle || !toastBody) {
+    alert(message);
+    return;
+  }
 
   if (isSuccess) {
     toastTitle.textContent = '✅ 저장 성공';
@@ -203,12 +230,18 @@ function showToast(message, isSuccess) {
   }
 
   toastBody.textContent = message;
-  new bootstrap.Toast(toastElement, { delay: 3000 }).show();
+
+  // Bootstrap Toast가 없으면 alert fallback
+  if (window.bootstrap?.Toast) {
+    new bootstrap.Toast(toastElement, { delay: 3000 }).show();
+  } else {
+    alert(message);
+  }
 }
 
-/* =========================================================
-   Helpers
-========================================================= */
+/* -------------------------
+   3) Helpers
+------------------------- */
 function buildUrlWithParams(base, params) {
   const url = new URL(base, window.location.origin);
   Object.entries(params || {}).forEach(([k, v]) => {
@@ -228,9 +261,18 @@ function isAllowedGrade(grade) {
   return grade === "superuser" || grade === "main_admin";
 }
 
-/* =========================================================
-   DataTables init (one-shot)
-========================================================= */
+async function parseJsonResponse(res) {
+  const text = await res.text();
+  try {
+    return { ok: res.ok, status: res.status, data: JSON.parse(text), text };
+  } catch {
+    return { ok: false, status: res.status, data: null, text };
+  }
+}
+
+/* -------------------------
+   4) DataTables init
+------------------------- */
 function initTables() {
   const userGrade = "{{ user.grade }}";
   const selectedPart = "{{ selected_part|default:'' }}";
@@ -238,13 +280,13 @@ function initTables() {
 
   if (!isAllowedGrade(userGrade)) return;
 
-  // ✅ superuser는 둘 다 있어야 초기화
+  // superuser: 둘 다 있어야
   if (userGrade === "superuser" && (!selectedPart || !selectedBranch)) {
     console.log("superuser: 부서/지점 미선택 — DataTables 초기화 생략");
     return;
   }
 
-  // ✅ main_admin도 둘 중 하나라도 없으면 초기화 생략
+  // main_admin: 둘 중 하나라도 없으면 생략
   if (!selectedPart || !selectedBranch) {
     console.log("부서/지점 정보 부족 — DataTables 초기화 생략");
     return;
@@ -252,7 +294,8 @@ function initTables() {
 
   const $subTable = $("#subAdminTable");
   const $allTable = $("#allUserTable");
-  const ajaxBase = String($allTable.data("ajax-base") || "").trim();
+
+  const ajaxBase = str($allTable.data("ajax-base"));
   if (!ajaxBase) {
     console.warn("ajax-base 누락 — allUserTable 초기화 불가");
     return;
@@ -263,7 +306,7 @@ function initTables() {
     branch: selectedBranch,
   });
 
-  // ✅ BFCache/재진입 대비
+  // BFCache/재진입 대비 destroy
   safeDestroyDataTable($subTable);
   safeDestroyDataTable($allTable);
 
@@ -350,17 +393,17 @@ function initTables() {
         action: function () {
           const url = buildUrlWithParams(ajaxUrl, { length: 999999 });
 
-          fetch(url)
-            .then(res => {
+          fetch(url, { credentials: "same-origin" })
+            .then((res) => {
               if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
               return res.json();
             })
-            .then(data => {
+            .then((data) => {
               if (!data.data || !Array.isArray(data.data)) {
                 throw new Error("서버에서 잘못된 형식의 데이터를 반환했습니다.");
               }
 
-              const rows = data.data.map(u => ({
+              const rows = data.data.map((u) => ({
                 성명: u.name || "",
                 사번: u.user_id || "",
                 직급: u.position || "",
@@ -379,7 +422,7 @@ function initTables() {
               XLSX.utils.book_append_sheet(wb, ws, "전체설계사명단");
               XLSX.writeFile(wb, "전체설계사명단.xlsx");
             })
-            .catch(err => {
+            .catch((err) => {
               alert("엑셀 생성 중 오류가 발생했습니다.");
               console.error("엑셀 다운로드 오류:", err);
             });
@@ -389,13 +432,15 @@ function initTables() {
         text: "<i class='bi bi-upload'></i> 엑셀 업로드",
         className: "btn btn-success btn-sm",
         action: function () {
-          document.getElementById("excelFile").click();
+          document.getElementById("excelFile")?.click();
         },
       },
     ],
   });
 
-  // ✅ 엑셀 업로드
+  /* -------------------------
+     5) Excel Upload bind
+  ------------------------- */
   const excelFile = document.getElementById("excelFile");
   const excelForm = document.getElementById("excelUploadForm");
 
@@ -413,48 +458,67 @@ function initTables() {
     });
   }
 
-  // ✅ 레벨 변경 이벤트
+  /* -------------------------
+     6) Level update bind (핵심: 빈 CSRF 헤더 방지)
+  ------------------------- */
   if (!$subTable.data("levelBound")) {
     $subTable.data("levelBound", "1");
 
-    $subTable.on("change", ".level-select", function () {
+    $subTable.on("change", ".level-select", async function () {
       const row = $(this).closest("tr");
       const userId = row.data("user-id");
       const newLevel = $(this).val();
 
-      fetch("{% url 'partner:ajax_update_level' %}", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRFToken": getCSRFToken(),
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: new URLSearchParams({ user_id: userId, level: newLevel }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
-          } else {
-            showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
-          }
-        })
-        .catch(err => {
-          console.error("요청 실패:", err);
-          showToast("서버 요청 중 오류가 발생했습니다.", false);
+      const csrf = getCSRFToken();
+      const headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest",
+      };
+      // ✅ 중요: CSRF가 비어있으면 헤더에 넣지 않음
+      if (csrf) headers["X-CSRFToken"] = csrf;
+
+      try {
+        const res = await fetch("{% url 'partner:ajax_update_level' %}", {
+          method: "POST",
+          headers,
+          credentials: "same-origin",
+          body: new URLSearchParams({ user_id: userId, level: newLevel }),
         });
+
+        const parsed = await parseJsonResponse(res);
+
+        if (!parsed.ok || !parsed.data) {
+          console.error("서버가 JSON이 아닌 응답을 반환:", { status: parsed.status, text: parsed.text });
+          throw new Error(`서버 응답이 JSON이 아닙니다. (${parsed.status})`);
+        }
+
+        const data = parsed.data;
+
+        if (!res.ok) {
+          console.error("요청 실패(HTTP):", res.status, data);
+          throw new Error(data?.error || data?.message || `요청 실패 (${res.status})`);
+        }
+
+        if (data.success) {
+          showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
+        } else {
+          showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
+        }
+      } catch (err) {
+        console.error("요청 실패:", err);
+        showToast(err?.message || "서버 요청 중 오류가 발생했습니다.", false);
+      }
     });
   }
 }
 
 /* =========================================================
    Boot
-   - 일반 DOMContentLoaded
-   - BFCache(back/forward) 복귀 시 pageshow에서도 재시도
+   - DOMContentLoaded
+   - BFCache pageshow persisted 재진입 시 재시도
 ========================================================= */
 document.addEventListener("DOMContentLoaded", initTables);
 window.addEventListener("pageshow", (e) => {
-  // BFCache로 복귀하면 DataTables가 깨질 수 있어 재시도
   if (e.persisted) initTables();
 });
 </script>

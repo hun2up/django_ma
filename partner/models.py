@@ -235,8 +235,9 @@ class RateTable(models.Model):
 
 
 # ------------------------------------------------------------
-# 📘 지점효율 (EfficiencyChange)
-# - manage_efficiency/fetch.js (14열)과 1:1 매칭 스키마
+# 📘 지점효율 (EfficiencyChange)  ✅ NEW schema compatible
+# - 프론트(구분/금액/공제자/지급자/내용) 저장/조회에 맞춤
+# - 기존 구조형 필드(target/chg_branch/rank...)는 호환 유지(삭제 X)
 # ------------------------------------------------------------
 class EfficiencyChange(models.Model):
     requester = models.ForeignKey(
@@ -245,10 +246,12 @@ class EfficiencyChange(models.Model):
         null=True,
         related_name="efficiency_requests",
     )
+    # (기존 호환용) 필요 없으면 나중에 nullable로만 두고 미사용 가능
     target = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name="efficiency_targets",
     )
 
@@ -256,17 +259,36 @@ class EfficiencyChange(models.Model):
     branch = models.CharField(max_length=50, default="-")
     month = models.CharField(max_length=7, db_index=True)  # "YYYY-MM"
 
-    # 변경 전/후 소속/직급 (fetch.js가 기대)
-    target_branch = models.CharField(max_length=50, blank=True, default="")  # 변경전 소속
-    chg_branch = models.CharField(max_length=50, blank=True, default="")     # 변경후 소속
-    rank = models.CharField(max_length=20, blank=True, default="")           # 변경전 직급
-    chg_rank = models.CharField(max_length=20, blank=True, default="")       # 변경후 직급
-    or_flag = models.BooleanField(default=False)
+    # ===== ✅ NEW fields (지점효율 전용) =====
+    category = models.CharField(max_length=30, blank=True, default="")   # 구분
+    amount = models.PositiveIntegerField(null=True, blank=True)          # 금액(정수)
 
+    ded_name = models.CharField(max_length=50, blank=True, default="")
+    ded_id = models.CharField(max_length=20, blank=True, default="")
+    pay_name = models.CharField(max_length=50, blank=True, default="")
+    pay_id = models.CharField(max_length=20, blank=True, default="")
+
+    content = models.CharField(max_length=80, blank=True, default="")    # 내용(템플릿 maxlength=80)
+
+    # ===== (기존 구조형 필드: 호환 유지) =====
+    target_branch = models.CharField(max_length=50, blank=True, default="")
+    chg_branch = models.CharField(max_length=50, blank=True, default="")
+    rank = models.CharField(max_length=20, blank=True, default="")
+    chg_rank = models.CharField(max_length=20, blank=True, default="")
+    or_flag = models.BooleanField(default=False)
     memo = models.CharField(max_length=200, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     process_date = models.DateField(null=True, blank=True)
+
+    confirm_attachment = models.ForeignKey(
+        "partner.EfficiencyConfirmAttachment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="efficiency_rows",
+        verbose_name="확인서",
+    )
 
     class Meta:
         ordering = ["-id"]
@@ -275,4 +297,39 @@ class EfficiencyChange(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.month} - {getattr(self.target, 'name', '-')}"
+        return f"{self.month} - {getattr(self.requester, 'name', '-')}"
+    
+# ------------------------------------------------------------
+# 📎 지점효율 확인서 첨부 (EfficiencyConfirmAttachment)
+# ------------------------------------------------------------
+class EfficiencyConfirmAttachment(models.Model):
+    uploader = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="efficiency_confirm_uploads",
+        verbose_name="업로더",
+    )
+
+    part = models.CharField(max_length=50, default="-", verbose_name="부서")
+    branch = models.CharField(max_length=50, default="-", verbose_name="지점")
+    month = models.CharField(max_length=7, db_index=True, verbose_name="월(YYYY-MM)")
+
+    file = models.FileField(
+        upload_to="partner/efficiency_confirm/%Y/%m/",
+        verbose_name="확인서 파일",
+    )
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="원본파일명")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["month", "branch"]),
+        ]
+        verbose_name = "지점효율 확인서"
+        verbose_name_plural = "지점효율 확인서"
+
+    def __str__(self):
+        return f"{self.month} / {self.branch} / {self.original_name or (self.file.name if self.file else '-')}"

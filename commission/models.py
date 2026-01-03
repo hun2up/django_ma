@@ -1,6 +1,8 @@
 # django_ma/commission/models.py
+
 from django.db import models
 from django.conf import settings
+from decimal import Decimal
 
 
 class DepositSummary(models.Model):
@@ -16,19 +18,31 @@ class DepositSummary(models.Model):
         verbose_name="사번",
     )
 
+    DIV_CHOICES = (
+        ("정상", "정상"),
+        ("분급", "분급"),
+    )    
+
     # 주요지표
     final_payment = models.BigIntegerField(default=0, verbose_name="최종지급액")
+    sales_total = models.BigIntegerField(default=0, verbose_name="장기총실적")
     refund_expected = models.BigIntegerField(default=0, verbose_name="환수예상")
     pay_expected = models.BigIntegerField(default=0, verbose_name="지급예상")
-    ns_25_total = models.BigIntegerField(default=0, verbose_name="25회손보통산")
-    ls_25_total = models.BigIntegerField(default=0, verbose_name="25회생보통산")
+    maint_total = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"), verbose_name="손생합산통산")
 
     # 보증/기타/채권
+    debt_total = models.BigIntegerField(default=0, verbose_name="채권합계")
     surety_total = models.BigIntegerField(default=0, verbose_name="보증합계")
     other_total = models.BigIntegerField(default=0, verbose_name="기타합계")
-    debt_total = models.BigIntegerField(default=0, verbose_name="채권합계")
     required_debt = models.BigIntegerField(default=0, verbose_name="필요채권")
     final_excess_amount = models.BigIntegerField(default=0, verbose_name="최종초과금액")
+
+    # 기타지표
+    div_1m = models.CharField(max_length=10, blank=True, default="", choices=DIV_CHOICES, verbose_name="1개월전분급")
+    div_2m = models.CharField(max_length=10, blank=True, default="", choices=DIV_CHOICES, verbose_name="2개월전분급")
+    div_3m = models.CharField(max_length=10, blank=True, default="", choices=DIV_CHOICES, verbose_name="3개월전분급")
+    inst_current = models.BigIntegerField(default=0, verbose_name="당월인정계속분")
+    inst_prev = models.BigIntegerField(default=0, verbose_name="전월인정계속분")
 
     # 수수료현황
     refund_ns = models.BigIntegerField(default=0, verbose_name="환수손보")
@@ -42,15 +56,23 @@ class DepositSummary(models.Model):
     comm_12m = models.BigIntegerField(default=0, verbose_name="12개월총수수료")
 
     # 유지율/수금율 (요청 그대로 표기했지만, 필드명은 안전하게)
-    ns_18_total = models.BigIntegerField(default=0, verbose_name="18회손보통산")
-    ns_25_total_2 = models.BigIntegerField(default=0, verbose_name="25회손보통산(2)")  # 중복 표기 대응
-    ns_18_total_2 = models.BigIntegerField(default=0, verbose_name="18손보통산")
-    ls_25_total_2 = models.BigIntegerField(default=0, verbose_name="25회생보통산(2)")  # 중복 표기 대응
+    # 회차유지율
+    ns_13_round = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="13회손보회차")
+    ns_18_round = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="18회손보회차")
+    ls_13_round = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="13회생보회차")
+    ls_18_round = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="18회생보회차")
+    
+    # 통산유지율
+    ns_18_total = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="18회손보통산")
+    ns_25_total = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="25회손보통산")
+    ls_18_total = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="18회생보통산")
+    ls_25_total = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="25회생보통산")
 
-    ns_2_6_due = models.BigIntegerField(default=0, verbose_name="2-6회손보응당")
-    ns_2_13_due = models.BigIntegerField(default=0, verbose_name="2-13회손보응당")
-    ls_2_6_due = models.BigIntegerField(default=0, verbose_name="2-6회생보응당")
-    ls_2_13_due = models.BigIntegerField(default=0, verbose_name="2-13회생보응당")
+    # 응당수금율
+    ns_2_6_due = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="2-6회손보응당")
+    ns_2_13_due = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="2-13회손보응당")
+    ls_2_6_due = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="2-6회생보응당")
+    ls_2_13_due = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="2-13회생보응당")
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -72,6 +94,7 @@ class DepositSurety(models.Model):
         verbose_name="사번",
     )
     product_name = models.CharField(max_length=200, verbose_name="상품명")
+    policy_no = models.CharField(max_length=100, blank=True, default="", verbose_name="증권번호")
     amount = models.BigIntegerField(default=0, verbose_name="가입금액")
     status = models.CharField(max_length=50, blank=True, default="", verbose_name="상태")
     start_date = models.DateField(null=True, blank=True, verbose_name="보험가입일")
@@ -97,10 +120,12 @@ class DepositOther(models.Model):
         verbose_name="사번",
     )
     product_name = models.CharField(max_length=200, verbose_name="상품명")
+    product_type = models.CharField(max_length=200, blank=True, default="", verbose_name="보증내용")
     amount = models.BigIntegerField(default=0, verbose_name="가입금액")
     bond_no = models.CharField(max_length=100, blank=True, default="", verbose_name="채권번호")
+    status = models.CharField(max_length=50, blank=True, default="", verbose_name="상태")
     start_date = models.DateField(null=True, blank=True, verbose_name="가입일")
-    memo = models.CharField(max_length=255, blank=True, default="", verbose_name="비고")
+    memo = models.CharField(max_length=255, blank=True, default="", verbose_name="비고")    
 
     created_at = models.DateTimeField(auto_now_add=True)
 

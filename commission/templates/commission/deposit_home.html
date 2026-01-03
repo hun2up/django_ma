@@ -1,6 +1,6 @@
 {# django_ma/commission/templates/commission/deposit_home.html #}
-
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 {% load commission_extras %}
 
@@ -9,8 +9,15 @@
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 1100px;">
-    <div class="card shadow p-4 border-0 rounded-4">
-
+    <div
+      id="deposit-home"
+      class="card shadow p-4 border-0 rounded-4"
+      data-user-detail-url="/commission/api/user-detail/"
+      data-deposit-summary-url="/commission/api/deposit-summary/"
+      data-deposit-surety-url="{% url 'commission:api_deposit_surety_list' %}"
+      data-deposit-other-url="{% url 'commission:api_deposit_other_list' %}"
+      data-reset-url="/commission/deposit/"
+    >
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
         <div class="d-flex gap-2">
@@ -65,55 +72,69 @@
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">최종지급액</th>
+                  <th scope="col" class="text-nowrap">장기총실적</th>
                   <th scope="col" class="text-nowrap">환수예상</th>
                   <th scope="col" class="text-nowrap">지급예상</th>
-                  <th scope="col" class="text-nowrap">25회손보통산</th>
-                  <th scope="col" class="text-nowrap">25회생보통산</th>
+                  <th scope="col" class="text-nowrap">손생합산통산</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">
-                    <span id="metric_final_payment">
-                      {% if payment %}{{ payment|intcomma }}{% else %}-{% endif %}
-                    </span>
-                  </td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_final_payment">{% if payment %}{{ payment|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_sales_total">{% if sales_total %}{{ sales_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_refund_expected">{% if refund_expected %}{{ refund_expected|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_pay_expected">{% if pay_expected %}{{ pay_expected|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_maint_total">{% if maint_total %}{{ maint_total }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div class="table-responsive">
+          <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
+                  <th scope="col" class="text-nowrap">채권합계</th>
                   <th scope="col" class="text-nowrap">보증합계</th>
                   <th scope="col" class="text-nowrap">기타합계</th>
-                  <th scope="col" class="text-nowrap">채권합계</th>
                   <th scope="col" class="text-nowrap">필요채권</th>
                   <th scope="col" class="text-nowrap">최종초과금액</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">
-                    <span id="metric_debt_total">
-                      {% if debt_total %}{{ debt_total|intcomma }}{% else %}-{% endif %}
-                    </span>
-                  </td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_debt_total">{% if debt_total %}{{ debt_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_surety_total">{% if surety_total %}{{ surety_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_other_total">{% if other_total %}{{ other_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_required_debt">{% if required_debt %}{{ required_debt|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_final_excess_amount">{% if final_excess_amount %}{{ final_excess_amount|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">1개월전분급</th>
+                  <th scope="col" class="text-nowrap">2개월전분급</th>
+                  <th scope="col" class="text-nowrap">3개월전분급</th>
+                  <th scope="col" class="text-nowrap">당월인정계속분</th>
+                  <th scope="col" class="text-nowrap">전월인정계속분</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap"><span id="metric_div_1m">{% if div_1m %}{{ div_1m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_div_2m">{% if div_2m %}{{ div_2m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_div_3m">{% if div_3m %}{{ div_3m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_inst_current">{% if inst_current %}{{ inst_current|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_inst_prev">{% if inst_prev %}{{ inst_prev|intcomma }}{% else %}-{% endif %}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -157,15 +178,14 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_comm_3m">{% if comm_3m %}{{ comm_3m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_6m">{% if comm_6m %}{{ comm_6m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_9m">{% if comm_9m %}{{ comm_9m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_12m">{% if comm_12m %}{{ comm_12m|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
-
         </div>
       </div>
 
@@ -176,27 +196,51 @@
             <div class="fw-bold" style="color:#000000;">유지율/수금율</div>
           </div>
 
+          <!-- ✅ 회차유지율 -->
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0 info-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="text-nowrap">13회손보회차</th>
+                  <th scope="col" class="text-nowrap">18회손보회차</th>
+                  <th scope="col" class="text-nowrap">13회생보회차</th>
+                  <th scope="col" class="text-nowrap">18회생보회차</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap"><span id="metric_ns_13_round">{% if ns_13_round %}{{ ns_13_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_18_round">{% if ns_18_round %}{{ ns_18_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_13_round">{% if ls_13_round %}{{ ls_13_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_18_round">{% if ls_18_round %}{{ ls_18_round|intcomma }}{% else %}-{% endif %}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ✅ 통산유지율 -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">18회손보통산</th>
                   <th scope="col" class="text-nowrap">25회손보통산</th>
-                  <th scope="col" class="text-nowrap">18손보통산</th>
+                  <th scope="col" class="text-nowrap">18회생보통산</th>
                   <th scope="col" class="text-nowrap">25회생보통산</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_ns_18_total">{% if ns_13_total %}{{ ns_13_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_25_total">{% if ns_18_total %}{{ ns_18_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_18_total">{% if ls_13_total %}{{ ls_13_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_25_total">{% if ls_18_total %}{{ ls_18_total|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          <!-- ✅ 응당수금율 -->
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
@@ -209,10 +253,10 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_ns_2_6_due">{% if ns_2_6_due %}{{ ns_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_2_13_due">{% if ns_2_13_due %}{{ ns_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_2_6_due">{% if ls_2_6_due %}{{ ls_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_2_13_due">{% if ls_2_13_due %}{{ ls_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -233,21 +277,21 @@
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">상품명</th>
+                  <th scope="col" class="text-nowrap">증권번호</th>
                   <th scope="col" class="text-nowrap">가입금액</th>
                   <th scope="col" class="text-nowrap">상태</th>
                   <th scope="col" class="text-nowrap">보험가입일</th>
                   <th scope="col" class="text-nowrap">보험종료일</th>
                 </tr>
               </thead>
-              <tbody>
+
+              {# ✅ JS가 렌더링하는 영역 #}
+              <tbody id="suretyTableBody">
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap text-center" colspan="5">대상자를 선택하면 보증보험 내역이 표시됩니다.</td>
                 </tr>
               </tbody>
+
             </table>
           </div>
 
@@ -260,19 +304,19 @@
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">상품명</th>
+                  <th scope="col" class="text-nowrap">보증내용</th>
                   <th scope="col" class="text-nowrap">가입금액</th>
+                  <th scope="col" class="text-nowrap">상태</th>
                   <th scope="col" class="text-nowrap">채권번호</th>
                   <th scope="col" class="text-nowrap">가입일</th>
                   <th scope="col" class="text-nowrap">비고</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="otherTableBody">
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-center text-nowrap" colspan="7">
+                    대상자를 선택하면 기타채권 내역이 표시됩니다.
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -280,7 +324,7 @@
 
         </div>
       </div>
-
+      {{ block.super }}
     </div>
   </div>
 </div>
@@ -316,12 +360,14 @@
 
                 {% for p in parts %}
                   <td class="text-nowrap text-center">
-                    {% if c == "최종지급액" %}
+                    {% if supported_upload_types and c in supported_upload_types %}
                       <span class="upload-date" data-key="{{ c }}" data-part="{{ p }}">
                         {{ upload_dates|get_item:c|get_item:p|default:"-" }}
                       </span>
                     {% else %}
-                      <span data-key="{{ c }}" data-part="{{ p }}">-</span>
+                      <span data-key="{{ c }}" data-part="{{ p }}">
+                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
+                      </span>
                     {% endif %}
                   </td>
                 {% endfor %}
@@ -332,6 +378,7 @@
         </table>
       </div>
 
+    </div>
   </div>
 </div>
 
@@ -401,352 +448,6 @@
   </div>
 </div>
 
-{# ============================================================
-   ✅ 1) 대상자 선택 + 주요지표(최종지급액/채권합계) 연동 (REFactor)
-============================================================ #}
-<script>
-(function () {
-  "use strict";
-
-  const DEBUG = true;
-
-  const API = {
-    userDetail: (userId) => `/commission/api/user-detail/?user=${encodeURIComponent(userId)}`,
-    depositSummary: (userId) => `/commission/api/deposit-summary/?user=${encodeURIComponent(userId)}`, // ✅ 추가 API
-  };
-
-  const els = {
-    // 인적사항
-    empId: document.getElementById("target_emp_id"),
-    name: document.getElementById("target_name"),
-    branch: document.getElementById("target_branch"),
-    joinDate: document.getElementById("target_join_date"),
-    retireDate: document.getElementById("target_retire_date"),
-
-    // 주요지표
-    finalPayment: document.getElementById("metric_final_payment"),
-    debtTotal: document.getElementById("metric_debt_total"),
-
-    // 버튼/모달
-    resetBtn: document.getElementById("resetUserBtn"),
-    searchModal: document.getElementById("searchUserModal"),
-    excelModal: document.getElementById("excelUploadModal"),
-  };
-
-  function log(...args) { if (DEBUG) console.log("[DepositHome]", ...args); }
-  function warn(...args) { if (DEBUG) console.warn("[DepositHome]", ...args); }
-
-  function setTextEl(el, value, fallback="-") {
-    if (!el) return;
-    const v = (value === undefined || value === null) ? "" : String(value);
-    el.textContent = v.trim() ? v : fallback;
-  }
-
-  function formatNumber(v) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "-";
-    return new Intl.NumberFormat("ko-KR").format(n) +"원";
-  }
-
-  function setNumberEl(el, value) {
-    if (!el) return;
-    el.textContent = formatNumber(value);
-  }
-
-  function hideModal(modalEl) {
-    if (!modalEl || !window.bootstrap) return;
-    const inst = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
-    inst.hide();
-  }
-
-  async function safeJson(res) {
-    const text = await res.text().catch(() => "");
-    try { return JSON.parse(text); } catch (_) { return {}; }
-  }
-
-  async function fetchJson(url) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      credentials: "same-origin",
-    });
-
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${t.slice(0, 200)}`);
-    }
-
-    const data = await res.json().catch(() => ({}));
-    return data || {};
-  }
-
-  async function fetchUserDetail(userId) {
-    const url = API.userDetail(userId);
-    log("fetchUserDetail ->", url);
-
-    const data = await fetchJson(url);
-    if (!data.ok || !data.user) throw new Error("invalid user-detail response");
-    return data.user;
-  }
-
-  async function fetchDepositSummary(userId) {
-    const url = API.depositSummary(userId);
-    log("fetchDepositSummary ->", url);
-
-    const data = await fetchJson(url);
-    if (!data.ok || !data.summary) throw new Error("invalid deposit-summary response");
-    return data.summary;
-  }
-
-  function renderUser(u) {
-    setTextEl(els.empId, u.id);
-    setTextEl(els.name, u.name);
-    setTextEl(els.branch, u.branch);
-    setTextEl(els.joinDate, u.join_date_display);
-    setTextEl(els.retireDate, (u.retire_date_display || "").trim() || "재직중");
-  }
-
-  function renderSummary(s) {
-    // ✅ 최종지급액 / 채권합계 반영
-    setNumberEl(els.finalPayment, s.final_payment);
-    setNumberEl(els.debtTotal, s.debt_total);
-  }
-
-  function clearUserAndSummary() {
-    renderUser({
-      id: "-",
-      name: "-",
-      branch: "-",
-      join_date_display: "-",
-      retire_date_display: "-",
-    });
-    // 숫자는 "-" 로
-    if (els.finalPayment) els.finalPayment.textContent = "-";
-    if (els.debtTotal) els.debtTotal.textContent = "-";
-  }
-
-  // ✅ 중복 호출 방지(이벤트/클릭이 동시에 들어오는 케이스)
-  let lastSelectedUserId = "";
-  let inflight = null;
-
-  async function applySelection(userId, { closeModal = true } = {}) {
-    const uid = String(userId || "").trim();
-    if (!uid) return;
-
-    if (uid === lastSelectedUserId && inflight) {
-      log("skip duplicated selection while inflight:", uid);
-      return;
-    }
-
-    lastSelectedUserId = uid;
-    inflight = (async () => {
-      const [u, s] = await Promise.all([
-        fetchUserDetail(uid),
-        fetchDepositSummary(uid),
-      ]);
-
-      log("user:", u);
-      log("summary:", s);
-
-      renderUser(u);
-      renderSummary(s);
-
-      if (closeModal) hideModal(els.searchModal);
-    })();
-
-    try {
-      await inflight;
-    } catch (err) {
-      console.error(err);
-      alert("대상자 정보를 불러오지 못했습니다.");
-    } finally {
-      inflight = null;
-    }
-  }
-
-  // ✅ userId 추출(모달 구현 차이 흡수)
-  function extractUserIdFromElement(el) {
-    if (!el) return "";
-
-    const ds = el.dataset || {};
-    const candidates = [
-      ds.userId, ds.userid, ds.userPK, ds.userPk, ds.pk, ds.id, ds.empId, ds.empid
-    ].filter(Boolean).map(v => String(v).trim());
-    if (candidates[0]) return candidates[0];
-
-    const href = el.getAttribute && el.getAttribute("href");
-    if (href) {
-      try {
-        const u = new URL(href, window.location.origin);
-        const q = (u.searchParams.get("user") || u.searchParams.get("id") || "").trim();
-        if (q) return q;
-      } catch (_) {}
-    }
-
-    const val = (el.value || "").trim();
-    if (val) return val;
-
-    const onclick = el.getAttribute && (el.getAttribute("onclick") || "");
-    if (onclick) {
-      const m = onclick.match(/(\d{4,})/);
-      if (m && m[1]) return m[1];
-    }
-
-    const text = (el.textContent || "").trim();
-    if (text) {
-      const m2 = text.match(/\((\d{4,})\)/);
-      if (m2 && m2[1]) return m2[1];
-    }
-
-    return "";
-  }
-
-  function findUserIdFromClickTarget(target) {
-    let el = target;
-    for (let i = 0; i < 8 && el; i++) {
-      const id = extractUserIdFromElement(el);
-      if (id) return id;
-      el = el.parentElement;
-    }
-    return "";
-  }
-
-  function isInsideSearchModal(target) {
-    return !!(els.searchModal && target && els.searchModal.contains(target));
-  }
-
-  function looksLikeSelectAction(target) {
-    const el = target.closest ? (target.closest("a,button,[role='button'],div,span") || target) : target;
-    const txt = (el.textContent || "").trim();
-    if (txt === "선택" || txt === "적용" || txt === "확인") return true;
-
-    if (el.classList) {
-      if (el.classList.contains("btn-select-user")) return true;
-      if (el.classList.contains("select-user")) return true;
-    }
-
-    if (el.getAttribute) {
-      if (el.getAttribute("data-action") === "select") return true;
-      if (el.getAttribute("data-select") === "1") return true;
-    }
-    return false;
-  }
-
-  // ✅ 1) 이벤트(userSelected) 수신
-  function onUserSelectedEvent(e) {
-    const detail = e?.detail || {};
-    const u = detail.user || detail.selected || detail.data || detail.payload || detail;
-    const uid = String(u.id || u.user_id || u.pk || u.emp_id || u.userid || "").trim();
-    if (!uid) {
-      warn("userSelected but cannot extract userId:", detail);
-      return;
-    }
-    applySelection(uid, { closeModal: true });
-  }
-
-  window.addEventListener("userSelected", onUserSelectedEvent);
-  document.addEventListener("userSelected", onUserSelectedEvent);
-
-  // ✅ 2) 클릭 캡처(모달 내부 선택 버튼)
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (!t) return;
-    if (!isInsideSearchModal(t)) return;
-    if (!looksLikeSelectAction(t)) return;
-
-    const userId = findUserIdFromClickTarget(t);
-    log("modal click captured. extracted userId =", userId);
-
-    if (!userId) {
-      warn("Select-like click, but userId not found.");
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    applySelection(userId, { closeModal: true });
-  }, true);
-
-  // ✅ 초기화 버튼
-  if (els.resetBtn) {
-    els.resetBtn.addEventListener("click", () => {
-      // 서버 렌더 상태까지 초기화하려면 redirect
-      window.location.href = "/commission/deposit/";
-      // SPA 느낌으로만 지우려면 아래로 대체 가능:
-      // clearUserAndSummary();
-    });
-  }
-
-  // ✅ 엑셀 업로드 모달 열릴 때 입력 초기화
-  if (els.excelModal) {
-    els.excelModal.addEventListener("show.bs.modal", () => {
-      const partSel = document.getElementById("uploadPartSelect");
-      const typeSel = document.getElementById("uploadTypeSelect");
-      const fileInp = document.getElementById("excelFile");
-      const result = document.getElementById("uploadResult");
-      if (partSel) partSel.value = "";
-      if (typeSel) typeSel.value = "";
-      if (fileInp) fileInp.value = "";
-      if (result) result.textContent = "";
-    });
-  }
-
-})();
-</script>
-
-{# ============================================================
-   ✅ 2) 엑셀 업로드(fetch) (REFactor: 내성 강화)
-============================================================ #}
-<script>
-(function () {
-  "use strict";
-
-  const form = document.getElementById("excelUploadForm");
-  if (!form) return;
-
-  async function safeJson(res) {
-    const text = await res.text().catch(() => "");
-    try { return JSON.parse(text); } catch (_) { return {}; }
-  }
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const fd = new FormData(form);
-    const res = await fetch(form.action || window.location.href, {
-      method: "POST",
-      body: fd,
-      credentials: "same-origin",
-      headers: { "Accept": "application/json" },
-    });
-
-    const data = await safeJson(res);
-    const resultEl = document.getElementById("uploadResult");
-
-    if (!res.ok || !data.ok) {
-      if (resultEl) resultEl.textContent = data.message || "업로드 실패";
-      return;
-    }
-
-    if (resultEl) resultEl.textContent = data.message || "업로드 완료";
-
-    // ✅ 업로드 날짜를 해당 part / 최종지급액 셀에 반영
-    if (data.upload_type === "최종지급액") {
-      const selector = `.upload-date[data-key="최종지급액"][data-part="${CSS.escape(data.part || "")}"]`;
-      const cell = document.querySelector(selector);
-      if (cell) cell.textContent = data.uploaded_date || "-";
-    }
-
-    // 토스트(있으면)
-    if (window.bootstrap) {
-      const toastEl = document.getElementById("uploadToast");
-      if (toastEl) new bootstrap.Toast(toastEl).show();
-    }
-  });
-})();
-</script>
-
 <style>
   .info-table thead th{
     font-size: 0.85rem;
@@ -761,7 +462,49 @@
     padding: 10px 12px;
     border-bottom: 1px solid #eef2f7;
   }
+
+  /* ===============================
+  * 기타채권 테이블 컬럼 레이아웃 고정
+  * =============================== */
+
+  /* 기타채권 테이블 한정 */
+  #otherTableBody td {
+    vertical-align: top;
+  }
+
+  /* 줄바꿈 금지 컬럼들 */
+  #otherTableBody td:nth-child(1), /* 상품명 */
+  #otherTableBody td:nth-child(2), /* 보증내용 */
+  #otherTableBody td:nth-child(3), /* 가입금액 */
+  #otherTableBody td:nth-child(4), /* 상태 */
+  #otherTableBody td:nth-child(5), /* 채권번호 */
+  #otherTableBody td:nth-child(6)  /* 가입일 */
+  {
+    white-space: nowrap;        /* 줄바꿈 금지 */
+    word-break: keep-all;
+  }
+
+  /* 각 컬럼 너비 설정 */
+  #otherTableBody td:nth-child(1) { min-width: 110px; } /* 상품명 */
+  #otherTableBody td:nth-child(2) { min-width: 110px; } /* 보증내용 */
+  #otherTableBody td:nth-child(3) { min-width: 100px; text-align: right; } /* 가입금액 */
+  #otherTableBody td:nth-child(4) { min-width: 80px;  } /* 상태 */
+  #otherTableBody td:nth-child(5) { min-width: 110px; } /* 채권번호 */
+  #otherTableBody td:nth-child(6) { min-width: 95px;  } /* 가입일 */
+
+  /* 비고 컬럼 (마지막 컬럼) */
+  #otherTableBody td:nth-child(7) {
+    white-space: normal;        /* ✅ 줄바꿈 허용 */
+    word-break: break-word;     /* 긴 텍스트 자동 줄바꿈 */
+    width: 100%;                /* 남는 너비 전부 사용 */
+  }
 </style>
 
+
+
+
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
+
+<script type="module" src="{% static 'js/commission/deposit_home.js' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"></script>
 {% endblock %}
+

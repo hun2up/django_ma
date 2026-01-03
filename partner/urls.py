@@ -16,6 +16,7 @@ urlpatterns = [
     path("rate/", views.manage_rate, name="manage_rate"),
     path("tables/", views.manage_tables, name="manage_tables"),
     path("upload-grades-excel/", views.upload_grades_excel, name="upload_grades_excel"),
+    path("efficiency/upload-confirm/", views.efficiency_confirm_upload, name="efficiency_confirm_upload"),
 
     # ------------------------------------------------------------
     # Structure Change (편제변경) - 전용 API
@@ -86,5 +87,5 @@ urlpatterns = [
     path("api/delete/", views.structure_delete, name="ajax_delete"),
     path("api/update-process-date/", views.ajax_update_process_date, name="ajax_update_process_date"),
 
-    path("ajax/rate-userlist-template-excel/", views.ajax_rate_userlist_template_excel, name="ajax_rate_userlist_template_excel"),
+    path("ajax/rate-userlist-template-excel/", views.ajax_rate_userlist_template_excel, name="ajax_rate_userlist_template_excel"),    
 ]

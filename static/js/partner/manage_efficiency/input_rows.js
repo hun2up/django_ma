@@ -1,20 +1,11 @@
 // django_ma/static/js/partner/manage_efficiency/input_rows.js
 //
-// ✅ Refactor (2025-12-29) — ded/pay 모달 주입 “100% 보장” + 금액 콤마 자동삽입
-// ------------------------------------------------------------------
-// 목표
-// 1) 공제자/지급자 검색 버튼 각각 → 같은 모달을 열되,
-//    선택 결과를 'ded_*' 또는 'pay_*'에 정확히 주입
-// 2) 공통 모달 구현 차이(userSelected 이벤트/DOM 클릭 방식) 모두 대응
-// 3) 금액(amount) 숫자만 허용 + 천단위 콤마 자동 삽입 + 커서 유지
-// 4) row clone/초기화/삭제/저장/URL/CSRF/응답파싱 안정화
-//
-// 전제
-// - 템플릿 inputTable 버튼 클래스:
-//    .btnSearchDed (공제자 검색), .btnSearchPay (지급자 검색)
-// - 입력 필드 name:
-//    rq_name,rq_id,rq_branch, category(select), amount(input), ded_name,ded_id, pay_name,pay_id, content
-// - 모달: #searchUserModal (components/search_user_modal.html)
+// ✅ Final Refactor (2025-12-31 + tax)
+// - ded/pay 모달 주입 “100% 보장” (event + click-hook)
+// - amount: 숫자만 + 천단위 콤마 + 커서 유지
+// - ✅ tax: content 입력(또는 amount 변경) 시 tax = floor(amount * 0.033) 자동 표시 (콤마 포함)
+// - payload: category/amount/ded*/pay*/content (efficiency schema 유지: tax는 화면표시용)
+// - URL/CSRF/응답파싱 안정화 + saved_count===0 안내
 //
 // IMPORTANT
 // - import 경로에 ?v= 절대 붙이지 마세요. (템플릿 script src에서만 v 사용)
@@ -24,25 +15,26 @@ import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
 import { fetchData } from "./fetch.js";
 
 console.log("✅ efficiency/input_rows.js LOADED", {
-  build: "2025-12-29-efficiency-inputrows-refactor-amount-comma",
+  build: "2025-12-31-efficiency-inputrows-final-tax-refactor",
   url: import.meta?.url,
 });
 
-/* =======================================================
-   0) 작은 유틸
-======================================================= */
 const W = window;
 
+/* =======================================================
+   0) small utils
+======================================================= */
 function str(v) {
   return String(v ?? "").trim();
 }
-
+function info(...args) {
+  console.log("[efficiency/input_rows]", ...args);
+}
 function warn(...args) {
   console.warn("[efficiency/input_rows]", ...args);
 }
-
-function info(...args) {
-  console.log("[efficiency/input_rows]", ...args);
+function $(id) {
+  return document.getElementById(id);
 }
 
 /* =======================================================
@@ -75,11 +67,11 @@ function getBoot() {
    2) Controls helpers (year/month/branch)
 ======================================================= */
 function getYearValue() {
-  return str(els.year?.value || document.getElementById("yearSelect")?.value);
+  return str(els.year?.value || $("yearSelect")?.value);
 }
 
 function getMonthValue() {
-  return str(els.month?.value || document.getElementById("monthSelect")?.value);
+  return str(els.month?.value || $("monthSelect")?.value);
 }
 
 function getYM() {
@@ -93,13 +85,10 @@ function getEffectiveBranch() {
   const user = getUser();
   const grade = str(user.grade);
 
-  // superuser는 선택 지점 우선
   if (grade === "superuser") {
-    const v = str(els.branch?.value || document.getElementById("branchSelect")?.value);
+    const v = str(els.branch?.value || $("branchSelect")?.value);
     return v || "-";
   }
-
-  // 그 외는 로그인 사용자 지점
   return str(user.branch || "-") || "-";
 }
 
@@ -107,7 +96,7 @@ function getEffectiveBranch() {
    3) DOM helpers
 ======================================================= */
 function getField(row, name) {
-  return row?.querySelector?.(`[name="${name}"]`) || null; // input/select 모두
+  return row?.querySelector?.(`[name="${name}"]`) || null; // input/select/textarea
 }
 
 function getVal(row, name) {
@@ -118,6 +107,16 @@ function setVal(row, name, value) {
   const el = getField(row, name);
   if (!el) return;
   el.value = value ?? "";
+}
+
+function getTaxField(row) {
+  // 템플릿 name이 무엇이든 흡수하도록 후보들 지원
+  const candidates = ["tax", "tax_amount", "vat", "se_tax"];
+  for (const n of candidates) {
+    const el = getField(row, n);
+    if (el) return el;
+  }
+  return null;
 }
 
 function clearRowInputs(row) {
@@ -133,11 +132,13 @@ function clearRowInputs(row) {
     el.value = hasEmpty ? "" : (el.options?.[0]?.value ?? "");
   });
 
+  row.querySelectorAll("textarea").forEach((el) => (el.value = ""));
+
   row.dataset.searchTarget = "";
 }
 
 /* =======================================================
-   4) 요청자 자동입력
+   4) 요청자 자동입력 (표시용)
 ======================================================= */
 function fillRequesterInfo(row) {
   const user = getUser();
@@ -147,7 +148,7 @@ function fillRequesterInfo(row) {
 }
 
 /* =======================================================
-   5) amount: 숫자만 + 천단위 콤마 자동 삽입 (커서 유지)
+   5) amount: 숫자만 + 콤마 (커서 유지)
 ======================================================= */
 function digitsOnly(v) {
   return str(v).replace(/[^\d]/g, "");
@@ -156,7 +157,7 @@ function digitsOnly(v) {
 function formatWithCommaFromDigits(digits) {
   const d = str(digits);
   if (!d) return "";
-  const normalized = d.replace(/^0+(?=\d)/, ""); // "00012" -> "12"
+  const normalized = d.replace(/^0+(?=\d)/, "");
   return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
@@ -168,13 +169,11 @@ function applyCommaFormatKeepCaret(inputEl) {
   const prev = str(inputEl.value);
   const caret = inputEl.selectionStart ?? prev.length;
 
-  // caret 왼쪽의 '숫자 개수'
   const leftDigitsCount = prev.slice(0, caret).replace(/[^\d]/g, "").length;
 
   const next = formatAmountValue(prev);
   inputEl.value = next;
 
-  // leftDigitsCount만큼 숫자가 나오는 위치를 찾아 caret 복원
   let newCaret = next.length;
   if (leftDigitsCount === 0) newCaret = 0;
   else {
@@ -193,22 +192,29 @@ function applyCommaFormatKeepCaret(inputEl) {
   } catch (_) {}
 }
 
+/**
+ * ✅ amount 변경에 의해 tax도 같이 갱신되어야 함
+ * - 단, 여기서는 "커서/콤마"만 처리하고 tax 갱신은 updateTaxForRow로 위임
+ */
 function attachAmountCommaFormatter() {
   if (W.__efficiencyAmountCommaBound) return;
   W.__efficiencyAmountCommaBound = true;
 
-  const table = document.getElementById("inputTable") || els.inputTable;
+  const table = $("inputTable") || els.inputTable;
   if (!table) return;
 
-  // 실시간 포맷 (행 추가/복제 대응: 이벤트 위임)
   table.addEventListener("input", (e) => {
     const el = e.target;
     if (!(el instanceof HTMLInputElement)) return;
     if (el.name !== "amount") return;
+
     applyCommaFormatKeepCaret(el);
+
+    // ✅ amount 입력 도중에도 tax 즉시 갱신
+    const row = el.closest(".input-row");
+    if (row) updateTaxForRow(row);
   });
 
-  // 붙여넣기 대응
   table.addEventListener("paste", (e) => {
     const el = e.target;
     if (!(el instanceof HTMLInputElement)) return;
@@ -222,17 +228,109 @@ function attachAmountCommaFormatter() {
       try {
         el.setSelectionRange(el.value.length, el.value.length);
       } catch (_) {}
+      const row = el.closest(".input-row");
+      if (row) updateTaxForRow(row);
     });
   });
 
-  // 포커스 아웃 시 정리
   table.addEventListener(
     "blur",
     (e) => {
       const el = e.target;
       if (!(el instanceof HTMLInputElement)) return;
       if (el.name !== "amount") return;
+
       el.value = formatAmountValue(el.value);
+
+      const row = el.closest(".input-row");
+      if (row) updateTaxForRow(row);
+    },
+    true
+  );
+}
+
+/* =======================================================
+   5.5) ✅ tax 계산/표시
+   - 내용(content) 입력/변경 시
+   - 금액(amount) 변경 시
+   tax = floor(amount * 0.033)
+   표시: 콤마 포함
+======================================================= */
+function calcTaxInt(amountInt) {
+  return Math.floor(Number(amountInt || 0) * 0.033);
+}
+
+function formatIntComma(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x <= 0) return "0";
+  return String(Math.trunc(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/**
+ * ✅ 요구사항 반영:
+ * - "내용 입력시" 표시하고 싶음
+ * - amount가 바뀌어도, content가 비어있으면 tax는 비움
+ * - content가 있고 amount가 유효하면 tax 표시
+ */
+function updateTaxForRow(row) {
+  if (!row) return;
+  const taxEl = getTaxField(row);
+  if (!taxEl) return; // 템플릿에 tax input이 없으면 패스
+
+  const amountDigits = digitsOnly(getVal(row, "amount"));
+  const content = getVal(row, "content");
+
+  // 내용이 없으면 표시하지 않음(요구사항)
+  if (!content) {
+    taxEl.value = "";
+    return;
+  }
+
+  const amountInt = parseInt(amountDigits || "0", 10);
+  if (!Number.isFinite(amountInt) || amountInt <= 0) {
+    taxEl.value = "";
+    return;
+  }
+
+  const taxInt = calcTaxInt(amountInt);
+  taxEl.value = formatIntComma(taxInt);
+}
+
+function attachTaxAutoCalculator() {
+  if (W.__efficiencyTaxAutoBound) return;
+  W.__efficiencyTaxAutoBound = true;
+
+  const table = $("inputTable") || els.inputTable;
+  if (!table) return;
+
+  // content는 input 이벤트가 가장 자연스러움
+  table.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+
+    const name = t.getAttribute("name") || "";
+    if (name !== "content") return;
+
+    const row = t.closest(".input-row");
+    if (!row) return;
+
+    updateTaxForRow(row);
+  });
+
+  // amount는 comma formatter에서 이미 갱신하므로 여기서는 blur만 보조
+  table.addEventListener(
+    "blur",
+    (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+
+      const name = t.getAttribute("name") || "";
+      if (name !== "content" && name !== "amount") return;
+
+      const row = t.closest(".input-row");
+      if (!row) return;
+
+      updateTaxForRow(row);
     },
     true
   );
@@ -245,7 +343,7 @@ function setActiveRowAndTarget(row, target /* "ded" | "pay" */) {
   if (!row) return;
   W.__efficiencyActiveRow = row;
   row.dataset.searchTarget = target;
-  W.__efficiencyLastSearchTarget = target; // 디버그용
+  W.__efficiencyLastSearchTarget = target;
 }
 
 function extractSelectedUser(detail) {
@@ -313,7 +411,7 @@ function attachUserPickHandlers() {
     else info("✅ injected", { source, target, id, name });
   };
 
-  // A) 이벤트 기반 (common/search_user_modal.js가 userSelected를 쏘는 경우)
+  // A) 이벤트 기반
   const eventHandler = (e) => {
     const { id, name } = extractSelectedUser(e?.detail);
     if (!id && !name) return;
@@ -325,9 +423,9 @@ function attachUserPickHandlers() {
     W.addEventListener(evt, eventHandler);
   });
 
-  // B) 클릭 훅 기반 (이벤트가 안 오는 환경 100% 커버)
+  // B) 클릭 훅 기반(이벤트가 안 오는 환경 커버)
   document.addEventListener("click", (e) => {
-    const modal = document.getElementById("searchUserModal");
+    const modal = $("searchUserModal");
     if (!modal) return;
     if (!modal.contains(e.target)) return;
 
@@ -395,11 +493,13 @@ export function resetInputSection() {
 
   clearRowInputs(firstRow);
   fillRequesterInfo(firstRow);
+
+  // ✅ 초기화 후 세액도 정리
+  updateTaxForRow(firstRow);
 }
 
 /* =======================================================
-   8) payload 구성 (NEW schema)
-   - amount는 "콤마 제거 후 정수"로 전송
+   8) payload 구성 (efficiency schema 유지: tax는 화면 표시용)
 ======================================================= */
 function collectValidRows() {
   const tbody = els.inputTable?.querySelector("tbody");
@@ -412,13 +512,13 @@ function collectValidRows() {
     const amountDigits = digitsOnly(amountView); // "1234"
     const content = getVal(row, "content");
 
-    // 완전 빈 행은 무시
     const hasAny =
       !!category ||
       !!amountDigits ||
       !!content ||
       !!getVal(row, "ded_id") ||
       !!getVal(row, "pay_id");
+
     if (!hasAny) return;
 
     if (!category) throw new Error(`(${idx + 1}행) 구분을 선택해주세요.`);
@@ -428,6 +528,7 @@ function collectValidRows() {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error(`(${idx + 1}행) 금액은 1 이상의 정수만 가능합니다.`);
     }
+
     if (!content) throw new Error(`(${idx + 1}행) 내용을 입력해주세요.`);
 
     valid.push({
@@ -535,7 +636,14 @@ async function saveRowsToServer() {
       return;
     }
 
-    (alertBox || alert)(data.message || "저장 완료!");
+    if (Number(data?.saved_count ?? -1) === 0) {
+      (alertBox || alert)(
+        "⚠️ 저장된 건수가 0건입니다.\n서버 EfficiencyChange 스키마/저장 로직이 프론트 payload와 일치하는지 확인하세요."
+      );
+    } else {
+      (alertBox || alert)(data.message || `저장 완료! (${data.saved_count}건)`);
+    }
+
     resetInputSection();
     await fetchData(ym, branch);
   } catch (err) {
@@ -554,9 +662,10 @@ export function initInputRowEvents() {
   W.__efficiencyInputRowsBound = true;
 
   attachAmountCommaFormatter();
+  attachTaxAutoCalculator(); // ✅ 세액 자동 계산
   attachUserPickHandlers();
 
-  // ✅ 공제자/지급자 검색 버튼 클릭 → activeRow/target 설정 (이벤트 위임)
+  // 공제자/지급자 검색 버튼 클릭 → activeRow/target 설정 (위임)
   document.addEventListener("click", (e) => {
     const dedBtn = e.target?.closest?.(".btnSearchDed");
     const payBtn = e.target?.closest?.(".btnSearchPay");
@@ -569,7 +678,7 @@ export function initInputRowEvents() {
     setActiveRowAndTarget(row, dedBtn ? "ded" : "pay");
   });
 
-  // ✅ 행 추가
+  // 행 추가
   els.btnAddRow?.addEventListener("click", () => {
     const tbody = els.inputTable?.querySelector("tbody");
     if (!tbody) return;
@@ -586,15 +695,18 @@ export function initInputRowEvents() {
     clearRowInputs(newRow);
     fillRequesterInfo(newRow);
     tbody.appendChild(newRow);
+
+    // ✅ 새 행도 세액 초기화
+    updateTaxForRow(newRow);
   });
 
-  // ✅ 초기화
+  // 초기화
   els.btnResetRows?.addEventListener("click", () => {
     if (!confirm("입력 내용을 모두 초기화하시겠습니까?")) return;
     resetInputSection();
   });
 
-  // ✅ 행 삭제 (위임)
+  // 행 삭제(위임)
   document.addEventListener("click", (e) => {
     const btn = e.target?.closest?.(".btnRemoveRow");
     if (!btn) return;
@@ -611,16 +723,19 @@ export function initInputRowEvents() {
     row.remove();
   });
 
-  // ✅ 저장
+  // 저장
   els.btnSaveRows?.addEventListener("click", async () => {
     await saveRowsToServer();
   });
 
-  // ✅ 최초 요청자 주입 + 금액 초기 포맷(혹시 기본값 있으면)
+  // 최초 요청자 주입 + 금액/세액 초기 포맷
   const firstRow = els.inputTable?.querySelector(".input-row");
   if (firstRow) {
     fillRequesterInfo(firstRow);
+
     const amountEl = getField(firstRow, "amount");
     if (amountEl) amountEl.value = formatAmountValue(amountEl.value);
+
+    updateTaxForRow(firstRow);
   }
 }

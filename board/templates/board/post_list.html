@@ -33,11 +33,11 @@
         <colgroup>
           <col style="width: 10%">
           <col style="width: 10%">
-          <col style="width: 8%">
-          <col style="width: 27%">
+          <col style="width: 10%">
+          <col style="width: 31%">
           <col style="width: 5%">
-          <col style="width: 13%">
-          <col style="width: 13%">
+          <col style="width: 10%">
+          <col style="width: 10%">
           <col style="width: 14%">
         </colgroup>
 
@@ -91,14 +91,21 @@
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="status">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
-                  <select name="status" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                  {# ✅ status-select 클래스 추가 + data-status 추가 #}
+                  <select name="status"
+                          class="form-select form-select-sm d-inline-block status-select"
+                          style="width:auto;"
+                          data-status="{{ post.status|default:'' }}">
                     {% for s in status_choices %}
                       <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
                     {% endfor %}
                   </select>
                 </form>
               {% else %}
-                <span class="fw-semibold">{{ post.status }}</span>
+                {# ✅ status-badge 클래스 추가 + data-status 추가 #}
+                <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
+                  {{ post.status }}
+                </span>
               {% endif %}
             </td>
 
@@ -172,6 +179,6 @@
 {% endblock %}
 
 {% block extra_js %}
-{# ✅ 캐시로 옛 JS가 남아있을 수 있어서 v 파라미터 추천 #}
-<script src="{% static 'js/post_list.js' %}?v=20251229_1"></script>
+{# ✅ 캐시 방지 버전 올려주세요 #}
+<script src="{% static 'js/post_list.js' %}?v=20260103_1"></script>
 {% endblock %}
