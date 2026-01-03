@@ -23,18 +23,12 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .models import (
-    EfficiencyChange,
-    PartnerChangeLog,
-    RateChange,
-    RateTable,
-    StructureChange,
-    SubAdminTemp,
-    TableSetting,
-)
+from .models import (EfficiencyChange, PartnerChangeLog, RateChange, RateTable, StructureChange, SubAdminTemp, TableSetting, EfficiencyConfirmAttachment)
 
 # ------------------------------------------------------------
 # ✅ 공용 상수
@@ -510,7 +504,7 @@ def ajax_update_process_date(request):
 
 
 # ------------------------------------------------------------
-# Efficiency (지점효율) - 전용 API
+# Efficiency (지점효율) - 전용 API  ✅ NEW schema
 # ------------------------------------------------------------
 @require_GET
 @grade_required(["superuser", "main_admin", "sub_admin"])
@@ -521,38 +515,53 @@ def efficiency_fetch(request):
         branch_param = (request.GET.get("branch") or "").strip()
         branch = resolve_branch_for_query(user, branch_param)
 
-        qs = EfficiencyChange.objects.filter(month=month).select_related("requester", "target")
+        qs = EfficiencyChange.objects.filter(month=month).select_related("requester")
+
         if user.grade == "superuser":
             if branch:
                 qs = qs.filter(branch__iexact=branch)
         else:
             qs = qs.filter(branch__iexact=branch)
 
+        qs = qs.order_by("-id")
+
         rows = []
         for ec in qs:
-            rows.append(
-                {
-                    "id": ec.id,
-                    "requester_id": getattr(ec.requester, "id", "") if ec.requester else "",
-                    "requester_name": getattr(ec.requester, "name", "") if ec.requester else "",
-                    "requester_branch": build_affiliation_display(ec.requester) if ec.requester else "",
-                    "target_id": getattr(ec.target, "id", "") if ec.target else "",
-                    "target_name": getattr(ec.target, "name", "") if ec.target else "",
-                    "target_branch": ec.target_branch or "",
-                    "chg_branch": ec.chg_branch or "",
-                    "rank": ec.rank or "",
-                    "chg_rank": ec.chg_rank or "",
-                    "or_flag": bool(ec.or_flag),
-                    "memo": ec.memo or "",
-                    "request_date": ec.created_at.strftime("%Y-%m-%d") if ec.created_at else "",
-                    "process_date": ec.process_date.strftime("%Y-%m-%d") if ec.process_date else "",
-                }
-            )
+            rows.append({
+                "id": ec.id,
 
-        return json_ok({"kind": "efficiency", "rows": rows})
+                # ✅ 요청자
+                "requester_name": getattr(ec.requester, "name", ""),
+                "requester_id": getattr(ec.requester, "id", ""),
+                "requester_branch": build_affiliation_display(ec.requester),
+
+                # ✅ 지점효율 핵심 필드 (🔥 이게 빠져 있었음)
+                "category": ec.category or "",
+                "amount": ec.amount or 0,
+
+                "ded_name": ec.ded_name or "",
+                "ded_id": ec.ded_id or "",
+                "pay_name": ec.pay_name or "",
+                "pay_id": ec.pay_id or "",
+
+                # ✅ 프론트는 content를 씀 (memo 아님)
+                "content": ec.content or "",
+                "memo": ec.memo or "",
+
+                # ✅ 날짜
+                "request_date": ec.created_at.strftime("%Y-%m-%d") if ec.created_at else "",
+                "process_date": ec.process_date.strftime("%Y-%m-%d") if ec.process_date else "",
+            })
+
+        return json_ok({
+            "kind": "efficiency",
+            "rows": rows,
+        })
+
     except Exception as e:
         traceback.print_exc()
         return json_err(str(e), status=500, extra={"rows": []})
+
 
 
 @require_POST
@@ -568,28 +577,62 @@ def efficiency_save(request):
         part = resolve_part_for_write(user, payload.get("part") or "")
         branch = resolve_branch_for_write(user, payload.get("branch") or "")
 
+        # ✅ 확인서 첨부 필수
+        attachment_id = payload.get("confirm_attachment_id")
+        if not attachment_id:
+            return json_err("확인서를 먼저 업로드해야 저장이 가능합니다.", status=400)
+
+        att = EfficiencyConfirmAttachment.objects.filter(id=attachment_id).first()
+        if not att:
+            return json_err("업로드된 확인서를 찾을 수 없습니다. 다시 업로드해 주세요.", status=400)
+
+        # ✅ 월/지점 불일치 방지(중요)
+        if (att.month or "") != month:
+            return json_err("확인서 월도와 저장 월도가 다릅니다.", status=400)
+        if user.grade != "superuser":
+            # main/sub는 지점 고정이므로 branch 일치 강제
+            if (att.branch or "") != branch:
+                return json_err("확인서 지점과 저장 지점이 다릅니다.", status=400)
+        else:
+            # superuser도 선택 지점과 확인서 지점이 동일해야 함
+            if branch and (att.branch or "") != branch:
+                return json_err("확인서 지점과 저장 지점이 다릅니다.", status=400)
+
         created_count = 0
         for row in items:
-            target_id = str(row.get("target_id") or "").strip()
-            if not target_id:
+            category = (row.get("category") or "").strip()
+            content = (row.get("content") or "").strip()
+
+            # amount는 프론트에서 정수로 오지만, 혹시 문자열이 와도 안전하게
+            raw_amount = row.get("amount", 0)
+            try:
+                amount = int(raw_amount)
+            except Exception:
+                amount = 0
+
+            if not category or not content or amount <= 0:
                 continue
 
-            target = CustomUser.objects.filter(id=target_id).first()
-            if not target:
-                continue
+            ded_id = str(row.get("ded_id") or "").strip()
+            ded_name = (row.get("ded_name") or "").strip()
+            pay_id = str(row.get("pay_id") or "").strip()
+            pay_name = (row.get("pay_name") or "").strip()
 
             EfficiencyChange.objects.create(
                 requester=user,
-                target=target,
                 part=part,
                 branch=branch,
                 month=month,
-                target_branch=build_affiliation_display(target),
-                chg_branch=(row.get("chg_branch") or row.get("after_branch") or "").strip(),
-                rank=(row.get("tg_rank") or row.get("rank") or "").strip(),
-                chg_rank=(row.get("chg_rank") or row.get("after_rank") or "").strip(),
-                or_flag=bool(row.get("or_flag", False)),
-                memo=(row.get("memo") or "").strip(),
+                category=category,
+                amount=amount,
+                ded_id=ded_id,
+                ded_name=ded_name,
+                pay_id=pay_id,
+                pay_name=pay_name,
+                content=content,
+                # (선택) 기존 memo에도 요약 저장해두면 레거시 화면에서도 확인 가능
+                memo=content[:200],
+                confirm_attachment=att,
             )
             created_count += 1
 
@@ -617,11 +660,56 @@ def efficiency_delete(request):
 
         record = get_object_or_404(EfficiencyChange, id=record_id)
         record.delete()
-        return json_ok({})
+        return json_ok({"message": "삭제 완료"})
     except Exception as e:
         traceback.print_exc()
         return json_err(str(e), status=500)
 
+@require_POST
+@grade_required(["superuser", "main_admin", "sub_admin"])
+@transaction.atomic
+def efficiency_confirm_upload(request):
+    """
+    확인서 파일 업로드
+    - FormData(multipart)로 받음
+    - 업로드 후 attachment_id + original_name 반환
+    """
+    f = request.FILES.get("file")
+    if not f:
+        return json_err("파일이 없습니다.", status=400)
+
+    # ✅ (선택) 확장자 제한
+    allowed = (".pdf", ".png", ".jpg", ".jpeg", ".heic", ".xlsx", ".xls")
+    name_lower = (f.name or "").lower()
+    if allowed and not any(name_lower.endswith(ext) for ext in allowed):
+        return json_err("허용되지 않는 파일 형식입니다.", status=400)
+
+    payload_part = (request.POST.get("part") or "").strip()
+    payload_branch = (request.POST.get("branch") or "").strip()
+    payload_month = normalize_month(request.POST.get("month") or "")
+
+    user = request.user
+    part = resolve_part_for_write(user, payload_part)
+    branch = resolve_branch_for_write(user, payload_branch)
+
+    if not payload_month:
+        return json_err("month(YYYY-MM)가 없습니다.", status=400)
+    if user.grade == "superuser" and not branch:
+        return json_err("superuser는 branch가 필요합니다.", status=400)
+
+    att = EfficiencyConfirmAttachment.objects.create(
+        uploader=user,
+        part=part,
+        branch=branch,
+        month=payload_month,
+        file=f,
+        original_name=f.name or "",
+    )
+
+    return json_ok({
+        "attachment_id": att.id,
+        "file_name": att.original_name or (att.file.name.split("/")[-1] if att.file else ""),
+    })
 
 # ------------------------------------------------------------
 # ✅ 권한관리 (superuser: 부서 + 지점 선택)

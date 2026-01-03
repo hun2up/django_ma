@@ -1,3 +1,5 @@
+<!-- django_ma/partner/templates/partner/manage_calculate.html -->
+
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}지점효율{% endblock %}
@@ -52,7 +54,8 @@
       data-data-delete-url="{{ data_delete_url }}"
       data-set-deadline-url="{{ set_deadline_url }}"
       data-search-user-url="{{ search_user_url|default:'/api/accounts/search-user/' }}"
-      data-update-process-date-url="{% url 'partner:ajax_update_process_date' %}">
+      data-update-process-date-url="{% url 'partner:ajax_update_process_date' %}"
+      data-efficiency-confirm-upload-url="{% url 'partner:efficiency_confirm_upload' %}">
 
     {% if user.grade not in 'superuser main_admin sub_admin' %}
       <div class="alert alert-danger">접근 권한이 없습니다.</div>
@@ -111,29 +114,53 @@
     <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
-        <div class="d-flex gap-2">
-          <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
-          <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
-          <button type="button" id="btnSaveRows" class="btn btn-success btn-sm">저장</button>
+        <div class="efficiency-actions">
+          <div class="efficiency-action-row">
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    id="btnUploadConfirm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#confirmUploadModal">
+                확인서 업로드
+            </button>
+
+            <input type="text"
+                  id="confirmFileName"
+                  class="form-control form-control-sm efficiency-file-input"
+                  placeholder="업로드 된 확인서 파일명"
+                  readonly>
+
+            <button type="button" class="btn btn-primary btn-sm" id="btnAddRow">
+                추가
+            </button>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnResetRows">
+                초기화
+            </button>
+
+            <button type="button" class="btn btn-success btn-sm" id="btnSaveRows">
+                저장
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="table-responsive">
         <table class="table align-middle" id="inputTable">
           <colgroup>
-            <col style="width: 6%">
-            <col style="width: 7%">
-            <col style="width: 12%">
-            <col style="width: 8%">
-            <col style="width: 8%">
-            <col style="width: 6%">
-            <col style="width: 7%">
-            <col style="width: 6%">
-            <col style="width: 6%">
-            <col style="width: 7%">
-            <col style="width: 6%">
-            <col style="width: 20%">
-            <col style="width: 5%">
+            <col style="width: 6%"> <!-- 성명(요청자) -->
+            <col style="width: 7%"> <!-- 사번(요청자) -->
+            <col style="width: 12%"> <!-- 소속(요청자) -->
+            <col style="width: 8%"> <!-- 구분 -->
+            <col style="width: 8%"> <!-- 금액 -->
+            <col style="width: 6%"> <!-- 성명(공제자) -->
+            <col style="width: 7%"> <!-- 사명(공제자) -->
+            <col style="width: 6%"> <!-- 검색(공제자) -->
+            <col style="width: 6%"> <!-- 성명(지급자) -->
+            <col style="width: 7%"> <!-- 사번(공제자) -->
+            <col style="width: 6%"> <!-- 검색(공제자) -->
+            <col style="width: 20%"> <!-- 비고 -->
+            <col style="width: 5%"> <!-- 삭제 -->
           </colgroup>
 
           <thead class="table-light">
@@ -207,6 +234,7 @@
         </table>
       </div>
 
+      <div class="small fw-bold" style="color:#dc3545;">※ 반드시 확인서를 첨부해야 내용 저장이 가능합니다.</div>
       <div class="small text-muted">※ 한 번에 최대 10건까지 추가할 수 있습니다.</div>
     </div>
 
@@ -224,19 +252,20 @@
       <div class="table-responsive">
         <table class="table table-striped align-middle" id="mainTable">
           <colgroup>
-            <col style="width: 5%">
-            <col style="width: 6%">
-            <col style="width: 12%">
-            <col style="width: 7%">
-            <col style="width: 8%">
-            <col style="width: 6%">
-            <col style="width: 6%">
-            <col style="width: 6%">
-            <col style="width: 6%">
-            <col style="width: 20%">
-            <col style="width: 8%">
-            <col style="width: 8%">
-            <col style="width: 4%">
+            <col style="width: 6%"> <!-- 성명(요청자) -->
+            <col style="width: 6%"> <!-- 사번(요청자) -->
+            <col style="width: 12%"> <!-- 소속(요청자) -->
+            <col style="width: 7%"> <!-- 구분 -->
+            <col style="width: 6%"> <!-- 금액 -->
+            <col style="width: 6%"> <!-- 세액 -->
+            <col style="width: 6%"> <!-- 성명(공제자) -->
+            <col style="width: 6%"> <!-- 사번(공제자) -->
+            <col style="width: 6%"> <!-- 성명(지급자) -->
+            <col style="width: 6%"> <!-- 사번(지급자) -->
+            <col style="width: 15%"> <!-- 내용 -->
+            <col style="width: 8%"> <!-- 요청일자 -->
+            <col style="width: 8%"> <!-- 처리일자 -->
+            <col style="width: 4%"> <!-- 삭제 -->
           </colgroup>
 
           <thead class="table-light">
@@ -246,6 +275,7 @@
               <th>소속<br>(요청자)</th>
               <th>구분</th>
               <th>금액</th>
+              <th>세액</th>
               <th>성명<br>(공제자)</th>
               <th>사번<br>(공제자)</th>
               <th>성명<br>(지급자)</th>
@@ -270,6 +300,37 @@
       </div>
     </div>
   </div>
+
+  <!-- ✅ 확인서 업로드 모달 -->
+  <div class="modal fade" id="confirmUploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">확인서 업로드</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-2 small text-muted">
+            ※ 업로드가 완료되어야 “저장”이 가능합니다.
+          </div>
+
+          <input type="file" id="confirmFileInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.heic,.xlsx,.xls">
+          <div class="form-text">
+            권장: PDF / 이미지(PNG,JPG)
+          </div>
+
+          <div class="mt-3 d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+            <button type="button" id="btnConfirmUploadDo" class="btn btn-primary">업로드</button>
+          </div>
+
+          <div id="confirmUploadMsg" class="mt-3 small" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Boot 데이터 -->
   {{ ManageefficiencyBoot|json_script:"boot-efficiency" }}
