@@ -1,4 +1,4 @@
-<!-- django_ma/board/templates/board/task_detail.html -->
+{# django_ma/board/templates/board/task_detail.html #}
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -8,36 +8,38 @@
 {% block content %}
 
 {% if user.grade != 'superuser' %}
-    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% endif %}
 
-{# ✅ 상세 인라인 업데이트용 Boot #}
 <div id="taskDetailBoot"
      data-update-url="{% url 'ajax_update_task_field_detail' task.pk %}"
      class="d-none"></div>
 
 <div class="container mt-5">
-  {# ✅ AJAX 알림 영역 (task_list와 동일 패턴) #}
   <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
+  {# ✅ messages #}
   {% if messages %}
-  <div class="container mt-3">
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  </div>
+    <div class="mb-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
   {% endif %}
 
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
+
+      {# ✅ 제목/작성일 #}
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0 text-primary">{{ task.title }}</h5>
         <p class="text-muted small mb-0">{{ task.created_at|date:"Y-m-d H:i" }}</p>
       </div>
 
+      {# ✅ 본문 #}
       <div class="my-3 p-3 bg-light rounded-3">
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
           {{ task.content }}
@@ -46,110 +48,39 @@
 
       <hr class="my-3">
 
-      <!-- ✅ 댓글 -->
+      {# ✅ 댓글 CSRF 토큰(동적 수정폼용) - 페이지에 1개만 유지 #}
+      <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
+
+      {# ✅ 댓글 #}
       <div class="my-3">
         <span class="info-value">댓글</span>
 
-        {# ✅ (중요) JS가 동적 수정폼에 넣을 CSRF 토큰을 여기서 확보 #}
-        <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
-
-        {# ✅ 댓글 수정 UI 스타일 (버튼 줄바꿈 방지 + textarea 기본 높이 개선) #}
-        <style>
-          .comment-edit-form {
-            display: flex;
-            align-items: flex-start;   /* textarea 높이 커져도 버튼 상단 정렬 */
-            flex-wrap: nowrap;         /* ✅ 줄바꿈 금지 */
-            gap: 8px;
-            width: 100%;
-          }
-          .comment-edit-textarea {
-            flex: 1 1 auto;
-            min-width: 0;              /* flex overflow 방지 */
-            max-width: 82%;            /* ✅ 버튼 공간 확보(줄바꿈 방지 핵심) */
-            resize: vertical;
-          }
-          .comment-edit-actions {
-            flex: 0 0 auto;
-            display: flex;
-            gap: 6px;
-            white-space: nowrap;
-          }
-        </style>
-
-        <div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
-          {% for comment in comments %}
-          <div class="mb-3 position-relative">
-            <small class="text-muted d-block mb-1" style="font-size:12px;">
-              {{ comment.created_at|date:"Y-m-d H:i" }}
-            </small>
-
-            <div class="comment-box">
-              <div class="comment-content position-relative" data-comment-id="{{ comment.id }}">
-                <p class="mb-0 small comment-text" style="white-space: pre-wrap;">{{ comment.content }}</p>
-
-                {% if user == comment.author %}
-                <div class="position-absolute top-0 end-0 mt-1 me-2 edit-delete-btns">
-                  <button type="button"
-                          class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
-                          data-id="{{ comment.id }}"
-                          style="font-size:12px;">수정</button>
-
-                  <form method="task" style="display:inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action_type" value="delete_comment">
-                    <input type="hidden" name="comment_id" value="{{ comment.id }}">
-                    <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-0" style="font-size:12px;">삭제</button>
-                  </form>
-                </div>
-                {% endif %}
-              </div>
-
-              <span class="info-label">{{ comment.author.name }}</span>
-            </div>
-          </div>
-          {% empty %}
-          <p class="comment-empty mb-0">아직 댓글이 없습니다.</p>
-          {% endfor %}
-        </div>
-
-        {% if user.is_authenticated %}
-        <form method="task" class="mt-3 d-flex align-items-center flex-nowrap gap-2">
-          {% csrf_token %}
-          <input type="hidden" name="action_type" value="comment">
-          {{ form.content|add_class:"form-control form-control-sm flex-grow-1" }}
-          <button type="submit" class="btn btn-sm btn-primary px-3 py-1" style="font-size:13px; white-space: nowrap;">등록</button>
-        </form>
-        {% else %}
-        <p class="comment-login mt-3">
-          댓글을 작성하려면 <a href="{% url 'login' %}" class="text-primary fw-semibold">로그인</a> 하세요.
-        </p>
-        {% endif %}
+        {% include "board/includes/_comment_list.html" with comments=comments empty_text="아직 댓글이 없습니다." %}
+        {% include "board/includes/_comment_form.html" with form=form action_url=detail_url submit_label="등록" %}
       </div>
 
       <hr class="my-3">
 
-      <!-- ✅ 게시글 기본정보 -->
+      {# ✅ 기본정보 #}
       <div class="my-3">
         <div class="row gy-2 gx-3">
           {% for label, value in task_info.items %}
-          <div class="col-md-4">
-            <span class="info-label">{{ label }}</span>
-            <span class="info-value">{{ value|default:"-" }}</span>
-          </div>
+            <div class="col-md-4">
+              <span class="info-label">{{ label }}</span>
+              <span class="info-value">{{ value|default:"-" }}</span>
+            </div>
           {% endfor %}
         </div>
       </div>
 
       <hr class="my-3">
 
-      <!-- ✅ 담당자 / 상태 -->
+      {# ✅ 담당자/상태 #}
       <div class="my-3">
         <div class="row align-items-center">
 
-          <!-- 담당자 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
-
             {% if is_superuser %}
               <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
@@ -166,10 +97,8 @@
             {% endif %}
           </div>
 
-          <!-- 상태 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
-
             {% if is_superuser %}
               <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
@@ -196,62 +125,66 @@
             {% endif %}
           </div>
 
-          <!-- 상태변경일 -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태변경</span>
             <span id="statusUpdatedAtText" class="small-text">
               {{ task.status_updated_at|date:"Y-m-d H:i" }}
             </span>
           </div>
+
         </div>
       </div>
 
       <hr class="my-3">
 
-      <!-- ✅ 첨부파일 -->
-      {% if task.attachments.exists %}
-      <div class="my-3">
-        <span class="info-value">첨부파일</span>
-        <ul class="list-group mt-2">
-          {% for att in task.attachments.all %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div class="text-truncate" style="max-width: 80%;">
-              <i class="bi bi-paperclip"></i>
-              <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
-                {{ att.original_name|default:att.file.name }}
-              </a>
-            </div>
-            <span class="badge bg-light text-dark border">{{ att.size|filesizeformat }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
+      {# ✅ 첨부파일 #}
+      {% if attachments and attachments.exists %}
+        <div class="my-3">
+          <span class="info-value">첨부파일</span>
+          <ul class="list-group mt-2">
+            {% for att in attachments %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="text-truncate" style="max-width: 80%;">
+                  <i class="bi bi-paperclip"></i>
+                  <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
+                    {{ att.original_name|default:att.file.name }}
+                  </a>
+                </div>
+                <span class="badge bg-light text-dark border">{{ att.size|filesizeformat }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
       {% endif %}
 
-      <!-- ✅ 하단 버튼 -->
+      {# ✅ 하단 버튼 #}
       <div class="d-flex justify-content-between mt-4">
         <div class="d-flex gap-2">
-          <a href="{% url 'task_list' %}" class="btn btn-outline-secondary">목록으로</a>
+          <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
-          {% if user.id == task.user_id or is_superuser %}
-            <a href="{% url 'task_edit' task.id %}" class="btn btn-outline-primary">수정하기</a>
+          {% if can_edit %}
+            <a href="{{ edit_url }}" class="btn btn-outline-primary">수정하기</a>
 
-            <form method="task" style="display:inline;"
+            <form method="post" style="display:inline;"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
               <input type="hidden" name="action_type" value="delete_task">
-              <button type="submit" name="delete_button" class="btn btn-outline-danger">삭제하기</button>
+              <button type="submit" class="btn btn-outline-danger">삭제하기</button>
             </form>
           {% endif %}
         </div>
+
         <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
       </div>
 
     </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/task_detail.js' %}?v=20260103_1"></script>
+<script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/task_detail.js' %}?v=20260104"></script>
 {% endblock %}

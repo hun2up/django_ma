@@ -1,0 +1,26 @@
+<!-- django_ma/board/templates/board/includes/_edit_form.html -->
+<!-- 필수 context:
+  - mode: "create" | "edit"
+  - form
+  - list_url
+  - cancel_url
+  - attachments (edit일 때만, 없으면 None/빈 qs 가능)
+  - form_id (optional, default: "boardForm")
+-->
+
+{% with fid=form_id|default:"boardForm" %}
+<form method="post" enctype="multipart/form-data" id="{{ fid }}" novalidate>
+  {% csrf_token %}
+
+  {% include "board/includes/_form_common.html" with form=form mode=mode attachments=attachments only %}
+
+  <!-- ✅ 버튼 레이아웃: create/edit 동일 -->
+  <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
+    <a href="{{ list_url }}" class="btn btn-outline-secondary w-100 w-md-auto">목록으로</a>
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary w-100 w-md-auto">취소</a>
+    <button type="submit" id="submitBtn" class="btn btn-primary w-100 w-md-auto">
+      {% if mode == "edit" %}수정 완료{% else %}등록하기{% endif %}
+    </button>
+  </div>
+</form>
+{% endwith %}

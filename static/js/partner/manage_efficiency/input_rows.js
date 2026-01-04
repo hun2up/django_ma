@@ -1,6 +1,9 @@
 // django_ma/static/js/partner/manage_efficiency/input_rows.js
 //
 // ✅ (기존 코드 유지) + reset 시 confirmGroupId도 같이 초기화
+// ✅ amount 입력 시 콤마 + caret 유지
+// ✅ content/amount 변화 시 tax 자동 계산
+// ✅ user pick(검색모달) 이벤트 흡수
 
 import { els } from "./dom_refs.js";
 import { alertBox } from "./utils.js";
@@ -169,6 +172,7 @@ function updateTaxForRow(row) {
   const amountDigits = digitsOnly(getVal(row, "amount"));
   const content = getVal(row, "content");
 
+  // content 비었으면 세액도 비움(기존 UX 유지)
   if (!content) {
     taxEl.value = "";
     return;
@@ -216,7 +220,7 @@ function attachTaxAutoCalculator() {
   );
 }
 
-/* user pick hooks (기존 그대로) */
+/* user pick hooks */
 function setActiveRowAndTarget(row, target) {
   if (!row) return;
   W.__efficiencyActiveRow = row;

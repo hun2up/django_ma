@@ -1,77 +1,25 @@
 <!-- django_ma/board/templates/board/task_create.html -->
-
 {% extends "base.html" %}
 {% load static %}
-{% load widget_tweaks %}
 
 {% block title %}직원업무 작성{% endblock %}
 
 {% block content %}
-
 {% if user.grade != 'superuser' %}
-    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% endif %}
 
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
-
     <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">직원업무 작성</h3>
-
-    <!-- ✅ AJAX endpoint 주입 (대상자 검색) -->
-    <div id="taskCreateBoot"
-         data-search-url="{% url 'search_user' %}"
-         class="d-none"></div>
-
-    <!-- ✅ 모달/알림 표시 영역 -->
-    <div id="inlineTargetAlertHost" class="mb-3"></div>
 
     <div class="card shadow p-4 border-0 rounded-4">
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <form method="task" enctype="multipart/form-data" id="taskForm" novalidate>
-        {% csrf_token %}
-
-        <!-- 구분 / 대상자 -->
-        <div class="row mb-3 align-items-end">
-          <div class="col-md-4">
-            <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">구분</label>
-            {{ form.category }}
-          </div>
-        </div>
-
-        <!-- 제목 -->
-        <div class="mb-3">
-          <label for="{{ form.title.id_for_label }}" class="form-label fw-semibold text-danger">제목*</label>
-          {{ form.title }}
-        </div>
-
-        <!-- 내용 -->
-        <div class="mb-3">
-          <label for="{{ form.content.id_for_label }}" class="form-label fw-semibold text-danger">내용*</label>
-          {{ form.content }}
-        </div>
-
-        <!-- 첨부파일 -->
-        <div class="mb-3">
-          <label class="form-label fw-semibold">첨부파일</label>
-          <input type="file" id="fileInput" name="attachments" class="form-control" multiple>
-          <div class="form-text">파일은 개당 최대 <strong>10MB</strong>까지 업로드할 수 있습니다.</div>
-        </div>
-
-        <!-- 파일 목록 표시 -->
-        <div id="fileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
-          <p class="text-muted m-0 small" id="noFilesText">첨부된 파일이 없습니다.</p>
-          <ul id="fileNames" class="list-unstyled m-0"></ul>
-        </div>
-
-        <!-- 버튼 -->
-        <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2">
-          <a href="{% url 'task_list' %}" class="btn btn-outline-secondary w-100 w-md-auto">목록으로</a>
-          <button type="submit" id="submitBtn" class="btn btn-primary w-100 w-md-auto">등록하기</button>
-        </div>
-      </form>
+      {% url "task_list" as list_url %}
+      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="taskForm" %}
     </div>
 
     <div class="text-center mt-4">
@@ -79,10 +27,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-<!-- ✅ 업로드 유틸 -->
+{% block extra_js %}
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
-
-<!-- ✅ 글작성 페이지 스크립트(모달 검색 + 중복 클릭 방지 포함) -->
-<script src="{% static 'js/task_create.js' %}"></script>
+<script src="{% static 'js/board/form_submit_lock.js' %}?v=20260104_2"></script>
 {% endblock %}

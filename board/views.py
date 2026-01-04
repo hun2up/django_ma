@@ -1,8 +1,10 @@
+# django_ma/board/views.py
 # ===========================================
-# 📂 board/views.py — 업무요청 게시판 & PDF 생성 뷰 (Refactor)
+# 📂 board/views.py — 업무요청 게시판 & PDF 생성 뷰 (FINAL)
 # ===========================================
 
 import logging
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -10,13 +12,18 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from .forms import PostForm, CommentForm
-from .models import Post, Attachment, Comment
+from .forms import PostForm, CommentForm, TaskForm, TaskCommentForm
+from .models import (
+    Post, Attachment, Comment,
+    Task, TaskAttachment, TaskComment
+)
+
 from board.utils.pdf_support_utils import generate_request_support as build_support
 from board.utils.pdf_states_utils import generate_request_states as build_states
 
@@ -26,65 +33,352 @@ User = get_user_model()
 STATUS_CHOICES = ["확인중", "진행중", "보완요청", "완료", "반려"]
 
 
-# ===========================================
-# 📋 결재관리
-# ===========================================
+# =========================================================
+# ✅ 공용 유틸
+# =========================================================
+def _get_handlers():
+    return list(User.objects.filter(grade="superuser").values_list("name", flat=True))
+
+
+def _handle_comments_actions(*, request, obj, comment_model, fk_field: str, redirect_detail_name: str):
+    """
+    detail 페이지 댓글 공용 처리
+    - fk_field: Comment 모델의 FK 필드명 ("post" or "task")
+    """
+    act = (request.POST.get("action_type") or "").strip()
+
+    if act == "comment":
+        content = (request.POST.get("content") or "").strip()
+        if content:
+            comment_model.objects.create(**{fk_field: obj, "author": request.user, "content": content})
+            messages.success(request, "댓글 등록 완료")
+        else:
+            messages.error(request, "댓글 내용을 입력해주세요.")
+        return redirect(redirect_detail_name, pk=obj.pk)
+
+    if act == "edit_comment":
+        comment_id = request.POST.get("comment_id")
+        content = (request.POST.get("content") or "").strip()
+        if not content:
+            messages.error(request, "댓글 내용을 입력해주세요.")
+            return redirect(redirect_detail_name, pk=obj.pk)
+
+        c = get_object_or_404(comment_model, id=comment_id, author=request.user, **{fk_field: obj})
+        c.content = content
+        c.save(update_fields=["content"])
+        messages.success(request, "댓글 수정 완료")
+        return redirect(redirect_detail_name, pk=obj.pk)
+
+    if act == "delete_comment":
+        comment_id = request.POST.get("comment_id")
+        comment_model.objects.filter(id=comment_id, author=request.user, **{fk_field: obj}).delete()
+        messages.info(request, "댓글 삭제 완료")
+        return redirect(redirect_detail_name, pk=obj.pk)
+
+    return None
+
+
+# =========================
+# ✅ 직원업무 게시판: 목록
+# =========================
 @grade_required(["superuser"])
 @login_required
-def manage_sign(request):
-    return render(request, "board/manage_sign.html")
-
-
-# ===========================================
-# 📋 게시글 목록 (검색 + 필터)  ✅ GET 전용
-# ===========================================
-@login_required
-def post_list(request):
-    """
-    게시글 목록
-    - 제목/내용/요청자/구분 검색 + 담당자/상태 필터
-    - superuser: 담당자/상태 인라인 변경은 ajax_update_post_field에서 처리
-    """
-    is_superuser = (request.user.grade == "superuser")
-
-    # GET 파라미터
+def task_list(request):
     keyword = request.GET.get("keyword", "").strip()
     search_type = request.GET.get("search_type", "title")
     selected_handler = request.GET.get("handler", "전체")
     selected_status = request.GET.get("status", "전체")
     page = request.GET.get("page")
 
-    posts_qs = Post.objects.order_by("-created_at")
+    qs = Task.objects.order_by("-created_at")
 
-    # 검색
     if keyword:
         if search_type == "title":
-            posts_qs = posts_qs.filter(title__icontains=keyword)
+            qs = qs.filter(title__icontains=keyword)
         elif search_type == "content":
-            posts_qs = posts_qs.filter(content__icontains=keyword)
+            qs = qs.filter(content__icontains=keyword)
         elif search_type == "title_content":
-            posts_qs = posts_qs.filter(Q(title__icontains=keyword) | Q(content__icontains=keyword))
+            qs = qs.filter(Q(title__icontains=keyword) | Q(content__icontains=keyword))
         elif search_type == "user_name":
-            posts_qs = posts_qs.filter(user_name__icontains=keyword)
+            qs = qs.filter(user_name__icontains=keyword)
         elif search_type == "category":
-            posts_qs = posts_qs.filter(category__icontains=keyword)
+            qs = qs.filter(category__icontains=keyword)
 
-    # 필터
     if selected_handler != "전체":
-        posts_qs = posts_qs.filter(handler=selected_handler)
+        qs = qs.filter(handler=selected_handler)
     if selected_status != "전체":
-        posts_qs = posts_qs.filter(status=selected_status)
+        qs = qs.filter(status=selected_status)
 
-    posts = Paginator(posts_qs, 10).get_page(page)
-    handlers = list(User.objects.filter(grade="superuser").values_list("name", flat=True))
+    tasks = Paginator(qs, 10).get_page(page)
+
+    return render(request, "board/task_list.html", {
+        "tasks": tasks,
+        "is_superuser": True,
+        "handlers": _get_handlers(),
+        "status_choices": STATUS_CHOICES,
+        "keyword": keyword,
+        "search_type": search_type,
+        "selected_handler": selected_handler,
+        "selected_status": selected_status,
+    })
+
+
+# =========================
+# ✅ 직원업무: 인라인 업데이트 (list)
+# =========================
+@require_POST
+@grade_required(["superuser"])
+@login_required
+def ajax_update_task_field(request):
+    task_id = request.POST.get("task_id")
+    action = request.POST.get("action_type")
+    value = (request.POST.get("value") or "").strip()
+
+    if not task_id or action not in ("handler", "status"):
+        return JsonResponse({"ok": False, "message": "요청이 올바르지 않습니다."}, status=400)
+
+    task = get_object_or_404(Task, id=task_id)
+    now = timezone.localtime()
+
+    if action == "handler":
+        task.handler = "" if value in ("", "선택") else value
+        task.status_updated_at = now
+        task.save(update_fields=["handler", "status_updated_at"])
+        return JsonResponse({
+            "ok": True,
+            "message": f"담당자 → '{task.handler or '미지정'}'로 변경되었습니다.",
+            "handler": task.handler,
+            "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
+        })
+
+    if value not in STATUS_CHOICES:
+        return JsonResponse({"ok": False, "message": "상태 값이 올바르지 않습니다."}, status=400)
+
+    task.status = value
+    task.status_updated_at = now
+    task.save(update_fields=["status", "status_updated_at"])
+    return JsonResponse({
+        "ok": True,
+        "message": f"상태 → '{task.status}'로 변경되었습니다.",
+        "status": task.status,
+        "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
+    })
+
+
+# =========================
+# ✅ 직원업무: 인라인 업데이트 (detail)
+# =========================
+@require_POST
+@grade_required(["superuser"])
+@login_required
+def ajax_update_task_field_detail(request, pk):
+    action = request.POST.get("action_type")
+    value = (request.POST.get("value") or "").strip()
+
+    if action not in ("handler", "status"):
+        return JsonResponse({"ok": False, "message": "요청이 올바르지 않습니다."}, status=400)
+
+    task = get_object_or_404(Task, pk=pk)
+    now = timezone.localtime()
+
+    if action == "handler":
+        task.handler = "" if value in ("", "선택") else value
+        task.status_updated_at = now
+        task.save(update_fields=["handler", "status_updated_at"])
+        return JsonResponse({
+            "ok": True,
+            "message": f"담당자 → '{task.handler or '미지정'}'로 변경되었습니다.",
+            "handler": task.handler,
+            "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
+        })
+
+    if value not in STATUS_CHOICES:
+        return JsonResponse({"ok": False, "message": "상태 값이 올바르지 않습니다."}, status=400)
+
+    task.status = value
+    task.status_updated_at = now
+    task.save(update_fields=["status", "status_updated_at"])
+    return JsonResponse({
+        "ok": True,
+        "message": f"상태 → '{task.status}'로 변경되었습니다.",
+        "status": task.status,
+        "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
+    })
+
+
+# =========================
+# ✅ 직원업무: 상세
+# =========================
+@grade_required(["superuser"])
+@login_required
+def task_detail(request, pk):
+    task = get_object_or_404(Task, pk=pk)
+    is_superuser = True
+    can_edit = True
+
+    if request.method == "POST":
+        act = (request.POST.get("action_type") or "").strip()
+
+        # 댓글 처리(공용)
+        handled = _handle_comments_actions(
+            request=request,
+            obj=task,
+            comment_model=TaskComment,
+            fk_field="task",
+            redirect_detail_name="task_detail",
+        )
+        if handled:
+            return handled
+
+        # 삭제
+        if act == "delete_task":
+            task.delete()
+            messages.success(request, "게시글이 삭제되었습니다.")
+            return redirect("task_list")
+
+        return redirect("task_detail", pk=pk)
+
+    task_info = {
+        "구분": task.category,
+        "소속(요청자)": task.user_branch,
+        "성명(요청자)": task.user_name,
+        "사번(요청자)": task.user_id,
+    }
+
+    return render(request, "board/task_detail.html", {
+        "task": task,
+        "task_info": task_info,
+        "is_superuser": is_superuser,
+        "can_edit": can_edit,
+        "handlers": _get_handlers(),
+        "status_choices": STATUS_CHOICES,
+        "comments": task.comments.order_by("-created_at"),
+        "attachments": task.attachments.all(),
+
+        # include용
+        "form": TaskCommentForm(),
+        "detail_url": reverse("task_detail", kwargs={"pk": task.pk}),
+
+        # 하단 버튼용
+        "list_url": reverse("task_list"),
+        "edit_url": reverse("task_edit", kwargs={"pk": task.pk}),
+    })
+
+
+# =========================
+# ✅ 직원업무: 작성/수정
+# =========================
+@grade_required(["superuser"])
+@login_required
+def task_create(request):
+    if request.method == "POST":
+        form = TaskForm(request.POST, request.FILES)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.user_id = str(request.user.id)
+            task.user_name = getattr(request.user, "name", "") or ""
+            task.user_branch = getattr(request.user, "branch", "") or ""
+            task.save()
+
+            for f in request.FILES.getlist("attachments"):
+                TaskAttachment.objects.create(
+                    task=task,
+                    file=f,
+                    original_name=getattr(f, "name", "") or "",
+                    size=getattr(f, "size", 0) or 0,
+                    content_type=getattr(f, "content_type", "") or "",
+                )
+
+            messages.success(request, "게시글이 등록되었습니다.")
+            return redirect("task_detail", pk=task.pk)
+
+        messages.error(request, "입력값을 다시 확인해주세요.")
+    else:
+        form = TaskForm()
+
+    return render(request, "board/task_create.html", {"form": form})
+
+
+@grade_required(["superuser"])
+@login_required
+def task_edit(request, pk):
+    task = get_object_or_404(Task, pk=pk)
+
+    if request.method == "POST":
+        form = TaskForm(request.POST, request.FILES, instance=task)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.user_id = task.user_id or str(request.user.id)
+            task.user_name = task.user_name or getattr(request.user, "name", "") or ""
+            task.user_branch = task.user_branch or getattr(request.user, "branch", "") or ""
+            task.save()
+
+            del_ids = request.POST.getlist("delete_files")
+            if del_ids:
+                TaskAttachment.objects.filter(id__in=del_ids, task=task).delete()
+
+            for f in request.FILES.getlist("attachments"):
+                TaskAttachment.objects.create(
+                    task=task,
+                    file=f,
+                    original_name=getattr(f, "name", "") or "",
+                    size=getattr(f, "size", 0) or 0,
+                    content_type=getattr(f, "content_type", "") or "",
+                )
+
+            messages.success(request, "게시글이 수정되었습니다.")
+            return redirect("task_detail", pk=task.pk)
+
+        messages.error(request, "입력값을 확인해주세요.")
+    else:
+        form = TaskForm(instance=task)
+
+    return render(request, "board/task_edit.html", {
+        "form": form,
+        "task": task,
+        "attachments": task.attachments.all(),
+    })
+
+
+# ===========================================
+# 📋 업무요청 게시판: 목록
+# ===========================================
+@login_required
+def post_list(request):
+    is_superuser = (request.user.grade == "superuser")
+
+    keyword = request.GET.get("keyword", "").strip()
+    search_type = request.GET.get("search_type", "title")
+    selected_handler = request.GET.get("handler", "전체")
+    selected_status = request.GET.get("status", "전체")
+    page = request.GET.get("page")
+
+    qs = Post.objects.order_by("-created_at")
+
+    if keyword:
+        if search_type == "title":
+            qs = qs.filter(title__icontains=keyword)
+        elif search_type == "content":
+            qs = qs.filter(content__icontains=keyword)
+        elif search_type == "title_content":
+            qs = qs.filter(Q(title__icontains=keyword) | Q(content__icontains=keyword))
+        elif search_type == "user_name":
+            qs = qs.filter(user_name__icontains=keyword)
+        elif search_type == "category":
+            qs = qs.filter(category__icontains=keyword)
+
+    if selected_handler != "전체":
+        qs = qs.filter(handler=selected_handler)
+    if selected_status != "전체":
+        qs = qs.filter(status=selected_status)
+
+    posts = Paginator(qs, 10).get_page(page)
 
     return render(request, "board/post_list.html", {
         "posts": posts,
         "is_superuser": is_superuser,
-        "handlers": handlers,
+        "handlers": _get_handlers(),
         "status_choices": STATUS_CHOICES,
-
-        # 유지
         "keyword": keyword,
         "search_type": search_type,
         "selected_handler": selected_handler,
@@ -93,15 +387,11 @@ def post_list(request):
 
 
 # ===========================================
-# ✅ AJAX: 담당자/상태 즉시 업데이트
+# ✅ 업무요청: 인라인 업데이트(list/detail)
 # ===========================================
 @require_POST
 @login_required
 def ajax_update_post_field(request):
-    """
-    superuser 전용: post_list에서 담당자/상태를 즉시(AJAX) 업데이트
-    payload: post_id, action_type(handler|status), value
-    """
     if request.user.grade != "superuser":
         return JsonResponse({"ok": False, "message": "권한이 없습니다."}, status=403)
 
@@ -113,15 +403,12 @@ def ajax_update_post_field(request):
         return JsonResponse({"ok": False, "message": "요청이 올바르지 않습니다."}, status=400)
 
     post = get_object_or_404(Post, id=post_id)
-
     now = timezone.localtime()
 
     if action == "handler":
-        # ✅ handler는 None 금지 (모델이 CharField)
         post.handler = "" if value in ("", "선택") else value
         post.status_updated_at = now
         post.save(update_fields=["handler", "status_updated_at"])
-
         return JsonResponse({
             "ok": True,
             "message": f"담당자 → '{post.handler or '미지정'}'로 변경되었습니다.",
@@ -129,14 +416,12 @@ def ajax_update_post_field(request):
             "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
         })
 
-    # action == "status"
     if value not in STATUS_CHOICES:
         return JsonResponse({"ok": False, "message": "상태 값이 올바르지 않습니다."}, status=400)
 
     post.status = value
     post.status_updated_at = now
     post.save(update_fields=["status", "status_updated_at"])
-
     return JsonResponse({
         "ok": True,
         "message": f"상태 → '{post.status}'로 변경되었습니다.",
@@ -148,10 +433,6 @@ def ajax_update_post_field(request):
 @require_POST
 @login_required
 def ajax_update_post_field_detail(request, pk):
-    """
-    superuser 전용: post_detail에서 담당자/상태 즉시 업데이트(AJAX)
-    payload: action_type(handler|status), value
-    """
     if request.user.grade != "superuser":
         return JsonResponse({"ok": False, "message": "권한이 없습니다."}, status=403)
 
@@ -175,14 +456,12 @@ def ajax_update_post_field_detail(request, pk):
             "status_updated_at": now.strftime("%Y-%m-%d %H:%M"),
         })
 
-    # action == "status"
     if value not in STATUS_CHOICES:
         return JsonResponse({"ok": False, "message": "상태 값이 올바르지 않습니다."}, status=400)
 
     post.status = value
     post.status_updated_at = now
     post.save(update_fields=["status", "status_updated_at"])
-
     return JsonResponse({
         "ok": True,
         "message": f"상태 → '{post.status}'로 변경되었습니다.",
@@ -192,50 +471,40 @@ def ajax_update_post_field_detail(request, pk):
 
 
 # ===========================================
-# 📄 게시글 상세 + 댓글 CRUD
+# 📄 업무요청: 상세
 # ===========================================
 @login_required
 def post_detail(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    is_superuser = request.user.grade == "superuser"
+    is_superuser = (request.user.grade == "superuser")
 
     if not is_superuser and str(request.user.id) != str(post.user_id):
         messages.error(request, "조회 권한이 없습니다.")
         return redirect("post_list")
 
-    def update_post_field(field_name):
-        if not is_superuser:
-            messages.error(request, "권한이 없습니다.")
-            return
-        value = request.POST.get(field_name, "").strip() or ""
-        setattr(post, field_name, value)
-        post.status_updated_at = timezone.localtime()
-        post.save()
-        messages.success(request, f"{field_name} 변경 완료")
+    can_edit = is_superuser or (str(request.user.id) == str(post.user_id))
 
     if request.method == "POST":
-        act = request.POST.get("action_type")
-        match act:
-            case "handler" | "status":
-                update_post_field(act)
-            case "comment":
-                Comment.objects.create(post=post, author=request.user, content=request.POST.get("content", ""))
-                messages.success(request, "댓글 등록 완료")
-            case "edit_comment":
-                c = get_object_or_404(Comment, id=request.POST["comment_id"], author=request.user)
-                c.content = request.POST.get("content", "").strip()
-                c.save()
-                messages.success(request, "댓글 수정 완료")
-            case "delete_comment":
-                Comment.objects.filter(id=request.POST["comment_id"], author=request.user).delete()
-                messages.info(request, "댓글 삭제 완료")
-            case "delete_post":
-                if not (is_superuser or str(request.user.id) == str(post.user_id)):
-                    messages.error(request, "삭제 권한이 없습니다.")
-                    return redirect("post_detail", pk=pk)
-                post.delete()
-                messages.success(request, "게시글이 삭제되었습니다.")
-                return redirect("post_list")
+        act = (request.POST.get("action_type") or "").strip()
+
+        handled = _handle_comments_actions(
+            request=request,
+            obj=post,
+            comment_model=Comment,
+            fk_field="post",
+            redirect_detail_name="post_detail",
+        )
+        if handled:
+            return handled
+
+        if act == "delete_post":
+            if not can_edit:
+                messages.error(request, "삭제 권한이 없습니다.")
+                return redirect("post_detail", pk=pk)
+            post.delete()
+            messages.success(request, "게시글이 삭제되었습니다.")
+            return redirect("post_list")
+
         return redirect("post_detail", pk=pk)
 
     post_info = {
@@ -251,16 +520,22 @@ def post_detail(request, pk):
         "post": post,
         "post_info": post_info,
         "is_superuser": is_superuser,
-        "handlers": list(User.objects.filter(grade="superuser").values_list("name", flat=True)),
+        "can_edit": can_edit,
+        "handlers": _get_handlers(),
         "status_choices": STATUS_CHOICES,
         "comments": post.comments.order_by("-created_at"),
         "attachments": post.attachments.all(),
+
         "form": CommentForm(),
+        "detail_url": reverse("post_detail", kwargs={"pk": post.pk}),
+
+        "list_url": reverse("post_list"),
+        "edit_url": reverse("post_edit", kwargs={"pk": post.pk}),
     })
 
 
 # ===========================================
-# 📝 게시글 작성 / 수정
+# 📝 업무요청: 작성/수정
 # ===========================================
 @login_required
 def post_create(request):
@@ -269,32 +544,34 @@ def post_create(request):
         if form.is_valid():
             post = form.save(commit=False)
             post.user_id = request.user.id
-            post.user_name = request.user.name
-            post.user_branch = request.user.branch
+            post.user_name = getattr(request.user, "name", "") or ""
+            post.user_branch = getattr(request.user, "branch", "") or ""
             post.save()
 
             for f in request.FILES.getlist("attachments"):
                 Attachment.objects.create(
                     post=post,
                     file=f,
-                    original_name=f.name,
-                    size=getattr(f, "size", 0),
-                    content_type=getattr(f, "content_type", ""),
+                    original_name=getattr(f, "name", "") or "",
+                    size=getattr(f, "size", 0) or 0,
+                    content_type=getattr(f, "content_type", "") or "",
                 )
             messages.success(request, "게시글이 등록되었습니다.")
             return redirect("post_detail", pk=post.pk)
+
         messages.error(request, "입력값을 다시 확인해주세요.")
     else:
         form = PostForm()
+
     return render(request, "board/post_create.html", {"form": form})
 
 
 @login_required
 def post_edit(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    is_superuser = request.user.grade == "superuser"
+    is_superuser = (request.user.grade == "superuser")
 
-    if not (is_superuser or request.user.id == post.user_id):
+    if not (is_superuser or str(request.user.id) == str(post.user_id)):
         messages.error(request, "수정 권한이 없습니다.")
         return redirect("post_detail", pk=pk)
 
@@ -311,12 +588,14 @@ def post_edit(request, pk):
                 Attachment.objects.create(
                     post=post,
                     file=f,
-                    original_name=f.name,
-                    size=f.size,
-                    content_type=f.content_type or "",
+                    original_name=getattr(f, "name", "") or "",
+                    size=getattr(f, "size", 0) or 0,
+                    content_type=getattr(f, "content_type", "") or "",
                 )
+
             messages.success(request, "게시글이 수정되었습니다.")
-            return redirect("post_detail", pk=pk)
+            return redirect("post_detail", pk=post.pk)
+
         messages.error(request, "입력값을 확인해주세요.")
     else:
         form = PostForm(instance=post)

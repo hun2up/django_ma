@@ -1,21 +1,26 @@
-<!-- django_ma/board/templates/board/post_create.html -->
+<!-- django_ma/board/templates/board/task_edit.html -->
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}업무요청 작성{% endblock %}
+{% block title %}직원업무 수정{% endblock %}
 
 {% block content %}
+{% if user.grade != 'superuser' %}
+  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+{% endif %}
+
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
-    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 작성</h3>
+    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">직원업무 수정</h3>
 
     <div class="card shadow p-4 border-0 rounded-4">
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      {% url "post_list" as list_url %}
-      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="postForm" %}
+      {% url "task_list" as list_url %}
+      {% url "task_detail" task.pk as cancel_url %}
+      {% include "board/includes/_edit_form.html" with mode="edit" form=form attachments=attachments list_url=list_url cancel_url=cancel_url form_id="taskForm" %}
     </div>
 
     <div class="text-center mt-4">

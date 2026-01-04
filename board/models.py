@@ -162,6 +162,14 @@ class Task(models.Model):
         now = timezone.localtime()
         update_fields = kwargs.get("update_fields")
 
+        # ✅ None 방어 (DB NOT NULL 보호)
+        if self.user_id is None:
+            self.user_id = ""
+        if self.user_name is None:
+            self.user_name = ""
+        if self.user_branch is None:
+            self.user_branch = ""   # ✅ 핵심
+
         if self.handler is None:
             self.handler = ""
 
