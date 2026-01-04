@@ -1,23 +1,33 @@
 /* django_ma/static/css/base.css
-
 /* =======================================================
- 🎨 base.css — 공통 스타일 시트 (REFAC v3)
- - 목적: 가독성 / 유지보수 / 기능 분리
- - 원칙: 기능 변경 ❌ / 구조 정리 ⭕
+ 🎨 base.css — 공통 스타일 시트 (REFAC v5)
+ - 목적: 유지보수성 극대화 (공용/Board/Partner 강분리)
+ - 원칙: 기능 변경 ❌ / 선언 순서·주석·섹션화 ⭕
+ - 구성:
+   0) TOKENS
+   1) BASE
+   2) COMPONENTS (공용)
+   3) UTILITIES (공용)
+   4) PAGES: BOARD
+   5) PAGES: PARTNER (공용 → 편제/요율/지점효율 세부)
+   6) PLUGINS / FIXES
 ======================================================= */
 
 
 /* =======================================================
- 0) Design Tokens / Root Variables
+ 0) TOKENS: Design Tokens / Root Variables
 ======================================================= */
 :root {
+  /* Brand */
   --inka-blue: #005BAC;
   --inka-blue2: #0074D9;
   --inka-blue-dark: #004B93;
 
+  /* Surface / Border */
   --bg-app: #f9fbfd;
   --border-soft: #d2ddec;
 
+  /* Shadow / Radius */
   --shadow-card: 0 6px 15px rgba(0, 0, 0, 0.1);
   --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.05);
 
@@ -27,7 +37,7 @@
 
 
 /* =======================================================
- 1) Base Typography & Layout
+ 1) BASE: Typography / Layout
 ======================================================= */
 html { font-size: 16px; }
 
@@ -41,8 +51,10 @@ body {
 
 
 /* =======================================================
- 2) Navbar (Desktop / Mobile)
+ 2) COMPONENTS (COMMON): Navbar / Buttons / Forms / Cards
 ======================================================= */
+
+/* ---------- Navbar (Desktop / Mobile) ---------- */
 .navbar {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
@@ -59,15 +71,9 @@ body {
   color: var(--inka-blue) !important;
 }
 
-.nav-link.active {
-  font-weight: 700;
-}
+.nav-link.active { font-weight: 700; }
+.nav-link.inactive { color: #aaa !important; }
 
-.nav-link.inactive {
-  color: #aaa !important;
-}
-
-/* --- Mobile Navbar Toggler --- */
 .navbar .navbar-toggler {
   padding: 0.6rem 0.8rem;
   border-width: 2px;
@@ -80,24 +86,20 @@ body {
   background-size: 1.8rem;
 }
 
+.navbar .navbar-toggler:focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 91, 172, 0.25);
+}
+
 @media (max-width: 576px) {
-  .navbar .navbar-toggler {
-    padding: 0.75rem 0.95rem;
-  }
+  .navbar .navbar-toggler { padding: 0.75rem 0.95rem; }
   .navbar .navbar-toggler-icon {
     width: 2.1rem;
     height: 2.1rem;
   }
 }
 
-.navbar .navbar-toggler:focus {
-  box-shadow: 0 0 0 0.2rem rgba(0, 91, 172, 0.25);
-}
 
-
-/* =======================================================
- 3) Buttons
-======================================================= */
+/* ---------- Buttons ---------- */
 .btn-primary {
   background: linear-gradient(135deg, var(--inka-blue), var(--inka-blue2));
   border: none;
@@ -119,6 +121,7 @@ body {
   padding: 6px 14px;
 }
 
+/* small action buttons */
 .btn-search,
 .btn-remove {
   white-space: nowrap;
@@ -133,9 +136,7 @@ button[disabled],
 }
 
 
-/* =======================================================
- 4) Forms / Inputs / Readonly
-======================================================= */
+/* ---------- Forms / Inputs ---------- */
 .form-control {
   border-radius: var(--radius-soft);
   border: 1px solid var(--border-soft);
@@ -147,21 +148,21 @@ button[disabled],
   box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
 }
 
+/* readonly */
 .readonly-field[readonly] {
   background-color: #f1f1f1;
   color: #666;
   cursor: not-allowed;
 }
 
+/* numeric alignment */
 input[name^="premium_"],
 #manage-efficiency input[name="amount"] {
   text-align: right;
 }
 
 
-/* =======================================================
- 5) Cards & Containers
-======================================================= */
+/* ---------- Cards ---------- */
 .card {
   border: none;
   border-radius: var(--radius-card);
@@ -169,9 +170,7 @@ input[name^="premium_"],
 }
 
 
-/* =======================================================
- 6) Utility UI (Info / Comment / Status)
-======================================================= */
+/* ---------- Common info chips ---------- */
 .info-row {
   display: flex;
   gap: 10px;
@@ -194,17 +193,12 @@ input[name^="premium_"],
   font-weight: 600;
 }
 
-.comment-content {
-  background: #f8f9fa;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 10px;
-}
-
 
 /* =======================================================
- 7) Loading / Disabled State
+ 3) UTILITIES (COMMON): Loading / Disabled / Search / Status
 ======================================================= */
+
+/* ---------- Loading overlay ---------- */
 .loading-overlay {
   position: fixed;
   inset: 0;
@@ -215,16 +209,14 @@ input[name^="premium_"],
   z-index: 2000;
 }
 
+/* ---------- Disabled mode ---------- */
 .disabled-mode {
   opacity: 0.6;
   pointer-events: none;
   filter: grayscale(0.8);
 }
 
-
-/* =======================================================
- 8) Search Result UI
-======================================================= */
+/* ---------- Search result hover ---------- */
 #searchResults .search-result {
   border-radius: 8px;
   transition: 0.2s;
@@ -235,9 +227,77 @@ input[name^="premium_"],
   transform: translateY(-1px);
 }
 
+/* ---------- Emphasis ---------- */
+.cell-after {
+  color: var(--inka-blue);
+  font-weight: 600;
+}
+
+/* ---------- Status colors (shared) ---------- */
+.status-is-checking { color: #f0ad4e; }
+.status-is-progress { color: #198754; }
+.status-is-fix      { color: #dc3545; }
+.status-is-done     { color: #000; }
+.status-is-reject   { color: #6c757d; }
+
 
 /* =======================================================
- 9) Partner 공용 레이아웃 확장
+ 4) PAGES: BOARD (업무요청/직원업무 게시판)
+======================================================= */
+
+/* ---------- Board base font / wrapper helpers ---------- */
+.board-font { /* 필요 시 board 전용 폰트/간격 확장 */
+  /* (현재는 기능 변경 방지 위해 빈 블록 유지 가능) */
+}
+
+/* ---------- Comment UI (board 전용) ---------- */
+.comment-content {
+  background: #f8f9fa;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.comment-created-at { font-size: 12px; }
+.comment-text { white-space: pre-wrap; }
+
+/* inline edit form */
+.comment-edit-form {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.comment-edit-textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 82%;
+  resize: vertical;
+}
+
+.comment-edit-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* buttons sizing */
+.edit-comment-btn,
+.edit-delete-btns .btn {
+  font-size: 12px;
+}
+
+
+/* =======================================================
+ 5) PAGES: PARTNER (조직관리: 편제/요율/지점효율)
+======================================================= */
+
+/* =======================================================
+ 5-0) PARTNER: Common Layout Expansion
+  - manage-structure / manage-rate / manage-efficiency 공통 확장 레이아웃
 ======================================================= */
 #manage-structure,
 #manage-rate,
@@ -249,7 +309,7 @@ input[name^="premium_"],
 
 
 /* =======================================================
- 10) Partner 테이블 공통 규칙
+ 5-1) PARTNER: Common Table Rules
 ======================================================= */
 #manage-structure table,
 #manage-rate table,
@@ -268,8 +328,27 @@ input[name^="premium_"],
 
 
 /* =======================================================
- 11) Partner 입력 테이블
+ 5-2) PARTNER: 편제변경 (manage_structure)
+  - 현재 base.css에 편제 전용 룰이 적으면 비워도 OK
 ======================================================= */
+/* (reserved) 편제변경 전용 스타일을 여기에 추가 */
+
+
+/* =======================================================
+ 5-3) PARTNER: 요율변경 (manage_rate)
+======================================================= */
+/* --- table check modal --- */
+#tableCheckModal table th,
+#tableCheckModal table td {
+  white-space: nowrap;
+}
+
+
+/* =======================================================
+ 5-4) PARTNER: 지점효율 (manage_efficiency)
+======================================================= */
+
+/* --- input table --- */
 #manage-efficiency #inputTable th,
 #manage-efficiency #inputTable td {
   white-space: nowrap;
@@ -277,10 +356,7 @@ input[name^="premium_"],
   text-overflow: ellipsis;
 }
 
-
-/* =======================================================
- 12) Partner 메인시트 테이블
-======================================================= */
+/* --- main sheet group table (accordion) --- */
 .main-group-table th,
 .main-group-table td {
   white-space: nowrap;
@@ -292,6 +368,7 @@ input[name^="premium_"],
   max-width: none;
 }
 
+/* helper: fixed table width (keep as-is) */
 #manage-efficiency .main-table-fixed {
   min-width: 1100px; /* 또는 제거 */
 }
@@ -301,10 +378,7 @@ input[name^="premium_"],
   max-width: none;
 }
 
-
-/* =======================================================
- 13) 지점효율(manage_efficiency) 전용 UI
-======================================================= */
+/* actions bar */
 #manage-efficiency .efficiency-actions-bar {
   display: flex;
   gap: 8px;
@@ -314,16 +388,7 @@ input[name^="premium_"],
 
 
 /* =======================================================
- 14) 요율관리 모달
-======================================================= */
-#tableCheckModal table th,
-#tableCheckModal table td {
-  white-space: nowrap;
-}
-
-
-/* =======================================================
- 15) DataTables / Firefox Fix
+ 6) PLUGINS / FIXES: DataTables / Browser Fix
 ======================================================= */
 #mainSheet { min-width: 0; }
 
@@ -331,18 +396,3 @@ input[name^="premium_"],
   width: 100% !important;
   table-layout: fixed;
 }
-
-
-/* =======================================================
- 16) 공용 강조 / 상태 색상
-======================================================= */
-.cell-after {
-  color: var(--inka-blue);
-  font-weight: 600;
-}
-
-.status-is-checking { color: #f0ad4e; }
-.status-is-progress { color: #198754; }
-.status-is-fix      { color: #dc3545; }
-.status-is-done     { color: #000; }
-.status-is-reject   { color: #6c757d; }

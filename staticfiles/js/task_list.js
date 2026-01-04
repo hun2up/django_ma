@@ -1,11 +1,10 @@
-// django_ma/static/js/board/task/task_list.js
+// django_ma/static/js/task_list.js
 //
-// ✅ Refactor (2026-01-03)
-// - 인라인 handler/status 변경 AJAX 유지
-// - 상태(status) 값에 따라 색상 클래스 적용 (초기/변경/롤백 포함)
-// - 검색/필터 select는 제외
-// - CSRF는 form hidden input 사용
-// - 상태변경일(status_updated_at) 갱신 유지
+// ✅ task_list 인라인 handler/status 변경 AJAX
+// - post_list.js 패턴 그대로
+// - key만 task_id로 변경
+// - 상태(status) 값에 따라 색상 클래스 적용
+// - status_updated_at 갱신 유지
 
 (() => {
   "use strict";
@@ -17,9 +16,6 @@
 
     const qs = (sel, root = document) => root.querySelector(sel);
 
-    /* =========================
-     * Utils
-     * ========================= */
     function escapeHtml(str) {
       return String(str ?? "")
         .replaceAll("&", "&amp;")
@@ -71,9 +67,7 @@
       return form?.querySelector("input[name='csrfmiddlewaretoken']")?.value || "";
     }
 
-    /* =========================
-     * Status Color (NEW)
-     * ========================= */
+    // Status color classes (post_list와 동일)
     const STATUS_CLASSES = [
       "status-is-checking",
       "status-is-progress",
@@ -104,22 +98,17 @@
     }
 
     function applyAllStatusColors(root = document) {
-      // 일반유저: span
       root.querySelectorAll(".status-badge").forEach((el) => {
         const v = el.dataset.status || el.textContent;
         applyStatusColor(el, v);
       });
 
-      // 슈퍼유저: select
       root.querySelectorAll("select.status-select").forEach((sel) => {
         applyStatusColor(sel, sel.value);
       });
     }
 
-    /* =========================
-     * API
-     * ========================= */
-    async function taskUpdate({ form, taskId, actionType, value }) {
+    async function postUpdate({ form, taskId, actionType, value }) {
       if (!updateUrl) {
         throw new Error("AJAX update URL이 없습니다. (taskListBoot data-update-url 확인)");
       }
@@ -133,7 +122,7 @@
       body.set("value", value);
 
       const res = await fetch(updateUrl, {
-        method: "task",
+        method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
           "X-CSRFToken": csrf,
@@ -150,9 +139,6 @@
       return data;
     }
 
-    /* =========================
-     * Init
-     * ========================= */
     // 초기 prevValue 세팅
     document
       .querySelectorAll(
@@ -160,12 +146,9 @@
       )
       .forEach((s) => (s.dataset.prevValue = s.value));
 
-    // ✅ 초기 상태 색상 적용
+    // 초기 상태 색상 적용
     applyAllStatusColors(document);
 
-    /* =========================
-     * Inline Update Handler
-     * ========================= */
     document.addEventListener("change", async (e) => {
       const sel = e.target;
       if (!(sel instanceof HTMLSelectElement)) return;
@@ -174,7 +157,7 @@
       if (!form) return;
 
       const fieldName = sel.getAttribute("name");
-      if (fieldName !== "handler" && fieldName !== "status") return; // 검색필터 select 제외
+      if (fieldName !== "handler" && fieldName !== "status") return;
 
       const taskId = qs('input[name="task_id"]', form)?.value || "";
       const actionType = qs('input[name="action_type"]', form)?.value || "";
@@ -190,22 +173,19 @@
       const prev = sel.dataset.prevValue ?? sel.value;
       sel.dataset.prevValue = sel.value;
 
-      // ✅ status는 변경 즉시 색상도 반영 (실패하면 롤백에서 다시 적용)
       if (fieldName === "status") applyStatusColor(sel, sel.value);
 
       setBusy(sel, true);
 
       try {
-        const data = await taskUpdate({ form, taskId, actionType, value: sel.value });
+        const data = await postUpdate({ form, taskId, actionType, value: sel.value });
 
-        // 상태변경일 갱신
         if (data.status_updated_at) {
           const tr = sel.closest("tr");
           const td = tr?.querySelector("td.status-updated-at");
           if (td) td.textContent = data.status_updated_at;
         }
 
-        // 서버가 status를 돌려주면(혹시 별칭/정규화) 그 값으로 확정 적용
         if (fieldName === "status") {
           const confirmed = data.status || sel.value;
           sel.value = confirmed;
@@ -215,7 +195,6 @@
 
         showAlert(data.message || "변경되었습니다.", "success");
       } catch (err) {
-        // 롤백
         sel.value = prev;
         sel.dataset.prevValue = prev;
 

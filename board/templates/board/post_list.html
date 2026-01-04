@@ -1,4 +1,5 @@
-{# django_ma/board/templates/board/post_list.html #}
+<!-- django_ma/board/templates/board/post_list.html -->
+
 {% extends 'base.html' %}
 {% load static %}
 
@@ -177,5 +178,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/post_list.js' %}?v=20260103_1"></script>
+<script src="{% static 'js/board/common/inline_update.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/post_list.js' %}?v=20260104"></script>
 {% endblock %}

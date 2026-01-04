@@ -1,0 +1,72 @@
+<!-- django_ma/board/templates/board/includes/_form_common.html -->
+<!-- 필수 context: form, mode ("create"|"edit"), attachments(optional) -->
+
+<!-- 구분 -->
+<div class="row mb-3 align-items-end">
+  <div class="col-md-4">
+    <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">구분</label>
+    {{ form.category }}
+  </div>
+</div>
+
+<!-- 제목 -->
+<div class="mb-3">
+  <label for="{{ form.title.id_for_label }}" class="form-label fw-semibold text-danger">제목*</label>
+  {{ form.title }}
+</div>
+
+<!-- 내용 -->
+<div class="mb-3">
+  <label for="{{ form.content.id_for_label }}" class="form-label fw-semibold text-danger">내용*</label>
+  {{ form.content }}
+</div>
+
+<!-- ✅ edit 모드일 때만 기존 첨부파일 표시 -->
+{% if mode == "edit" %}
+  <div class="mb-2">
+    <label class="form-label fw-semibold">현재 첨부파일</label>
+  </div>
+
+  <div id="existingFileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
+    {% if attachments %}
+      <ul id="existingFiles" class="list-unstyled m-0">
+        {% for att in attachments %}
+          <li class="d-flex justify-content-between align-items-center py-1 border-bottom small">
+            <span class="text-truncate" style="max-width:80%;">
+              <i class="bi bi-paperclip"></i>
+              <a href="{{ att.file.url }}" download>
+                {{ att.original_name|default:att.file.name }}
+              </a>
+              <span class="text-muted">({{ att.size|filesizeformat }})</span>
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-existing" data-id="{{ att.id }}">
+              ✖
+            </button>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted small m-0">첨부된 파일이 없습니다.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- ✅ 새 첨부파일 추가 (create/edit 공용) -->
+<div class="mb-3">
+  <label class="form-label fw-semibold">
+    {% if mode == "edit" %}새 첨부파일 추가{% else %}첨부파일{% endif %}
+  </label>
+  <input type="file" id="fileInput" name="attachments" class="form-control" multiple>
+  <div class="form-text">파일은 개당 최대 <strong>10MB</strong>까지 업로드할 수 있습니다.</div>
+</div>
+
+<!-- ✅ 새 파일 목록 -->
+<div id="fileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
+  <p class="text-muted m-0 small" id="noFilesText">
+    {% if mode == "edit" %}첨부된 새 파일이 없습니다.{% else %}첨부된 파일이 없습니다.{% endif %}
+  </p>
+  <ul id="fileNames" class="list-unstyled m-0"></ul>
+</div>
+
+<!-- ✅ 삭제할 파일 ID 전달용 (file_upload_utils.js가 hidden 생성) -->
+<div id="deleteContainer"></div>
