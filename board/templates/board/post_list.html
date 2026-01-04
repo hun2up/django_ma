@@ -1,4 +1,4 @@
-<!-- django_ma/board/templates/board/post_list.html -->
+{# django_ma/board/templates/board/post_list.html #}
 {% extends 'base.html' %}
 {% load static %}
 
@@ -61,11 +61,13 @@
             <td>{{ post.receipt_number }}</td>
             <td>{{ post.created_at|date:"Y-m-d" }}</td>
             <td>{{ post.category|default:"-" }}</td>
+
             <td class="text-start">
               <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
                 {{ post.title }}
               </a>
             </td>
+
             <td>{{ post.user_name|default:"-" }}</td>
 
             <td>
@@ -92,7 +94,7 @@
                   {% csrf_token %}
                   <input type="hidden" name="action_type" value="status">
                   <input type="hidden" name="post_id" value="{{ post.id }}">
-                  {# ✅ status-select 클래스 추가 + data-status 추가 #}
+
                   <select name="status"
                           class="form-select form-select-sm d-inline-block status-select"
                           style="width:auto;"
@@ -103,7 +105,6 @@
                   </select>
                 </form>
               {% else %}
-                {# ✅ status-badge 클래스 추가 + data-status 추가 #}
                 <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
                   {{ post.status }}
                 </span>
@@ -123,20 +124,13 @@
       </table>
     </div>
 
-    <div class="text-center mt-3">
-      {% if posts.has_previous %}
-        <a href="?page={{ posts.previous_page_number }}" class="btn btn-outline-primary btn-sm">이전</a>
-      {% endif %}
-      <span class="mx-2">Page {{ posts.number }} / {{ posts.paginator.num_pages }}</span>
-      {% if posts.has_next %}
-        <a href="?page={{ posts.next_page_number }}" class="btn btn-outline-primary btn-sm">다음</a>
-      {% endif %}
-    </div>
+    {% include "board/includes/pagination.html" with page_obj=posts %}
   </div>
 
   {# 검색/필터 #}
   <form method="get" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
     <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
+
       <div class="d-flex align-items-center gap-2">
         <select name="search_type" class="form-select form-select-sm select-filter">
           <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
@@ -145,7 +139,9 @@
           <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
           <option value="category" {% if search_type == 'category' %}selected{% endif %}>구분</option>
         </select>
-        <input type="text" name="keyword" value="{{ keyword }}" class="form-control form-control-sm"
+
+        <input type="text" name="keyword" value="{{ keyword }}"
+               class="form-control form-control-sm"
                placeholder="검색어 입력" style="width:180px;">
       </div>
 
@@ -173,6 +169,7 @@
         <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
         <a href="{% url 'post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
       </div>
+
     </div>
   </form>
 </div>
@@ -180,6 +177,5 @@
 {% endblock %}
 
 {% block extra_js %}
-{# ✅ 캐시 방지 버전 올려주세요 #}
 <script src="{% static 'js/post_list.js' %}?v=20260103_1"></script>
 {% endblock %}

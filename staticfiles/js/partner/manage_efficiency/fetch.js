@@ -107,6 +107,84 @@ function getGroupsContainer() {
   );
 }
 
+
+/* =========================
+   ⭐ 컬럼 비율 설정 (MAIN TABLE)
+========================= */
+const MAIN_COL_KEYS = [
+  "requester",
+  "requester_id",
+  "category",
+  "amount",
+  "tax",
+  "ded",
+  "pay",
+  "content",
+  "request_date",
+  "process_date",
+  "remove",
+];
+
+const DEFAULT_MAIN_COL_WIDTHS = {
+  requester: 8,
+  requester_id: 7,
+  category: 8,
+  amount: 8,
+  tax: 6,
+  ded: 10,
+  pay: 10,
+  content: 20,
+  request_date: 7,
+  process_date: 8,
+  remove: 8,
+};
+
+// ⭐ <colgroup> 생성
+function buildMainColGroup() {
+  return `
+    <colgroup>
+      ${MAIN_COL_KEYS.map((k) => `<col data-col="${k}">`).join("")}
+    </colgroup>
+  `;
+}
+
+// ⭐ 비율 적용
+function applyMainColWidths(root, table) {
+  if (!root || !table) return;
+
+  let conf;
+  try {
+    conf = JSON.parse(root.dataset.mainColWidths || "{}");
+    conf = { ...DEFAULT_MAIN_COL_WIDTHS, ...conf };
+  } catch {
+    conf = { ...DEFAULT_MAIN_COL_WIDTHS };
+  }
+
+  const entries = Object.entries(conf).filter(([, v]) => Number(v) > 0);
+  const sum = entries.reduce((a, [, v]) => a + Number(v), 0);
+  if (!sum) return;
+
+  const ratios = {};
+  for (const [k, v] of entries) {
+    ratios[k] = (Number(v) / sum) * 100;
+  }
+
+  // ✅ mismatch 경고
+  const thCount = table.querySelectorAll("thead th").length;
+  const colCount = table.querySelectorAll("colgroup col[data-col]").length;
+  if (thCount && colCount && thCount !== colCount) {
+    console.warn("[efficiency] colgroup/th count mismatch", { thCount, colCount });
+  }
+
+  table.querySelectorAll("colgroup col[data-col]").forEach((col) => {
+    const key = col.dataset.col;
+    if (ratios[key]) col.style.width = `${ratios[key]}%`;
+  });
+
+  table.style.tableLayout = "fixed";
+}
+
+
 /* =========================
    그룹 타이틀 정규화
 ========================= */
@@ -543,7 +621,8 @@ function renderGroups(groups, rowsByGroup) {
       const rowsHtml = rows.length
         ? `
           <div class="table-responsive">
-            <table class="table table-sm mb-0">
+            <table class="table table-sm mb-0 main-group-table">
+              ${buildMainColGroup()}
               <thead class="table-light">
                 <tr>
                   <th class="text-center">요청자</th>
@@ -606,7 +685,7 @@ function renderGroups(groups, rowsByGroup) {
 
                         <td class="text-center">${ded || "-"}</td>
                         <td class="text-center">${pay || "-"}</td>
-                        <td class="text-center">${escapeHtml(str(r.content))}</td>
+                        <td class="text-center td-content">${escapeHtml(str(r.content))}</td>
                         <td class="text-center">${escapeHtml(str(r.request_date))}</td>
 
                         <td class="text-center">
@@ -678,6 +757,12 @@ function renderGroups(groups, rowsByGroup) {
     .join("");
 
   acc.innerHTML = html;
+
+  // ⭐ 렌더 후 컬럼비율 적용 (모든 그룹 테이블)
+  const root = getRoot();
+  acc.querySelectorAll("table.main-group-table").forEach((tbl) => {
+    applyMainColWidths(root, tbl);
+  });
 }
 
 /* =========================

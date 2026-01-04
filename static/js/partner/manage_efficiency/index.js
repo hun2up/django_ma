@@ -10,6 +10,7 @@ import { initInputRowEvents } from "./input_rows.js";
 import { fetchData } from "./fetch.js";
 import { initManageBoot } from "../../common/manage_boot.js";
 import { initConfirmUploadHandlers } from "./confirm_upload.js";
+import { applyInputColWidths } from "./col_widths.js";
 
 const DEBUG = false;
 const log = (...a) => DEBUG && console.log("[efficiency/index]", ...a);
@@ -59,6 +60,10 @@ function getSearchBtn() {
 
 onReady(() => {
   const root = getRoot();
+
+  const inputTable = document.getElementById("inputTable");
+  applyInputColWidths(root, inputTable);
+  
   if (!root) {
     console.error("⚠️ manage-efficiency root 요소를 찾을 수 없습니다.");
     return;

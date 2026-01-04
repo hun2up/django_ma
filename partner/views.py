@@ -652,14 +652,31 @@ def _build_efficiency_groups_payload(*, month: str, branch: str, user: CustomUse
     ✅ Accordion 렌더링용 그룹 구조
     - group_key: confirm_group_id(문자열)
     - group_pk: DB PK(숫자)
+    - ✅ 권한별 조회범위 적용:
+      superuser: 선택 branch 전체
+      main_admin: 자기 branch 전체
+      sub_admin(A/B/C): 자기 팀 범위(uploader 기준)
     """
     gqs = EfficiencyConfirmGroup.objects.filter(month=month)
 
+    # ✅ branch scope
     if user.grade == "superuser":
         if branch:
             gqs = gqs.filter(branch__iexact=branch)
+        else:
+            # superuser가 branch 없이 호출하면 빈 리스트로 (프론트 정책과 동일)
+            return []
     else:
         gqs = gqs.filter(branch__iexact=branch)
+
+    # ✅ sub_admin: 팀 범위(uploader 기준)
+    if user.grade == "sub_admin":
+        allowed_ids = _get_level_team_filter_user_ids(user)  # 같은 branch + 같은 level team의 user_id들
+        if allowed_ids:
+            gqs = gqs.filter(uploader_id__in=allowed_ids)
+        else:
+            # 레벨/팀 미설정이면 누수 방지: 본인 업로드만
+            gqs = gqs.filter(uploader_id=user.id)
 
     gqs = gqs.annotate(
         row_count=Count("efficiency_rows", distinct=True),
@@ -725,6 +742,15 @@ def efficiency_fetch(request):
                 qs = qs.filter(branch__iexact=branch)
         else:
             qs = qs.filter(branch__iexact=branch)
+
+        # ✅ sub_admin: 팀 범위(requester 기준)
+        if user.grade == "sub_admin":
+            allowed_ids = _get_level_team_filter_user_ids(user)
+            if allowed_ids:
+                qs = qs.filter(requester_id__in=allowed_ids)
+            else:
+                # 레벨/팀 미설정이면 누수 방지: 본인 작성만
+                qs = qs.filter(requester_id=user.id)
 
         rows = []
         for ec in qs:

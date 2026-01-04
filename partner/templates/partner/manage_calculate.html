@@ -20,7 +20,36 @@
       data-update-process-date-url="{{ update_process_date_url }}"
       data-efficiency-confirm-upload-url="{% url 'partner:efficiency_confirm_upload' %}"
       data-efficiency-confirm-groups-url="{{ efficiency_confirm_groups_url }}"
-      data-search-user-url="{{ search_user_url|default:'/api/accounts/search-user/' }}">
+      data-search-user-url="{{ search_user_url|default:'/api/accounts/search-user/' }}"
+      data-input-col-widths='{
+        "rq_name": 6,
+        "rq_id": 6,
+        "rq_branch": 10,
+        "category": 8,
+        "amount": 7,
+        "tax": 6,
+        "ded_name": 6,
+        "ded_id": 6,
+        "ded_search": 4,
+        "pay_name": 6,
+        "pay_id": 6,
+        "pay_search": 4,
+        "content": 21,
+        "remove": 4
+      }'
+      data-main-col-widths='{
+        "requester": 6,
+        "requester_id": 6,
+        "category": 8,
+        "amount": 7,
+        "tax": 6,
+        "ded": 10,
+        "pay": 10,
+        "content": 28,
+        "request_date": 7,
+        "process_date": 7,
+        "remove": 6
+      }'>
 
     {% if user.grade not in 'superuser main_admin sub_admin' %}
       <div class="alert alert-danger">접근 권한이 없습니다.</div>
@@ -82,7 +111,7 @@
         <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
 
         <div class="efficiency-actions">
-          <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <div class="efficiency-actions-bar">
             <a href="{% url 'partner:efficiency_confirm_template_download' %}" class="btn btn-outline-success btn-sm">
               확인서양식
             </a>
@@ -107,6 +136,22 @@
 
       <div class="table-responsive">
         <table class="table align-middle" id="inputTable">
+          <colgroup>
+            <col data-col="rq_name">
+            <col data-col="rq_id">
+            <col data-col="rq_branch">
+            <col data-col="category">
+            <col data-col="amount">
+            <col data-col="tax">
+            <col data-col="ded_name">
+            <col data-col="ded_id">
+            <col data-col="ded_search">
+            <col data-col="pay_name">
+            <col data-col="pay_id">
+            <col data-col="pay_search">
+            <col data-col="content">
+            <col data-col="remove">
+          </colgroup>
           <thead class="table-light">
             <tr>
               <th>성명<br>(요청자)</th>
