@@ -46,6 +46,7 @@
     // person
     empId: document.getElementById("target_emp_id"),
     name: document.getElementById("target_name"),
+    part: document.getElementById("target_part"),
     branch: document.getElementById("target_branch"),
     joinDate: document.getElementById("target_join_date"),
     retireDate: document.getElementById("target_retire_date"),
@@ -213,6 +214,7 @@
   function renderUser(u = {}) {
     setText(els.empId, u.id);
     setText(els.name, u.name);
+    setText(els.part, u.part);
     setText(els.branch, u.branch);
     setText(els.joinDate, u.join_date_display);
     setText(els.retireDate, u.retire_date_display || "재직중");

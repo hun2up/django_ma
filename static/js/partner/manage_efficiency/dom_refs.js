@@ -2,28 +2,38 @@
 
 export const els = {
   root: document.getElementById("manage-efficiency"),
+
+  // top controls
   year: document.getElementById("yearSelect"),
   month: document.getElementById("monthSelect"),
-  branch: document.getElementById("branchSelect"),
-  deadline: document.getElementById("deadlineSelect"),
+  branch: document.getElementById("branchSelect"), // superuser only
   btnSearch: document.getElementById("btnSearchPeriod"),
-  btnDeadline: document.getElementById("btnSetDeadline"),
+
+  // sections
   inputSection: document.getElementById("inputSection"),
+  mainSheet: document.getElementById("mainSheet"),
+
+  // input actions
   btnAddRow: document.getElementById("btnAddRow"),
   btnResetRows: document.getElementById("btnResetRows"),
   btnSaveRows: document.getElementById("btnSaveRows"),
   inputTable: document.getElementById("inputTable"),
-  mainTable: document.getElementById("mainTable"),
-  loading: document.getElementById("loadingOverlay"),
-  searchForm: document.getElementById("searchUserForm"),
-  searchKeyword: document.getElementById("searchKeyword"),
-  searchResults: document.getElementById("searchResults"),
-};
 
-/**
- * ✅ 연/월 초기화는 common/manage_boot.js에서만 수행합니다.
- * 이 함수는 더 이상 사용하지 않도록 비활성화합니다.
- */
-export function initSelectOptions() {
-  // intentionally no-op
-}
+  // accordion container
+  accordion: document.getElementById("confirmGroupsAccordion"),
+  sheetNotice: document.getElementById("sheetNotice"),
+
+  // loading
+  loading: document.getElementById("loadingOverlay"),
+
+  // confirm upload (modal)
+  btnConfirmUploadDo: document.getElementById("btnConfirmUploadDo"),
+  confirmFileInput: document.getElementById("confirmFileInput"),
+  confirmFileName: document.getElementById("confirmFileName"),
+
+  // ✅ NEW
+  confirmGroupId: document.getElementById("confirmGroupId"),
+
+  // (legacy)
+  confirmAttachmentId: document.getElementById("confirmAttachmentId"),
+};

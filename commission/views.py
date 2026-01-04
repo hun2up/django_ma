@@ -1,11 +1,11 @@
 # django_ma/commission/views.py
 
 import os
-import re
 import io
 import datetime
 import pandas as pd
-from decimal import Decimal, InvalidOperation
+
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html.parser import HTMLParser
 
 from django.http import JsonResponse
@@ -26,20 +26,12 @@ from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOthe
 # Constants
 # =========================================================
 UPLOAD_CATEGORIES = [
-    "최종지급액", "환수지급예상", "보증증액", "보증보험", "기타채권",
-    "통산생보", "통산손보", "응당생보", "응당손보",
-]
+    "최종지급액", "환수지급예상", "보증증액", "보증보험", "기타채권", "통산생보", "통산손보", "응당생보", "응당손보"]
 
-# ✅ 실제 업로드 지원 타입 (통산손보 추가)
-SUPPORTED_UPLOAD_TYPES = {
-    "최종지급액",
-    "보증증액",
-    "응당생보",
-    "응당손보",
-    "보증보험",
-    "기타채권",
-    "통산손보",   # ✅ 추가
-}
+SUPPORTED_UPLOAD_TYPES = {"최종지급액", "보증증액", "응당생보", "응당손보", "보증보험", "기타채권", "통산손보", '통산생보'}
+
+# 통산손보(소수) 저장 시 기본 소수자리 (프론트 toFixed(2) 기준)
+DEC2 = Decimal("0.00")
 
 
 # =========================================================
@@ -90,6 +82,19 @@ def _to_decimal(v, default=Decimal("0.00")):
         return default
 
 
+def _to_decimal_q2(v, default=DEC2):
+    """
+    Decimal 변환 + 소수 2자리 반올림(ROUND_HALF_UP)
+    """
+    try:
+        d = _to_decimal(v, default=default)
+        if d is None:
+            return default
+        return d.quantize(DEC2, rounding=ROUND_HALF_UP)
+    except Exception:
+        return default
+
+
 def _to_date(v):
     """엑셀 날짜(날짜/문자/NaN) -> date or None"""
     try:
@@ -130,13 +135,20 @@ def _norm_emp_id(v):
     return s
 
 
-def _safe_int(v, default=0):
+def _safe_decimal_q2(v, default=DEC2):
+    """
+    raw matrix(통산손보)에서 셀 값을 Decimal(2자리)로 안전 변환
+    - 숫자/문자/NaN/공백/콤마 모두 처리
+    """
     try:
         if v is None:
             return default
-        if pd.isna(v):
+        if hasattr(pd, "isna") and pd.isna(v):
             return default
-        return int(float(v))
+        s = str(v).strip().replace(",", "")
+        if s.lower() in ("", "nan", "none", "-"):
+            return default
+        return Decimal(s).quantize(DEC2, rounding=ROUND_HALF_UP)
     except Exception:
         return default
 
@@ -201,8 +213,27 @@ def _extract_emp7_from_a(raw):
 
 
 # =========================================================
-# Excel reader
+# Excel / Text reader
 # =========================================================
+def _sniff_is_html(file_path: str) -> bool:
+    try:
+        with open(file_path, "rb") as f:
+            head = f.read(512)
+    except Exception:
+        return False
+    head_l = head.lstrip().lower()
+    return head_l.startswith(b"<html") or head_l.startswith(b"<!doctype") or head_l.startswith(b"<table")
+
+
+def _decode_bytes_best_effort(raw: bytes) -> str:
+    for enc in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
+        try:
+            return raw.decode(enc)
+        except Exception:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def _parse_first_html_table(file_path: str) -> pd.DataFrame:
     """
     lxml 없이(표준 라이브러리만) HTML <table>을 DataFrame으로 파싱.
@@ -210,15 +241,7 @@ def _parse_first_html_table(file_path: str) -> pd.DataFrame:
     - 첫 번째 row를 header로 간주(빈약하면 다음 row)
     """
     raw = open(file_path, "rb").read()
-    text = None
-    for enc in ("utf-8", "cp949", "euc-kr"):
-        try:
-            text = raw.decode(enc)
-            break
-        except Exception:
-            continue
-    if text is None:
-        text = raw.decode("utf-8", errors="replace")
+    text = _decode_bytes_best_effort(raw)
 
     class TableParser(HTMLParser):
         def __init__(self):
@@ -286,8 +309,8 @@ def _parse_first_html_table(file_path: str) -> pd.DataFrame:
 
     df = pd.DataFrame(norm_rows, columns=[str(c).strip() for c in header])
 
-    new_cols = []
-    used = {}
+    # duplicate column name safe
+    new_cols, used = [], {}
     for i, c in enumerate(df.columns):
         name = (c or "").strip() or f"COL_{i+1}"
         if name in used:
@@ -300,96 +323,15 @@ def _parse_first_html_table(file_path: str) -> pd.DataFrame:
     return df
 
 
-def _sniff_is_html(file_path: str) -> bool:
-    try:
-        with open(file_path, "rb") as f:
-            head = f.read(256)
-    except Exception:
-        return False
-    head_l = head.lstrip().lower()
-    return head_l.startswith(b"<html") or head_l.startswith(b"<!doctype") or head_l.startswith(b"<table")
-
-
-def _read_excel_safely(file_path: str, original_name: str = "") -> pd.DataFrame:
-    """
-    ✅ xlsx: openpyxl
-    ✅ xls(OLE2): xlrd (없으면 안내)
-    ✅ xls인데 실제로 HTML인 경우: 표준 파서로 처리
-    """
-    ext = os.path.splitext((original_name or file_path))[1].lower()
-
-    if _sniff_is_html(file_path):
-        return _parse_first_html_table(file_path)
-
-    if ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
-        return pd.read_excel(file_path, header=0, engine="openpyxl")
-
-    if ext == ".xls":
-        try:
-            import xlrd  # noqa: F401
-        except Exception:
-            raise ValueError(
-                "업로드 실패: 현재 서버에 .xls 처리 모듈(xlrd)이 없습니다.\n"
-                "엑셀에서 '다른 이름으로 저장' → .xlsx로 저장 후 업로드해주세요."
-            )
-        return pd.read_excel(file_path, header=0, engine="xlrd")
-
-    raise ValueError("지원하지 않는 파일 형식입니다. (.xlsx 또는 .xls만 업로드 가능)")
-
-
-def _read_excel_raw_matrix(file_path: str, original_name: str, skiprows: int, header_none: bool = True) -> pd.DataFrame:
-    """
-    통산손보 전용:
-    - 1~5행 drop => skiprows=5
-    - 머릿글 없음 => header=None
-    - HTML 가짜 xls도 최대한 대응(테이블 파싱 후 행 skip)
-    """
-    ext = os.path.splitext((original_name or file_path))[1].lower()
-
-    # HTML로 저장된 xls 가능성
-    if _sniff_is_html(file_path):
-        df_html = _parse_first_html_table(file_path)
-        # header 있는 형태로 파싱되므로, "행 기반"으로 다시 변환
-        values = df_html.to_numpy().tolist()
-        values = values[skiprows:] if skiprows else values
-        return pd.DataFrame(values)  # 0..N 컬럼
-
-    # xlsx
-    if ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
-        return pd.read_excel(file_path, header=None if header_none else 0, skiprows=skiprows, engine="openpyxl")
-
-    # xls
-    if ext == ".xls":
-        try:
-            import xlrd  # noqa: F401
-        except Exception:
-            raise ValueError(
-                "업로드 실패: 현재 서버에 .xls 처리 모듈(xlrd)이 없습니다.\n"
-                "엑셀에서 '다른 이름으로 저장' → .xlsx로 저장 후 업로드해주세요."
-            )
-        return pd.read_excel(file_path, header=None if header_none else 0, skiprows=skiprows, engine="xlrd")
-
-    raise ValueError("지원하지 않는 파일 형식입니다. (.xlsx 또는 .xls만 업로드 가능)")
-
 def _read_text_table(file_path: str) -> pd.DataFrame:
     """
-    .xls 확장자지만 실제는 TSV/CSV(텍스트)인 케이스 대응
-    - 탭(\t) / 콤마(,) / 세미콜론(;) 자동 추정
-    - 인코딩은 utf-8 우선, 실패 시 cp949/euc-kr
+    .xls 확장자지만 실제는 TSV/CSV(텍스트)인 케이스 대응 (헤더 포함)
+    - 탭/콤마/세미콜론 자동 추정
+    - 인코딩: utf-8 계열 우선, 실패 시 cp949/euc-kr
     """
     raw = open(file_path, "rb").read()
+    text = _decode_bytes_best_effort(raw)
 
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
-        try:
-            text = raw.decode(enc)
-            break
-        except Exception:
-            continue
-    if text is None:
-        text = raw.decode("utf-8", errors="replace")
-
-    # 구분자 추정 (앞부분만 보고 탭이 많으면 TSV로)
     head = text[:5000]
     tab_cnt = head.count("\t")
     comma_cnt = head.count(",")
@@ -402,35 +344,25 @@ def _read_text_table(file_path: str) -> pd.DataFrame:
     elif semi_cnt > 0:
         sep = ";"
     else:
-        # 마지막 fallback: pandas가 추정하도록
         sep = None
 
-    # header는 1행으로 가정(대부분 첫 줄이 컬럼)
+    buf = io.StringIO(text)
     try:
         if sep is None:
-            return pd.read_csv(file_path, engine="python")  # 자동 추정
-        return pd.read_csv(file_path, sep=sep, engine="python")
+            return pd.read_csv(buf, engine="python")
+        return pd.read_csv(buf, sep=sep, engine="python")
     except Exception:
-        # 그래도 실패하면 "전체를 1컬럼"이라도 살려서 디버깅 가능하게
         return pd.DataFrame({"COL_1": [line for line in text.splitlines() if line.strip()]})
+
 
 def _read_text_table_matrix(file_path: str, skiprows: int = 0) -> pd.DataFrame:
     """
-    .xls 확장자지만 실제는 TSV/CSV(텍스트)인 케이스를 '행렬(raw matrix)'로 읽기
-    - header=None (열 위치 기반 파싱을 위해)
+    .xls 확장자지만 실제는 TSV/CSV(텍스트)인 케이스를 raw matrix로 읽기
+    - header=None
     - skiprows 적용
     """
     raw = open(file_path, "rb").read()
-
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
-        try:
-            text = raw.decode(enc)
-            break
-        except Exception:
-            continue
-    if text is None:
-        text = raw.decode("utf-8", errors="replace")
+    text = _decode_bytes_best_effort(raw)
 
     head = text[:5000]
     tab_cnt = head.count("\t")
@@ -444,24 +376,24 @@ def _read_text_table_matrix(file_path: str, skiprows: int = 0) -> pd.DataFrame:
     elif semi_cnt > 0:
         sep = ";"
     else:
-        sep = None  # pandas 추정
+        sep = None
 
     buf = io.StringIO(text)
     if sep is None:
         return pd.read_csv(buf, engine="python", header=None, skiprows=skiprows)
     return pd.read_csv(buf, sep=sep, engine="python", header=None, skiprows=skiprows)
 
+
 def _read_excel_safely(file_path: str, original_name: str = "") -> pd.DataFrame:
     """
-    ✅ 스니핑 기반:
-    - HTML disguised xls: 표준라이브러리 파서로 처리
-    - XLSX: zip(PK) 시그니처면 openpyxl
-    - XLS(OLE2): OLE2 시그니처면 xlrd
-    - 그 외: TSV/CSV 텍스트로 간주하여 read_csv fallback
+    ✅ 스니핑 기반(헤더 포함 df용)
+    - HTML disguised: 표준 파서
+    - XLSX(zip): openpyxl
+    - XLS(OLE2): xlrd
+    - 그 외(.xls 텍스트 등): read_csv fallback
     """
     ext = os.path.splitext((original_name or file_path))[1].lower()
 
-    # 1) 헤더 스니핑
     head = b""
     try:
         with open(file_path, "rb") as f:
@@ -470,27 +402,18 @@ def _read_excel_safely(file_path: str, original_name: str = "") -> pd.DataFrame:
         head = b""
 
     head_l = head.lstrip().lower()
-
-    # 2) HTML disguised xls (공백/BOM 이후에도 잡힘)
     if head_l.startswith(b"<html") or head_l.startswith(b"<!doctype") or head_l.startswith(b"<table"):
         return _parse_first_html_table(file_path)
 
-    # 3) 매직바이트 판별
-    # XLSX/OOXML zip: "PK\x03\x04"
-    is_zip = head.startswith(b"PK\x03\x04")
-    # XLS OLE2: D0 CF 11 E0 A1 B1 1A E1
-    is_ole2 = head.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")
+    is_zip = head.startswith(b"PK\x03\x04")  # xlsx
+    is_ole2 = head.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")  # xls
 
-    # 4) xlsx 계열(확장자/매직 둘 중 하나라도 만족하면 우선 xlsx로 시도)
+    # xlsx 계열 우선
     if is_zip or ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
         return pd.read_excel(file_path, header=0, engine="openpyxl")
 
-    # 5) 진짜 xls(OLE2)만 xlrd로
-    if is_ole2 or ext == ".xls":
-        # ext가 .xls여도 ole2가 아니면 "가짜 xls"일 확률이 큼 → 텍스트 fallback
-        if not is_ole2:
-            return _read_text_table(file_path)
-
+    # 진짜 xls(OLE2)만 xlrd
+    if is_ole2:
         try:
             import xlrd  # noqa: F401
         except Exception:
@@ -500,8 +423,68 @@ def _read_excel_safely(file_path: str, original_name: str = "") -> pd.DataFrame:
             )
         return pd.read_excel(file_path, header=0, engine="xlrd")
 
-    # 6) 그 외는 텍스트로 시도
+    # .xls인데 OLE2가 아니면 대부분 텍스트
+    if ext == ".xls":
+        return _read_text_table(file_path)
+
+    # 그 외는 텍스트로
     return _read_text_table(file_path)
+
+
+def _read_excel_raw_matrix(file_path: str, original_name: str, skiprows: int, header_none: bool = True) -> pd.DataFrame:
+    """
+    ✅ 통산손보 전용 raw matrix reader (열 위치 기반)
+    - HTML disguised: 표준 파서 → values로 변환 후 skiprows
+    - XLSX(zip): openpyxl
+    - XLS(OLE2): xlrd
+    - 그 외(.xls 텍스트 등): TSV/CSV raw matrix fallback
+    """
+    ext = os.path.splitext((original_name or file_path))[1].lower()
+
+    if _sniff_is_html(file_path):
+        df_html = _parse_first_html_table(file_path)
+        values = df_html.to_numpy().tolist()
+        values = values[skiprows:] if skiprows else values
+        return pd.DataFrame(values)
+
+    head = b""
+    try:
+        with open(file_path, "rb") as f:
+            head = f.read(4096)
+    except Exception:
+        head = b""
+
+    is_zip = head.startswith(b"PK\x03\x04")
+    is_ole2 = head.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")
+
+    if is_zip or ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
+        return pd.read_excel(
+            file_path,
+            header=None if header_none else 0,
+            skiprows=skiprows,
+            engine="openpyxl",
+        )
+
+    if is_ole2:
+        try:
+            import xlrd  # noqa: F401
+        except Exception:
+            raise ValueError(
+                "업로드 실패: 현재 서버에 .xls 처리 모듈(xlrd)이 없습니다.\n"
+                "엑셀에서 '다른 이름으로 저장' → .xlsx로 저장 후 업로드해주세요."
+            )
+        return pd.read_excel(
+            file_path,
+            header=None if header_none else 0,
+            skiprows=skiprows,
+            engine="xlrd",
+        )
+
+    # .xls지만 OLE2가 아니면(가짜 xls) 텍스트로 처리
+    if ext == ".xls":
+        return _read_text_table_matrix(file_path, skiprows=skiprows)
+
+    return _read_text_table_matrix(file_path, skiprows=skiprows)
 
 
 # =========================================================
@@ -906,15 +889,15 @@ def _handle_upload_other_debt(df: pd.DataFrame):
 
 def _handle_upload_ns_total_from_file(file_path: str, original_name: str):
     """
-    ✅ 통산손보 업로드
-    - 1~5행 드랍 (skiprows=5)
+    ✅ 통산손보 업로드 (소수 지원)
+    - 1~5행 drop (skiprows=5)
     - header 없음 (header=None)
     - A열: 오른쪽 8~2번째(7자리) 사번
-    - K(10) -> ns_13_round
-    - P(15) -> ns_18_round
-    - AT(45) -> ns_18_total
-    - AY(50) -> ns_25_total
-    - 동일 사번: DepositSummary "해당 4개 필드만" 초기화 후 입력(OneToOne 전체 삭제 방지)
+    - K(10)  -> ns_13_round   (Decimal, 2자리)
+    - P(15)  -> ns_18_round   (Decimal, 2자리)
+    - AT(45) -> ns_18_total   (Decimal, 2자리)
+    - AY(50) -> ns_25_total   (Decimal, 2자리)
+    - 동일 사번: DepositSummary 해당 4개 필드만 갱신
     """
     df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=5, header_none=True)
 
@@ -924,43 +907,113 @@ def _handle_upload_ns_total_from_file(file_path: str, original_name: str):
     IDX_AT = 45
     IDX_AY = 50
 
-    updated = 0
-    skipped = 0
+    # 1) 1차 파싱(사번/값 추출) → DB hit 최소화(존재여부 bulk)
+    rows = []
+    emp_ids = []
 
     for _, row in df.iterrows():
         raw_a = row[IDX_A] if len(row) > IDX_A else None
         emp7 = _extract_emp7_from_a(raw_a)
         if not emp7:
-            skipped += 1
             continue
 
-        if not CustomUser.objects.filter(pk=emp7).exists():
+        v13 = _safe_decimal_q2(row[IDX_K]) if len(row) > IDX_K else DEC2
+        v18 = _safe_decimal_q2(row[IDX_P]) if len(row) > IDX_P else DEC2
+        t18 = _safe_decimal_q2(row[IDX_AT]) if len(row) > IDX_AT else DEC2
+        t25 = _safe_decimal_q2(row[IDX_AY]) if len(row) > IDX_AY else DEC2
+
+        emp_ids.append(emp7)
+        rows.append((emp7, v13, v18, t18, t25))
+
+    if not rows:
+        return {"updated": 0, "missing_users": 0, "existing_users": 0, "missing_sample": []}
+
+    existing_ids = _bulk_existing_user_ids(list(set(emp_ids)))
+
+    updated = 0
+    skipped = 0
+
+    for emp7, v13, v18, t18, t25 in rows:
+        if emp7 not in existing_ids:
             skipped += 1
             continue
-
-        v13 = _safe_int(row[IDX_K]) if len(row) > IDX_K else 0
-        v18 = _safe_int(row[IDX_P]) if len(row) > IDX_P else 0
-        t18 = _safe_int(row[IDX_AT]) if len(row) > IDX_AT else 0
-        t25 = _safe_int(row[IDX_AY]) if len(row) > IDX_AY else 0
 
         summary, _ = DepositSummary.objects.get_or_create(user_id=emp7)
-
-        summary.ns_13_round = 0
-        summary.ns_18_round = 0
-        summary.ns_18_total = 0
-        summary.ns_25_total = 0
-
         summary.ns_13_round = v13
         summary.ns_18_round = v18
         summary.ns_18_total = t18
         summary.ns_25_total = t25
-
         summary.save(update_fields=["ns_13_round", "ns_18_round", "ns_18_total", "ns_25_total"])
         updated += 1
 
     return {
         "updated": updated,
-        "missing_users": skipped,  # 통산손보는 "매칭 실패/파싱 실패"를 skipped로 묶어 반환
+        "missing_users": skipped,  # 통산손보는 매칭 실패/파싱 실패를 skipped로 반환
+        "existing_users": updated,
+        "missing_sample": [],
+    }
+
+def _handle_upload_ls_total_from_file(file_path: str, original_name: str):
+    """
+    ✅ 통산생보 업로드 (통산손보와 동일한 방식)
+    - 기존 DepositSummary 유지
+    - ls_* 필드만 갱신
+    """
+    df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=5, header_none=True)
+
+    IDX_A = 0
+    IDX_K = 10
+    IDX_P = 15
+    IDX_AT = 45
+    IDX_AY = 50
+
+    rows = []
+    emp_ids = []
+
+    for _, row in df.iterrows():
+        raw_a = row[IDX_A] if len(row) > IDX_A else None
+        emp7 = _extract_emp7_from_a(raw_a)
+        if not emp7:
+            continue
+
+        rows.append((
+            emp7,
+            _safe_decimal_q2(row[IDX_K]) if len(row) > IDX_K else DEC2,
+            _safe_decimal_q2(row[IDX_P]) if len(row) > IDX_P else DEC2,
+            _safe_decimal_q2(row[IDX_AT]) if len(row) > IDX_AT else DEC2,
+            _safe_decimal_q2(row[IDX_AY]) if len(row) > IDX_AY else DEC2,
+        ))
+        emp_ids.append(emp7)
+
+    if not rows:
+        return {"updated": 0, "missing_users": 0, "existing_users": 0, "missing_sample": []}
+
+    existing_ids = _bulk_existing_user_ids(set(emp_ids))
+
+    updated = 0
+    skipped = 0
+
+    for emp7, v13, v18, t18, t25 in rows:
+        if emp7 not in existing_ids:
+            skipped += 1
+            continue
+
+        summary, _ = DepositSummary.objects.get_or_create(user_id=emp7)
+        summary.ls_13_round = v13
+        summary.ls_18_round = v18
+        summary.ls_18_total = t18
+        summary.ls_25_total = t25
+        summary.save(update_fields=[
+            "ls_13_round",
+            "ls_18_round",
+            "ls_18_total",
+            "ls_25_total",
+        ])
+        updated += 1
+
+    return {
+        "updated": updated,
+        "missing_users": skipped,
         "existing_users": updated,
         "missing_sample": [],
     }
@@ -992,9 +1045,6 @@ def upload_excel(request):
     filename = fs.save(excel_file.name, excel_file)
     file_path = fs.path(filename)
 
-    # ✅ 업로드 타입별 handler 매핑
-    # - 대부분: df(헤더 있음) 기반
-    # - 통산손보: 파일 경로 기반(raw matrix) 필요
     handlers = {
         "최종지급액": ("df", _handle_upload_final_payment, "✅ {n}건 업로드 완료 (final_payment만 반영)"),
         "보증증액": ("df", _handle_upload_guarantee_increase, "✅ {n}건 업로드 완료 (보증증액 필드 반영)"),
@@ -1003,6 +1053,7 @@ def upload_excel(request):
         "보증보험": ("df", _handle_upload_surety, "✅ {n}건 업로드 완료 (보증보험 상세 반영)"),
         "기타채권": ("df", _handle_upload_other_debt, "기타채권 {n}건 반영 완료"),
         "통산손보": ("file", _handle_upload_ns_total_from_file, "통산손보 {n}건 반영 완료"),
+        "통산생보": ("file", _handle_upload_ls_total_from_file, "통산생보 {n}건 반영 완료"),
     }
 
     if upload_type not in handlers:
@@ -1020,7 +1071,6 @@ def upload_excel(request):
                 df = _read_excel_safely(file_path, original_name=excel_file.name)
                 result = fn(df)
             else:
-                # 통산손보
                 result = fn(file_path, excel_file.name)
 
             uploaded_date = _update_upload_log(
@@ -1031,7 +1081,6 @@ def upload_excel(request):
             )
 
         msg = msg_tpl.format(n=result["updated"])
-
         return _json_ok(
             msg,
             uploaded=result["updated"],
@@ -1040,11 +1089,10 @@ def upload_excel(request):
             missing_sample=result.get("missing_sample", []),
             part=part,
             upload_type=upload_type,
-            uploaded_date=uploaded_date,  # ✅ 프론트에서 업로드일자 즉시 갱신에 사용
+            uploaded_date=uploaded_date,
         )
 
     except ValueError as ve:
-        # df 컬럼 목록 제공(가능한 경우)
         detected_columns = []
         try:
             if mode == "df":
@@ -1054,12 +1102,24 @@ def upload_excel(request):
         return _json_error(str(ve), status=400, detected_columns=detected_columns)
 
     except Exception as e:
+        msg = str(e)
+
+        # ✅ 대표적인 포맷 오류는 400으로 안내
+        if ("Expected BOF record" in msg) or ("Unsupported format" in msg) or ("XLRDError" in msg):
+            return _json_error(
+                "업로드 실패: 엑셀 파일 형식이 올바르지 않습니다. "
+                "엑셀에서 '다른 이름으로 저장' → .xlsx로 저장 후 업로드해주세요. "
+                "(또는 원본이 TSV/CSV면 .csv로 저장 후 업로드 규칙에 맞게 변환)",
+                status=400,
+            )
+
+        # 나머지는 500
         try:
             with open(file_path, "rb") as f:
                 sniff = f.read(32)
         except Exception:
             sniff = b""
-        return _json_error(f"⚠️ 업로드 실패: {str(e)}", status=500, file_head=str(sniff))
+        return _json_error(f"⚠️ 업로드 실패: {msg}", status=500, file_head=str(sniff))
 
     finally:
         try:
@@ -1124,6 +1184,7 @@ def api_user_detail(request):
         user={
             "id": str(u.id),
             "name": u.name,
+            "part": u.part or "",
             "branch": u.branch or "",
             "join_date_display": join_disp or "-",
             "retire_date_display": retire_disp,
@@ -1195,11 +1256,11 @@ def api_deposit_summary(request):
         if isinstance(v, datetime.date):
             return v
         try:
-            s = str(v).strip()
-            if not s:
+            ss = str(v).strip()
+            if not ss:
                 return None
-            s = s.replace(".", "-").replace("/", "-")
-            return datetime.date.fromisoformat(s)
+            ss = ss.replace(".", "-").replace("/", "-")
+            return datetime.date.fromisoformat(ss)
         except Exception:
             return None
 
@@ -1254,7 +1315,7 @@ def api_deposit_summary(request):
         "comm_9m": comm_9m,
         "comm_12m": comm_12m,
 
-        # ✅ 통산손보 업로드로 갱신되는 필드 포함
+        # ✅ 통산손보 업로드로 갱신되는 필드 포함 (문자열로 내려줌)
         "ns_13_round": gd("ns_13_round", "0.00"),
         "ns_18_round": gd("ns_18_round", "0.00"),
         "ls_13_round": gd("ls_13_round", "0.00"),

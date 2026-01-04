@@ -41,6 +41,7 @@
                 <tr>
                   <th class="text-nowrap">사번</th>
                   <th class="text-nowrap">성명</th>
+                  <th class="text-nowrap">부서</th>
                   <th class="text-nowrap">소속</th>
                   <th class="text-nowrap">입사일</th>
                   <th class="text-nowrap">퇴사일</th>
@@ -50,6 +51,7 @@
                 <tr>
                   <td class="text-nowrap"><span id="target_emp_id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span></td>
                   <td class="text-nowrap fw-semibold"><span id="target_name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_part">{% if target %}{{ target.part|default:"-" }}{% else %}-{% endif %}</span></td>
                   <td class="text-nowrap"><span id="target_branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span></td>
                   <td class="text-nowrap"><span id="target_join_date">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span></td>
                   <td class="text-nowrap"><span id="target_retire_date">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span></td>
@@ -231,10 +233,10 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_ns_18_total">{% if ns_13_total %}{{ ns_13_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ns_25_total">{% if ns_18_total %}{{ ns_18_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_18_total">{% if ls_13_total %}{{ ls_13_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_25_total">{% if ls_18_total %}{{ ls_18_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_18_total">{% if ns_18_total is not None %}{{ ns_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_25_total">{% if ns_25_total is not None %}{{ ns_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_18_total">{% if ls_18_total is not None %}{{ ls_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_25_total">{% if ls_25_total is not None %}{{ ls_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -361,9 +363,7 @@
                 {% for p in parts %}
                   <td class="text-nowrap text-center">
                     {% if supported_upload_types and c in supported_upload_types %}
-                      <span class="upload-date" data-key="{{ c }}" data-part="{{ p }}">
-                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
-                      </span>
+                      <span class="upload-date" data-upload-date data-upload-type="{{ c }}" data-part="{{ p }}">{{ upload_dates|get_item:c|get_item:p|default:"-" }}</span>
                     {% else %}
                       <span data-key="{{ c }}" data-part="{{ p }}">
                         {{ upload_dates|get_item:c|get_item:p|default:"-" }}
@@ -458,7 +458,7 @@
     padding: 10px 12px;
   }
   .info-table tbody td{
-    font-size: 0.9rem;
+    font-size: 1rem;
     padding: 10px 12px;
     border-bottom: 1px solid #eef2f7;
   }

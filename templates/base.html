@@ -15,12 +15,31 @@
   <!-- ✅ Project base style (cache-buster) -->
   <link rel="stylesheet" href="{% static 'css/base.css' %}?v={% now 'U' %}">
 
-  <!-- ✅ Page extra head (필요한 페이지에서만 추가 로드) -->
+  <!-- ✅ Mobile Offcanvas tweak (optional but recommended) -->
+  <style>
+    /* Mobile offcanvas width */
+    #mobileOffcanvas {
+      width: min(86vw, 360px);
+    }
+    #mobileOffcanvas .accordion-button {
+      padding: 14px 16px;
+      font-weight: 700;
+    }
+    #mobileOffcanvas .accordion-body a {
+      color: #333;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    #mobileOffcanvas .accordion-body a:hover {
+      color: #005BAC;
+    }
+  </style>
+
+  <!-- ✅ Page extra head -->
   {% block extra_head %}{% endblock %}
 
   <!-- =====================================================
        ✅ DataTables CSS (옵션)
-       - 페이지에서 `enable_datatables`를 block으로 켜면 로드
   ====================================================== -->
   {% block enable_datatables %}{% endblock %}
 </head>
@@ -30,6 +49,8 @@
 {% if user.is_authenticated %}
   <!-- =====================================================
        ✅ Navbar
+       - Desktop: 기존 상단 dropdown 유지
+       - Mobile: 오른쪽 Offcanvas(날개메뉴)로 전체 메뉴 제공
   ====================================================== -->
   <nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-white">
     <div class="container-fluid position-relative">
@@ -39,13 +60,19 @@
         <img src="{% static 'images/logo.png' %}" alt="인카 로고" style="height: 40px;">
       </a>
 
-      <!-- 🔹 Mobile toggler -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-        <span class="navbar-toggler-icon"></span>
+      <!-- 🔹 Mobile Offcanvas button (only mobile) -->
+      <button class="btn btn-outline-secondary d-lg-none ms-auto"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#mobileOffcanvas"
+              aria-controls="mobileOffcanvas"
+              aria-label="메뉴 열기"
+              style="border-radius:10px;">
+        ☰
       </button>
 
-      <!-- 🔹 Center menu -->
-      <div class="collapse navbar-collapse justify-content-center position-absolute start-50 translate-middle-x"
+      <!-- 🔹 Center menu (Desktop only) -->
+      <div class="collapse navbar-collapse justify-content-center position-absolute start-50 translate-middle-x d-none d-lg-flex"
            id="navbarContent" style="width: fit-content;">
         <ul class="navbar-nav mb-2 mb-lg-0">
 
@@ -73,7 +100,7 @@
                 <li><a class="dropdown-item" href="{% url 'states_form' %}">FA소명서</a></li>
               {% endif %}
               {% if user.grade == 'superuser' %}
-                <li><a class="dropdown-item" href="{% url 'manage_sign' %}">결재관리</a></li>
+                <li><a class="dropdown-item" href="{% url 'task_list' %}">직원업무</a></li>
               {% endif %}
             </ul>
           </li>
@@ -136,7 +163,7 @@
         </ul>
       </div>
 
-      <!-- 🔹 Right user info + logout -->
+      <!-- 🔹 Right user info + logout (Desktop only) -->
       <div class="d-none d-lg-flex align-items-center ms-auto">
         <div class="me-3" style="font-weight:500; color:#333;">
           {{ user.branch }}&nbsp;<strong>{{ user.name }}({{ user.id }})</strong>
@@ -149,12 +176,157 @@
 
     </div>
   </nav>
+
+  <!-- =====================================================
+       ✅ Mobile Offcanvas (Right Wing Menu)
+       - 프로젝트명 클릭 → 하위 메뉴는 Accordion 드랍다운
+  ====================================================== -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileOffcanvas" aria-labelledby="mobileOffcanvasLabel">
+    <div class="offcanvas-header">
+      <div>
+        <div class="fw-bold" style="font-size: 1.05rem;">전체 메뉴</div>
+        <div class="text-muted" style="font-size: .85rem;">
+          {{ user.branch }} · {{ user.name }}({{ user.id }})
+        </div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+    </div>
+
+    <div class="offcanvas-body p-0">
+      <div class="accordion accordion-flush" id="mobileMenuAccordion">
+
+        <!-- 업무요청 (프로젝트) -->
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="mBoardHead">
+            <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#mBoard"
+                    aria-expanded="false" aria-controls="mBoard">
+              업무요청
+            </button>
+          </h2>
+          <div id="mBoard" class="accordion-collapse collapse" aria-labelledby="mBoardHead" data-bs-parent="#mobileMenuAccordion">
+            <div class="accordion-body pt-0">
+              <a class="d-block py-2" href="{% url 'post_list' %}">요청게시판</a>
+              {% if user.grade != 'inactive' %}
+                <a class="d-block py-2" href="{% url 'support_form' %}">업무요청서</a>
+                <a class="d-block py-2" href="{% url 'states_form' %}">FA소명서</a>
+              {% endif %}
+              {% if user.grade == 'superuser' %}
+                <a class="d-block py-2" href="{% url 'task_list' %}">직원업무</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if user.grade in 'superuser main_admin sub_admin' %}
+          <!-- 대시보드 -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="mDashHead">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mDash"
+                      aria-expanded="false" aria-controls="mDash">
+                대시보드
+              </button>
+            </h2>
+            <div id="mDash" class="accordion-collapse collapse" aria-labelledby="mDashHead" data-bs-parent="#mobileMenuAccordion">
+              <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'dash_sales' %}">매출현황</a>
+                <a class="d-block py-2" href="{% url 'dash_recruit' %}">리쿠르팅</a>
+                <a class="d-block py-2" href="{% url 'dash_retention' %}">유지율</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- 조직관리 -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="mPartnerHead">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mPartner"
+                      aria-expanded="false" aria-controls="mPartner">
+                조직관리
+              </button>
+            </h2>
+            <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
+              <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'partner:manage_charts' %}">편제변경</a>
+                <a class="d-block py-2" href="{% url 'partner:manage_rate' %}">요율변경</a>
+                <a class="d-block py-2" href="{% url 'partner:manage_calculate' %}">지점효율</a>
+                {% if user.grade in 'superuser main_admin' %}
+                  <a class="d-block py-2" href="{% url 'partner:manage_grades' %}">권한관리</a>
+                  <a class="d-block py-2" href="{% url 'partner:manage_tables' %}">테이블관리</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if user.grade == 'superuser' %}
+          <!-- 수수료 -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="mCommissionHead">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mCommission"
+                      aria-expanded="false" aria-controls="mCommission">
+                수수료
+              </button>
+            </h2>
+            <div id="mCommission" class="accordion-collapse collapse" aria-labelledby="mCommissionHead" data-bs-parent="#mobileMenuAccordion">
+              <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'commission:deposit_home' %}">채권관리</a>
+                <a class="d-block py-2" href="{% url 'commission:support_home' %}">지원신청서</a>
+                <a class="d-block py-2" href="{% url 'commission:approval_home' %}">수수료결재</a>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if user.grade != 'inactive' %}
+          <!-- 매뉴얼 -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="mManualHead">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mManual"
+                      aria-expanded="false" aria-controls="mManual">
+                매뉴얼
+              </button>
+            </h2>
+            <div id="mManual" class="accordion-collapse collapse" aria-labelledby="mManualHead" data-bs-parent="#mobileMenuAccordion">
+              <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'join:manual_basic' %}">업무매뉴얼</a>
+                {% if user.grade in 'superuser main_admin' %}
+                  <a class="d-block py-2" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a>
+                {% endif %}
+                <a class="d-block py-2" href="{% url 'join:rules_basic' %}">영업기준안</a>
+                {% if user.grade in 'superuser main_admin' %}
+                  <a class="d-block py-2" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if user.grade == 'superuser' %}
+          <!-- 관리자(커스텀 admin) -->
+          <div class="px-3 py-2 border-top">
+            <a class="d-block py-2 fw-bold" href="{% url 'home' %}admin/">관리자</a>
+          </div>
+        {% endif %}
+
+        <!-- 로그아웃 -->
+        <div class="p-3 border-top">
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger w-100" style="border-radius:10px;">로그아웃</button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
 {% endif %}
 
 <!-- =====================================================
      ✅ Content wrapper
-     - 기본: container
-     - 페이지에서 override 가능
 ====================================================== -->
 {% block content_wrapper %}
 <div class="container my-5">
@@ -170,7 +342,6 @@
 
 <!-- =====================================================
      ✅ DataTables JS (옵션)
-     - enable_datatables 블록에서 CSS/JS/설정 로드
 ====================================================== -->
 {% block datatables_bundle %}{% endblock %}
 
