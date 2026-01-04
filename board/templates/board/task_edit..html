@@ -1,15 +1,20 @@
-<!-- django_ma/board/templates/board/post_edit.html -->
+<!-- django_ma/board/templates/board/task_edit.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
 
-{% block title %}업무요청 글 수정{% endblock %}
+{% block title %}직원업무 수정{% endblock %}
 
 {% block content %}
+
+{% if user.grade != 'superuser' %}
+    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+{% endif %}
+
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
     <!-- ✅ 제목 -->
-    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 수정</h3>
+    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">직원업무 수정</h3>
 
     <!-- ✅ 본문 카드 -->
     <div class="card shadow p-4 border-0 rounded-4">
@@ -18,7 +23,7 @@
       {% endif %}
 
       <!-- ✅ 게시글 수정 폼 -->
-      <form method="post" enctype="multipart/form-data" id="postForm" novalidate>
+      <form method="task" enctype="multipart/form-data" id="taskForm" novalidate>
         {% csrf_token %}
 
         <!-- 구분 / 대상자 -->
@@ -88,7 +93,7 @@
 
         <!-- ✅ 버튼 -->
         <div class="d-flex justify-content-between align-items-center mt-4">
-          <a href="{% url 'post_detail' post.id %}" class="btn btn-outline-secondary px-4">취소</a>
+          <a href="{% url 'task_detail' task.id %}" class="btn btn-outline-secondary px-4">취소</a>
           <button type="submit" id="submitBtn" class="btn btn-primary px-4">수정 완료</button>
         </div>
       </form>
@@ -110,7 +115,7 @@
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     initFileUpload({
-      formSelector: "#postForm",
+      formSelector: "#taskForm",
       existingFileSelector: ".remove-existing",
       deleteContainerSelector: "#deleteContainer",
       maxFileSize: 10 * 1024 * 1024, // 10MB
@@ -119,5 +124,5 @@
 </script>
 
 <!-- ✅ 게시글 작성/수정 공용 JS -->
-<script src="{% static 'js/post_create.js' %}"></script>
+<script src="{% static 'js/task_create.js' %}"></script>
 {% endblock %}

@@ -1,115 +1,117 @@
 // django_ma/static/js/partner/manage_efficiency/confirm_upload.js
-import { els } from "./dom_refs.js";
-import { alertBox, getCSRFToken, selectedYM, showLoading, hideLoading } from "./utils.js";
+//
+// ✅ confirm_group_id 기반 업로드
+// - 업로드 성공 시 서버가 confirm_group_id 생성하여 내려줌
+// - UI: confirmFileName, confirmGroupId 세팅
+// - (legacy confirmAttachmentId는 비움 or 유지 가능)
 
-function str(v) { return String(v ?? "").trim(); }
+import { els } from "./dom_refs.js";
+import { showLoading, hideLoading, alertBox, getCSRFToken, selectedYM } from "./utils.js";
+
+function str(v) {
+  return String(v ?? "").trim();
+}
 
 function getRoot() {
   return els.root || document.getElementById("manage-efficiency");
 }
 
-function getUploadUrl(root) {
-  // ✅ 템플릿 root dataset에 이미 있는 값 사용
-  return (
-    root?.dataset?.efficiencyConfirmUploadUrl ||
-    root?.dataset?.dataEfficiencyConfirmUploadUrl || // 혹시 다른 키로 내려왔을 때 대비
-    "/partner/efficiency/upload-confirm/"
-  );
+function getUploadUrl() {
+  const ds = getRoot()?.dataset || {};
+  return str(ds.efficiencyConfirmUploadUrl || ds.efficiencyConfirmUpload || "");
 }
 
-function getBranchValue() {
-  // superuser면 branchSelect가 있고, 그 외에는 currentUser.branch
-  return (
-    str(document.getElementById("branchSelect")?.value) ||
-    str(window.currentUser?.branch) ||
-    str(getRoot()?.dataset?.branch) ||
-    ""
-  );
+function getGrade() {
+  return str(window.currentUser?.grade || getRoot()?.dataset?.userGrade || "");
 }
 
-function getPartValue() {
-  return (
-    str(window.currentUser?.part) ||
-    str(getRoot()?.dataset?.part) ||
-    ""
-  );
+function getBranch() {
+  const grade = getGrade();
+  if (grade === "superuser") return str(els.branch?.value || "");
+  return str(window.currentUser?.branch || getRoot()?.dataset?.branch || "");
+}
+
+function getPart() {
+  return str(window.currentUser?.part || getRoot()?.dataset?.part || "");
 }
 
 export function initConfirmUploadHandlers() {
-  const root = getRoot();
-  if (!root) return;
+  if (window.__effConfirmUploadBound) return;
+  window.__effConfirmUploadBound = true;
 
-  const btnDo = document.getElementById("btnConfirmUploadDo");
-  const fileInput = document.getElementById("confirmFileInput");
-  const fileNameBox = document.getElementById("confirmFileName"); // 업로드 된 파일명 표시 input(있다면)
+  const btn = els.btnConfirmUploadDo;
+  if (!btn) return;
 
-  if (!btnDo || !fileInput) return;
+  btn.addEventListener("click", async () => {
+    const url = getUploadUrl();
+    if (!url) return alertBox("업로드 URL이 없습니다. (data-efficiency-confirm-upload-url)");
 
-  // ✅ 중복 바인딩 방지
-  if (btnDo.dataset.bound === "1") return;
-  btnDo.dataset.bound = "1";
+    const file = els.confirmFileInput?.files?.[0];
+    if (!file) return alertBox("업로드할 파일을 선택해주세요.");
 
-  btnDo.addEventListener("click", async () => {
-    const f = fileInput.files?.[0];
-    if (!f) {
-      alertBox("파일을 선택해주세요.");
-      return;
-    }
+    const ym = selectedYM(els.year, els.month);
+    if (!ym) return alertBox("연도/월도를 확인해주세요.");
 
-    const month = selectedYM(els.year, els.month); // "YYYY-MM"
-    const branch = getBranchValue();
-    const part = getPartValue();
+    const grade = getGrade();
+    const branch = getBranch();
+    const part = getPart();
 
-    if (!month) {
-      alertBox("연/월 선택을 확인해주세요.");
-      return;
-    }
-    if (!branch) {
-      alertBox("지점 정보를 찾을 수 없습니다.");
-      return;
-    }
-
-    const url = getUploadUrl(root);
+    if (grade === "superuser" && !branch) return alertBox("지점을 먼저 선택하세요.");
 
     const fd = new FormData();
-    fd.append("file", f);
-    fd.append("month", month);
+    fd.append("file", file);
+    fd.append("month", ym);
     fd.append("branch", branch);
     fd.append("part", part);
 
-    btnDo.disabled = true;
-    showLoading("업로드 중...");
-
+    showLoading("확인서 업로드 중...");
     try {
       const res = await fetch(url, {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "X-CSRFToken": getCSRFToken(),
-          // ⚠️ FormData는 Content-Type 지정하지 마세요 (브라우저가 boundary를 붙임)
+          "X-Requested-With": "XMLHttpRequest",
         },
         body: fd,
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.status !== "success") {
-        alertBox(data.message || `업로드 실패 (${res.status})`);
-        return;
+      const text = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(text || "{}");
+      } catch {
+        throw new Error("서버 응답 파싱 실패");
       }
 
-      // ✅ attachment_id를 저장용으로 보관 (save 때 payload에 넣기 위함)
-      root.dataset.confirmAttachmentId = String(data.attachment_id || "");
+      if (!res.ok || data.status !== "success") {
+        throw new Error(data.message || `업로드 실패 (${res.status})`);
+      }
 
-      // ✅ 화면에 파일명 표시(있으면)
-      if (fileNameBox) fileNameBox.value = data.file_name || f.name;
+      const gid = str(data.confirm_group_id);
+      const fileName = str(data.file_name);
 
-      alertBox("✅ 확인서 업로드 완료");
+      if (!gid) throw new Error("confirm_group_id가 내려오지 않았습니다.");
+
+      if (els.confirmGroupId) els.confirmGroupId.value = gid;
+      if (els.confirmFileName) els.confirmFileName.value = fileName || "업로드 완료";
+
+      // legacy는 비움(정책: group 기반)
+      if (els.confirmAttachmentId) els.confirmAttachmentId.value = "";
+
+      alertBox(`✅ 업로드 완료\n그룹ID: ${gid}`);
+
+      // 모달 닫기
+      const modalEl = document.getElementById("confirmUploadModal");
+      if (modalEl && window.bootstrap?.Modal) {
+        const instance = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
+        instance.hide();
+      }
     } catch (e) {
-      console.error("confirm upload error:", e);
-      alertBox("업로드 중 오류가 발생했습니다.");
+      console.error(e);
+      alertBox(e?.message || "업로드 중 오류");
     } finally {
       hideLoading();
-      btnDo.disabled = false;
     }
   });
 }
