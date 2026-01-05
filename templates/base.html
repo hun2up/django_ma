@@ -61,14 +61,13 @@
       </a>
 
       <!-- 🔹 Mobile Offcanvas button (only mobile) -->
-      <button class="btn btn-outline-secondary d-lg-none ms-auto"
+      <button class="navbar-toggler d-lg-none ms-auto"
               type="button"
               data-bs-toggle="offcanvas"
               data-bs-target="#mobileOffcanvas"
               aria-controls="mobileOffcanvas"
-              aria-label="메뉴 열기"
-              style="border-radius:10px;">
-        ☰
+              aria-label="메뉴 열기">
+        <span class="navbar-toggler-icon"></span>
       </button>
 
       <!-- 🔹 Center menu (Desktop only) -->
@@ -156,7 +155,7 @@
           {% if user.grade == 'superuser' %}
             <li class="nav-item">
               <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}"
-                 href="{% url 'home' %}admin/">관리자</a>
+                 href="/admin/">관리자</a>
             </li>
           {% endif %}
 

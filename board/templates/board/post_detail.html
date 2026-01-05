@@ -1,4 +1,4 @@
-{# django_ma/board/templates/board/post_detail.html #}
+<!-- django_ma/board/templates/board/post_detail.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -37,9 +37,7 @@
 
       {# ✅ 본문 #}
       <div class="my-3 p-3 bg-light rounded-3">
-        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
-          {{ post.content }}
-        </p>
+        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ post.content }}</p>
       </div>
 
       <hr class="my-3">
@@ -95,28 +93,25 @@
 
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
+
             {% if is_superuser %}
               <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="status">
-                <select name="status" class="form-select form-select-sm status-select d-inline-block w-auto">
+
+                {# ✅ JS에서 초기색 적용을 위해 data-status 유지 #}
+                <select name="status"
+                        class="form-select form-select-sm status-select d-inline-block w-auto"
+                        data-status="{{ post.status|default:'' }}">
                   {% for s in status_choices %}
-                    <option value="{{ s }}" {% if post.status == s %}selected{% endif %}
-                            data-color="{% if s == '확인중' %}orange{% elif s == '진행중' %}green{% elif s == '보완요청' %}red{% elif s == '완료' %}black{% elif s == '반려' %}gray{% endif %}">
-                      {{ s }}
-                    </option>
+                    <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
                   {% endfor %}
                 </select>
               </form>
             {% else %}
-              <span class="fw-semibold" style="color:
-                {% if post.status == '확인중' %}orange
-                {% elif post.status == '진행중' %}green
-                {% elif post.status == '보완요청' %}red
-                {% elif post.status == '완료' %}black
-                {% elif post.status == '반려' %}gray
-                {% endif %};">
-                {{ post.status }}
+              {# ✅ inline style 제거: badge + data-status 통일 #}
+              <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
+                {{ post.status|default:"-" }}
               </span>
             {% endif %}
           </div>

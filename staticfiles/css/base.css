@@ -1,16 +1,8 @@
 /* django_ma/static/css/base.css
 /* =======================================================
- 🎨 base.css — 공통 스타일 시트 (REFAC v5)
- - 목적: 유지보수성 극대화 (공용/Board/Partner 강분리)
- - 원칙: 기능 변경 ❌ / 선언 순서·주석·섹션화 ⭕
- - 구성:
-   0) TOKENS
-   1) BASE
-   2) COMPONENTS (공용)
-   3) UTILITIES (공용)
-   4) PAGES: BOARD
-   5) PAGES: PARTNER (공용 → 편제/요율/지점효율 세부)
-   6) PLUGINS / FIXES
+ 🎨 base.css — 공통 스타일 시트 (REFAC v6)
+ - 목표: 유지보수성(섹션화/중복제거/명명정리) + 기능변경 ❌
+ - 범위: 공용 + Board + Partner (+ 플러그인/핫픽스)
 ======================================================= */
 
 
@@ -54,7 +46,7 @@ body {
  2) COMPONENTS (COMMON): Navbar / Buttons / Forms / Cards
 ======================================================= */
 
-/* ---------- Navbar (Desktop / Mobile) ---------- */
+/* ---------- Navbar ---------- */
 .navbar {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
@@ -74,6 +66,7 @@ body {
 .nav-link.active { font-weight: 700; }
 .nav-link.inactive { color: #aaa !important; }
 
+/* Mobile toggler visibility */
 .navbar .navbar-toggler {
   padding: 0.6rem 0.8rem;
   border-width: 2px;
@@ -121,7 +114,7 @@ body {
   padding: 6px 14px;
 }
 
-/* small action buttons */
+/* Small action buttons (Partner controls 등에서 사용) */
 .btn-search,
 .btn-remove {
   white-space: nowrap;
@@ -148,7 +141,7 @@ button[disabled],
   box-shadow: 0 0 6px rgba(0, 91, 172, 0.4);
 }
 
-/* readonly */
+/* readonly inputs */
 .readonly-field[readonly] {
   background-color: #f1f1f1;
   color: #666;
@@ -195,7 +188,7 @@ input[name^="premium_"],
 
 
 /* =======================================================
- 3) UTILITIES (COMMON): Loading / Disabled / Search / Status
+ 3) UTILITIES (COMMON): Loading / Disabled / Search / Emphasis
 ======================================================= */
 
 /* ---------- Loading overlay ---------- */
@@ -216,7 +209,7 @@ input[name^="premium_"],
   filter: grayscale(0.8);
 }
 
-/* ---------- Search result hover ---------- */
+/* ---------- Search result hover (common modal) ---------- */
 #searchResults .search-result {
   border-radius: 8px;
   transition: 0.2s;
@@ -233,24 +226,147 @@ input[name^="premium_"],
   font-weight: 600;
 }
 
-/* ---------- Status colors (shared) ---------- */
-.status-is-checking { color: #f0ad4e; }
-.status-is-progress { color: #198754; }
-.status-is-fix      { color: #dc3545; }
-.status-is-done     { color: #000; }
-.status-is-reject   { color: #6c757d; }
+
+/* =======================================================
+ 3-1) UTILITIES (COMMON): Status (Post/Task 공용)
+======================================================= */
+
+/*
+  상태 표현 규칙
+  - JS가 select/badge 요소에 아래 클래스를 부여:
+    status-start / status-progress / status-fix / status-done / (post only) status-reject
+  - badge/span, select 모두에 동일 톤을 적용
+*/
+
+.status-badge,
+.status-select {
+  font-weight: 700;
+}
+
+/* 공통 뱃지 스타일(중복 제거) */
+.status-start,
+.status-progress,
+.status-fix,
+.status-done,
+.status-reject {
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-block;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+/* 상태별 컬러 */
+.status-start {
+  color: #856404;
+  background-color: #fff3cd;
+  border-color: #ffeeba;
+}
+
+.status-progress {
+  color: #0f5132;
+  background-color: #d1e7dd;
+  border-color: #badbcc;
+}
+
+.status-fix {
+  color: #842029;
+  background-color: #f8d7da;
+  border-color: #f5c2c7;
+}
+
+.status-done {
+  color: #1b1f23;
+  background-color: #e2e3e5;
+  border-color: #d3d6d8;
+}
+
+/* 반려(Post 전용) */
+.status-reject {
+  color: #495057;
+  background-color: #f1f3f5;
+  border-color: #dee2e6;
+}
+
+/* ✅ form-select(드롭다운)에도 강제 적용 */
+.form-select.status-start,
+.status-select.status-start {
+  color: #856404 !important;
+  background-color: #fff3cd !important;
+  border-color: #ffeeba !important;
+}
+
+.form-select.status-progress,
+.status-select.status-progress {
+  color: #0f5132 !important;
+  background-color: #d1e7dd !important;
+  border-color: #badbcc !important;
+}
+
+.form-select.status-fix,
+.status-select.status-fix {
+  color: #842029 !important;
+  background-color: #f8d7da !important;
+  border-color: #f5c2c7 !important;
+}
+
+.form-select.status-done,
+.status-select.status-done {
+  color: #1b1f23 !important;
+  background-color: #e2e3e5 !important;
+  border-color: #d3d6d8 !important;
+}
+
+.form-select.status-reject,
+.status-select.status-reject {
+  color: #495057 !important;
+  background-color: #f1f3f5 !important;
+  border-color: #dee2e6 !important;
+}
 
 
 /* =======================================================
  4) PAGES: BOARD (업무요청/직원업무 게시판)
 ======================================================= */
 
-/* ---------- Board base font / wrapper helpers ---------- */
-.board-font { /* 필요 시 board 전용 폰트/간격 확장 */
-  /* (현재는 기능 변경 방지 위해 빈 블록 유지 가능) */
+/* Board base font / wrapper helpers
+   - 필요 시 board 전용 폰트/간격을 여기서 확장
+   - 현재는 기능 변경 방지 위해 최소 선언만 유지
+*/
+.board-font {}
+
+/* ---------- Board wide layout (Post/Task list 폭 확장) ----------
+   - container-fluid 내부에서 다시 max-width로 좁혀지는 문제 해결
+   - Partner 페이지(#manage-structure 등)와 같은 방식으로 중앙 정렬 확장
+--------------------------------------------------------------- */
+.board-container-wide{
+  width: 78vw;            /* 여기만 조절하면 체감 바로 됨 */
+  max-width: 1500px;      /* 1600이 너무 넓으면 1500/1400 추천 */
+  margin: 0 auto;         /* ✅ 진짜 중앙정렬 */
+}
+
+/* 큰 화면에서 더 넓게 */
+@media (min-width: 1600px) {
+  .board-container-wide {
+    width: 84vw;
+    margin-left: calc(-42vw + 50%);
+  }
+}
+
+/* 모바일에서는 그냥 꽉 차게 */
+@media (max-width: 576px) {
+  .board-container-wide {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 /* ---------- Comment UI (board 전용) ---------- */
+.comment-meta { gap: 8px; }
+.comment-author { font-size: 12px; }
+.comment-created-at { font-size: 12px; }
+.comment-meta-dot { margin: 0 6px; color: #bbb; }
+
 .comment-content {
   background: #f8f9fa;
   border: 1px solid var(--border-soft);
@@ -258,8 +374,14 @@ input[name^="premium_"],
   padding: 10px;
 }
 
-.comment-created-at { font-size: 12px; }
 .comment-text { white-space: pre-wrap; }
+
+/* 댓글 입력창 기본 높이 */
+.comment-form textarea,
+textarea[name="content"] {
+  min-height: 96px; /* 약 4줄 */
+  resize: vertical;
+}
 
 /* inline edit form */
 .comment-edit-form {
@@ -307,7 +429,6 @@ input[name^="premium_"],
   margin-left: calc(-43vw + 50%);
 }
 
-
 /* =======================================================
  5-1) PARTNER: Common Table Rules
 ======================================================= */
@@ -326,29 +447,24 @@ input[name^="premium_"],
   text-align: center;
 }
 
-
 /* =======================================================
  5-2) PARTNER: 편제변경 (manage_structure)
-  - 현재 base.css에 편제 전용 룰이 적으면 비워도 OK
 ======================================================= */
 /* (reserved) 편제변경 전용 스타일을 여기에 추가 */
-
 
 /* =======================================================
  5-3) PARTNER: 요율변경 (manage_rate)
 ======================================================= */
-/* --- table check modal --- */
 #tableCheckModal table th,
 #tableCheckModal table td {
   white-space: nowrap;
 }
 
-
 /* =======================================================
  5-4) PARTNER: 지점효율 (manage_efficiency)
 ======================================================= */
 
-/* --- input table --- */
+/* input table: nowrap + ellipsis */
 #manage-efficiency #inputTable th,
 #manage-efficiency #inputTable td {
   white-space: nowrap;
@@ -356,7 +472,7 @@ input[name^="premium_"],
   text-overflow: ellipsis;
 }
 
-/* --- main sheet group table (accordion) --- */
+/* main sheet group table (accordion) */
 .main-group-table th,
 .main-group-table td {
   white-space: nowrap;
@@ -370,7 +486,7 @@ input[name^="premium_"],
 
 /* helper: fixed table width (keep as-is) */
 #manage-efficiency .main-table-fixed {
-  min-width: 1100px; /* 또는 제거 */
+  min-width: 1100px;
 }
 
 #manage-efficiency .td-content {
@@ -392,6 +508,7 @@ input[name^="premium_"],
 ======================================================= */
 #mainSheet { min-width: 0; }
 
+/* DataTables가 width를 덮어쓰는 경우 방어 */
 #mainTable {
   width: 100% !important;
   table-layout: fixed;
