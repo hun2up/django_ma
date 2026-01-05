@@ -11,6 +11,13 @@ from django.conf import settings
 import mimetypes
 
 
+TASK_STATUS_CHOICES = [
+    ("시작전", "시작전"),
+    ("진행중", "진행중"),
+    ("보완필요", "보완필요"),
+    ("완료", "완료"),
+]
+
 # ===========================================
 # 📌 [1] 업무요청 게시글(Post)
 # ===========================================
@@ -148,14 +155,7 @@ class Task(models.Model):
 
     handler = models.CharField("담당자", max_length=100, blank=True, default="")
 
-    STATUS_CHOICES = [
-        ("확인중", "확인중"),
-        ("진행중", "진행중"),
-        ("보완요청", "보완요청"),
-        ("완료", "완료"),
-        ("반려", "반려"),
-    ]
-    status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="확인중")
+    status = models.CharField("상태", max_length=20, choices=TASK_STATUS_CHOICES, default="시작전")
     status_updated_at = models.DateTimeField("상태변경일", blank=True, null=True)
 
     def save(self, *args, **kwargs):
