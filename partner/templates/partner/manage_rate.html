@@ -29,7 +29,7 @@
     data-team-c="{{ subadmin_info.team_c|default:'' }}"
     >
 
-  {% if user.grade not in 'superuser main_admin sub_admin' %}
+  {% if user.grade not in 'superuser main_admin' %}
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
   {% endif %}
 
