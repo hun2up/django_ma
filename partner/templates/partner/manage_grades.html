@@ -9,7 +9,7 @@
 
 {% block content %}
 
-{% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+{% if user.grade not in 'superuser main_admin' %}
   <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% endif %}
 
@@ -27,7 +27,7 @@
 
 <div id="manage-grades"
      data-user-grade="{{ user.grade }}"
-     data-branch="{{ user.branch }}">
+     data-branch="{{ user.branch|default:'' }}">
 
   <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">권한관리 페이지</h3>
 
@@ -76,6 +76,15 @@
       <span class="text-muted small" style="white-space: nowrap;">※ 중간관리자 추가/제외는 부서장에게 문의바랍니다.</span>
     </div>
 
+    <!-- ✅ 안내 문구는 테이블 밖에서 처리 (DataTables colspan 경고 원천 차단) -->
+    {% if user.grade == 'superuser' %}
+      {% if not selected_part or not selected_branch %}
+        <div class="alert alert-warning py-2 mb-3">
+          부서와 지점을 선택한 뒤 검색하세요.
+        </div>
+      {% endif %}
+    {% endif %}
+
     <div class="table-responsive">
       <table class="table table-striped align-middle" id="subAdminTable">
         <thead class="table-light">
@@ -84,6 +93,8 @@
             <th>레벨</th><th>팀A</th><th>팀B</th><th>팀C</th>
           </tr>
         </thead>
+
+        <!-- ✅ tbody에는 "colspan 안내행" 넣지 않음 (emptyTable로 처리) -->
         <tbody>
           {% if selected_part and selected_branch %}
             {% for u in users_subadmin %}
@@ -104,11 +115,7 @@
                 <td>{{ u.team_b|default:"-" }}</td>
                 <td>{{ u.team_c|default:"-" }}</td>
               </tr>
-            {% empty %}
-              <tr><td colspan="9" class="text-center text-muted py-3">해당 부서/지점의 중간관리자가 없습니다.</td></tr>
             {% endfor %}
-          {% else %}
-            <tr><td colspan="9" class="text-center text-muted py-3">부서와 지점을 선택하세요.</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -118,6 +125,13 @@
   <!-- ✅ 하단: 전체 사용자 목록 -->
   <div class="card shadow p-3 border-0 rounded-4">
     <h5 class="fw-bold mb-3" style="color:#003f7d;">전체설계사 명단</h5>
+
+    {% if user.grade == 'superuser' and not selected_part or user.grade == 'superuser' and not selected_branch %}
+      <div class="alert alert-warning py-2">
+        부서/지점을 선택해야 전체설계사 명단을 조회할 수 있습니다.
+      </div>
+    {% endif %}
+
     <div class="table-responsive">
       <table id="allUserTable"
              class="table table-striped align-middle"
@@ -128,6 +142,7 @@
             <th>팀A</th><th>팀B</th><th>팀C</th>
           </tr>
         </thead>
+        <tbody></tbody>
       </table>
     </div>
   </div>
@@ -164,30 +179,23 @@
 <!-- (선택) Buttons가 DOM에 버튼 렌더링할 때 종종 필요 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-<!-- ✅ 공용: 부서/지점 셀렉터 -->
-<script type="module" src="{% static 'js/common/part_branch_selector.js' %}?v=20251229_2"></script>
-
-<!-- ✅ XLSX -->
+<!-- ✅ XLSX (클라이언트 엑셀 생성) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- ✅ 공용: 부서/지점 셀렉터 -->
+<script type="module" src="{% static 'js/common/part_branch_selector.js' %}?v=20260107_1"></script>
 
 <script>
 /* =========================================================
-   Manage Grades (Refactor)
+   Manage Grades (Final Refactor)
+   - DataTables colspan 경고 원천 차단(emptyTable 사용)
+   - destroy/re-init 안전(BFCache/pageshow)
    - CSRF robust (hidden input 우선 + cookie fallback)
-   - DataTables 재진입/BFCache 안전
-   - Level update: 빈 CSRF 헤더 방지 (중요)
 ========================================================= */
 
-/* -------------------------
-   0) tiny utils
-------------------------- */
 function str(v) { return String(v ?? "").trim(); }
 function qs(sel, root) { return (root || document).querySelector(sel); }
-function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
-/* -------------------------
-   1) CSRF (robust)
-------------------------- */
 function getCookie(name) {
   const value = `; ${document.cookie || ""}`;
   const parts = value.split(`; ${name}=`);
@@ -201,14 +209,10 @@ function getCSRFToken() {
     qs('input[name="csrfmiddlewaretoken"]');
   const fromInput = str(input?.value);
   if (fromInput) return fromInput;
-
-  const fromCookie = str(getCookie("csrftoken"));
-  return fromCookie;
+  return str(getCookie("csrftoken"));
 }
 
-/* -------------------------
-   2) Toast
-------------------------- */
+/* Toast */
 function showToast(message, isSuccess) {
   const toastElement = document.getElementById('statusToast');
   const toastTitle = document.getElementById('toastTitle');
@@ -231,22 +235,13 @@ function showToast(message, isSuccess) {
 
   toastBody.textContent = message;
 
-  // Bootstrap Toast가 없으면 alert fallback
-  if (window.bootstrap?.Toast) {
-    new bootstrap.Toast(toastElement, { delay: 3000 }).show();
-  } else {
-    alert(message);
-  }
+  if (window.bootstrap?.Toast) new bootstrap.Toast(toastElement, { delay: 3000 }).show();
+  else alert(message);
 }
 
-/* -------------------------
-   3) Helpers
-------------------------- */
 function buildUrlWithParams(base, params) {
   const url = new URL(base, window.location.origin);
-  Object.entries(params || {}).forEach(([k, v]) => {
-    url.searchParams.set(k, v ?? "");
-  });
+  Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v ?? ""));
   return url.toString();
 }
 
@@ -270,9 +265,6 @@ async function parseJsonResponse(res) {
   }
 }
 
-/* -------------------------
-   4) DataTables init
-------------------------- */
 function initTables() {
   const userGrade = "{{ user.grade }}";
   const selectedPart = "{{ selected_part|default:'' }}";
@@ -280,13 +272,13 @@ function initTables() {
 
   if (!isAllowedGrade(userGrade)) return;
 
-  // superuser: 둘 다 있어야
+  // superuser는 둘 다 있어야
   if (userGrade === "superuser" && (!selectedPart || !selectedBranch)) {
     console.log("superuser: 부서/지점 미선택 — DataTables 초기화 생략");
     return;
   }
 
-  // main_admin: 둘 중 하나라도 없으면 생략
+  // main_admin도 둘 다 필요(뷰가 내려주는 값 기준)
   if (!selectedPart || !selectedBranch) {
     console.log("부서/지점 정보 부족 — DataTables 초기화 생략");
     return;
@@ -296,17 +288,11 @@ function initTables() {
   const $allTable = $("#allUserTable");
 
   const ajaxBase = str($allTable.data("ajax-base"));
-  if (!ajaxBase) {
-    console.warn("ajax-base 누락 — allUserTable 초기화 불가");
-    return;
-  }
+  if (!ajaxBase) return console.warn("ajax-base 누락 — allUserTable 초기화 불가");
 
-  const ajaxUrl = buildUrlWithParams(ajaxBase, {
-    part: selectedPart,
-    branch: selectedBranch,
-  });
+  const ajaxUrl = buildUrlWithParams(ajaxBase, { part: selectedPart, branch: selectedBranch });
 
-  // BFCache/재진입 대비 destroy
+  // 재진입 대비 destroy
   safeDestroyDataTable($subTable);
   safeDestroyDataTable($allTable);
 
@@ -317,23 +303,13 @@ function initTables() {
     info: true,
     pageLength: 10,
     autoWidth: false,
-    columnDefs: [
-      { width: "8%", targets: 0 },
-      { width: "12%", targets: 1 },
-      { width: "12%", targets: 2 },
-      { width: "8%", targets: 3 },
-      { width: "10%", targets: 4 },
-      { width: "14%", targets: 5 },
-      { width: "12%", targets: 6 },
-      { width: "12%", targets: 7 },
-      { width: "12%", targets: 8 },
-    ],
     lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
     language: {
       url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
       lengthMenu: "페이지당 인원 _MENU_",
       search: "검색:",
       zeroRecords: "표시할 데이터가 없습니다.",
+      emptyTable: "해당 부서/지점의 중간관리자가 없습니다.",
       info: "총 _TOTAL_명 중 _START_–_END_ 표시",
       infoEmpty: "데이터 없음",
     },
@@ -362,16 +338,6 @@ function initTables() {
     ],
     pageLength: 10,
     autoWidth: false,
-    columnDefs: [
-      { width: "8%", targets: 0 },
-      { width: "15%", targets: 1 },
-      { width: "12%", targets: 2 },
-      { width: "10%", targets: 3 },
-      { width: "10%", targets: 4 },
-      { width: "15%", targets: 5 },
-      { width: "15%", targets: 6 },
-      { width: "15%", targets: 7 },
-    ],
     lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
     language: {
       url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
@@ -379,6 +345,7 @@ function initTables() {
       search: "검색:",
       processing: "로딩 중...",
       zeroRecords: "표시할 데이터가 없습니다.",
+      emptyTable: "표시할 데이터가 없습니다.",
     },
     dom: `
       <'d-flex justify-content-between align-items-center mb-2'
@@ -438,9 +405,7 @@ function initTables() {
     ],
   });
 
-  /* -------------------------
-     5) Excel Upload bind
-  ------------------------- */
+  /* Excel Upload bind */
   const excelFile = document.getElementById("excelFile");
   const excelForm = document.getElementById("excelUploadForm");
 
@@ -458,9 +423,7 @@ function initTables() {
     });
   }
 
-  /* -------------------------
-     6) Level update bind (핵심: 빈 CSRF 헤더 방지)
-  ------------------------- */
+  /* Level update bind */
   if (!$subTable.data("levelBound")) {
     $subTable.data("levelBound", "1");
 
@@ -474,7 +437,6 @@ function initTables() {
         "Content-Type": "application/x-www-form-urlencoded",
         "X-Requested-With": "XMLHttpRequest",
       };
-      // ✅ 중요: CSRF가 비어있으면 헤더에 넣지 않음
       if (csrf) headers["X-CSRFToken"] = csrf;
 
       try {
@@ -488,39 +450,27 @@ function initTables() {
         const parsed = await parseJsonResponse(res);
 
         if (!parsed.ok || !parsed.data) {
-          console.error("서버가 JSON이 아닌 응답을 반환:", { status: parsed.status, text: parsed.text });
+          console.error("서버가 JSON이 아닌 응답:", { status: parsed.status, text: parsed.text });
           throw new Error(`서버 응답이 JSON이 아닙니다. (${parsed.status})`);
         }
 
         const data = parsed.data;
 
         if (!res.ok) {
-          console.error("요청 실패(HTTP):", res.status, data);
           throw new Error(data?.error || data?.message || `요청 실패 (${res.status})`);
         }
 
-        if (data.success) {
-          showToast(`레벨이 ${newLevel}로 성공적으로 변경되었습니다.`, true);
-        } else {
-          showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
-        }
+        if (data.success) showToast(`레벨이 ${newLevel}로 변경되었습니다.`, true);
+        else showToast("저장 실패: " + (data.error || "알 수 없는 오류"), false);
       } catch (err) {
-        console.error("요청 실패:", err);
+        console.error("레벨 변경 오류:", err);
         showToast(err?.message || "서버 요청 중 오류가 발생했습니다.", false);
       }
     });
   }
 }
 
-/* =========================================================
-   Boot
-   - DOMContentLoaded
-   - BFCache pageshow persisted 재진입 시 재시도
-========================================================= */
 document.addEventListener("DOMContentLoaded", initTables);
-window.addEventListener("pageshow", (e) => {
-  if (e.persisted) initTables();
-});
+window.addEventListener("pageshow", (e) => { if (e.persisted) initTables(); });
 </script>
-
 {% endblock %}
