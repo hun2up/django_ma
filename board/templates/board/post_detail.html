@@ -29,10 +29,23 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      {# ✅ 제목/작성일 #}
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0 text-primary">{{ post.title }}</h5>
-        <p class="text-muted small mb-0">{{ post.created_at|date:"Y-m-d H:i" }}</p>
+      {# ✅ 헤더 #}
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
+        <div class="flex-grow-1">
+          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">{{ post.title }}</h4>
+
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="text-muted small">{{ post.category }} | {{ post.created_at|date:"Y-m-d H:i" }}</span>
+
+            <!-- non-superuser일 때 상태 뱃지(읽기용) -->
+            {% if not is_superuser %}
+              <span class="status-badge fw-semibold px-2 py-1 rounded-pill"
+                    data-status="{{ post.status|default:'' }}">
+                {{ post.status|default:"-" }}
+              </span>
+            {% endif %}
+          </div>
+        </div>
       </div>
 
       {# ✅ 본문 #}
@@ -40,20 +53,20 @@
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ post.content }}</p>
       </div>
 
-      <hr class="my-3">
-
       {# ✅ 댓글 CSRF 토큰(동적 수정폼용) - 페이지에 1개만 유지 #}
       <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
 
       {# ✅ 댓글 #}
-      <div class="my-3">
-        <span class="info-value">댓글</span>
+      <div class="mt-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="fw-bold mb-0">댓글</h6>
+        </div>
 
         {% include "board/includes/_comment_list.html" with comments=comments empty_text="아직 댓글이 없습니다." %}
         {% include "board/includes/_comment_form.html" with form=form action_url=detail_url submit_label="등록" %}
       </div>
 
-      <hr class="my-3">
+      <br><br>
 
       {# ✅ 게시글 기본정보 #}
       <div class="my-3">
@@ -66,8 +79,6 @@
           {% endfor %}
         </div>
       </div>
-
-      <hr class="my-3">
 
       {# ✅ 담당자/상태 #}
       <div class="my-3">
@@ -126,7 +137,7 @@
         </div>
       </div>
 
-      <hr class="my-3">
+      <br><br>
 
       {# ✅ 첨부파일 #}
       {% if attachments and attachments.exists %}
@@ -149,23 +160,25 @@
       {% endif %}
 
       {# ✅ 하단 버튼 #}
-      <div class="d-flex justify-content-between mt-4">
-        <div class="d-flex gap-2">
+      <div class="board-detail-actions mt-4">
+        <div class="board-detail-actions-left">
           <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
           {% if can_edit %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary">수정하기</a>
 
-            <form method="post" style="display:inline;"
+            <form method="post" class="board-detail-actions-form"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
-              <input type="hidden" name="action_type" value="delete_post">
-              <button type="submit" class="btn btn-outline-danger">삭제하기</button>
+              <input type="hidden" name="action_type" value="{% if post %}delete_post{% else %}delete_task{% endif %}">
+              <button type="submit" class="btn btn-outline-danger w-100">삭제하기</button>
             </form>
           {% endif %}
         </div>
 
-        <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+        <div class="board-detail-actions-right">
+          <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+        </div>
       </div>
 
     </div>

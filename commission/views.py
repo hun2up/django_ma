@@ -2,25 +2,34 @@
 
 import os
 import io
+import re
 import datetime
 import pandas as pd
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html.parser import HTMLParser
+from xml.sax.saxutils import escape
 
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Min, Max
 from django.core.files.storage import FileSystemStorage
 from django.utils import timezone
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepInFrame
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 
 from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOther
-
 
 # =========================================================
 # Constants
@@ -28,7 +37,7 @@ from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOthe
 UPLOAD_CATEGORIES = [
     "최종지급액", "환수지급예상", "보증증액", "보증보험", "기타채권", "통산생보", "통산손보", "응당생보", "응당손보"]
 
-SUPPORTED_UPLOAD_TYPES = {"최종지급액", "보증증액", "응당생보", "응당손보", "보증보험", "기타채권", "통산손보", '통산생보'}
+SUPPORTED_UPLOAD_TYPES = {"최종지급액", "환수지급예상", "보증증액", "응당생보", "응당손보", "보증보험", "기타채권", "통산손보", '통산생보'}
 
 # 통산손보(소수) 저장 시 기본 소수자리 (프론트 toFixed(2) 기준)
 DEC2 = Decimal("0.00")
@@ -178,6 +187,135 @@ def _find_exact_or_space_removed(df: pd.DataFrame, excel_col: str):
             return c
     return None
 
+def _norm_col(s: str) -> str:
+    """컬럼명 비교용 정규화: 공백/특수문자 제거 + 소문자"""
+    if s is None:
+        return ""
+    s = str(s).strip().lower()
+    s = re.sub(r"[^0-9a-z가-힣]", "", s)   # 한글/영문/숫자만 남김
+    s = s.replace("0", "o")               # 보증(0) 같은 케이스 대응
+    return s
+
+
+def _best_match_col(df_cols, required_tokens, optional_tokens=None, ban_tokens=None):
+    optional_tokens = optional_tokens or []
+    ban_tokens = ban_tokens or []
+
+    best = None
+    best_score = -10**9
+
+    for c in df_cols:
+        nc = _norm_col(c)
+
+        # 금지 토큰 포함 시 제외
+        if any(bt and bt in nc for bt in ban_tokens):
+            continue
+
+        # 필수 토큰 모두 포함해야 후보
+        if not all(rt and rt in nc for rt in required_tokens):
+            continue
+
+        score = 0
+        score += 100 * len(required_tokens)
+
+        for ot in optional_tokens:
+            if ot and ot in nc:
+                score += 15
+
+        # 컬럼명이 너무 길면 약간 감점(짧고 정확한 것 선호)
+        score -= max(0, len(nc) - 20)
+
+        if score > best_score:
+            best_score = score
+            best = c
+
+    return best
+
+
+def _find_col_by_aliases(df, alias_groups, ban_groups=None):
+    df_cols = list(df.columns)
+    ban_groups = ban_groups or []
+
+    ban_tokens = []
+    for bg in ban_groups:
+        ban_tokens += [_norm_col(x) for x in bg]
+
+    # 우선순위대로 탐색
+    for grp in alias_groups:
+        req = [_norm_col(x) for x in grp]
+        found = _best_match_col(df_cols, req, optional_tokens=[], ban_tokens=ban_tokens)
+        if found:
+            return found
+
+    return None
+
+
+def _detect_emp_id_col(df: pd.DataFrame) -> str | None:
+    alias_groups = [
+        ["사번"],
+        ["사원", "코드"],
+        ["사원", "번호"],
+        ["사원번호"],
+        ["등록", "번호"],
+        ["등록번호"],
+        ["fc", "코드"],
+        ["설계사", "코드"],
+        ["설계사", "번호"],
+        ["id"],  # 일부 파일이 영어로만 'ID'
+    ]
+
+    ban_groups = [
+        ["계약"], ["증권"], ["주민"], ["연락"], ["전화"], ["휴대"], ["메일"], ["email"]
+    ]
+
+    return _find_col_by_aliases(df, alias_groups, ban_groups=ban_groups)
+
+
+def _detect_refundpay_col(df: pd.DataFrame, surety_flag: str | None, kind: str, line: str) -> str | None:
+    """
+    surety_flag:
+      - "o": 보증(O)
+      - "x": 보증(X)
+      - None: 일반(보증구분 없음)
+    kind: "refund" or "pay"
+    line: "ns"(손보) or "ls"(생보) or "total"(합계)
+    """
+    df_cols = list(df.columns)
+
+    kind_tokens = ["환수"] if kind == "refund" else ["지급"]
+
+    if line == "ns":
+        line_tokens = ["손보"]
+        line_optional = ["손해", "손"]
+    elif line == "ls":
+        line_tokens = ["생보"]
+        line_optional = ["생명", "생"]
+    else:
+        line_tokens = ["합계"]
+        line_optional = ["총계", "전체", "계", "합"]
+
+    if surety_flag == "o":
+        surety_required = ["보증"]
+        surety_optional = ["o", "유", "yes", "y"]
+        surety_ban = ["x", "무", "no", "n"]
+    elif surety_flag == "x":
+        surety_required = ["보증"]
+        surety_optional = ["x", "무", "no", "n"]
+        surety_ban = ["o", "유", "yes", "y"]
+    else:
+        surety_required = []
+        surety_optional = []
+        surety_ban = []
+
+    required = surety_required + kind_tokens + line_tokens
+    optional = surety_optional + line_optional
+
+    return _best_match_col(
+        df_cols,
+        required_tokens=[_norm_col(t) for t in required],
+        optional_tokens=[_norm_col(t) for t in optional],
+        ban_tokens=[_norm_col(t) for t in surety_ban],
+    )
 
 def _bulk_existing_user_ids(user_ids):
     return set(CustomUser.objects.filter(pk__in=user_ids).values_list("pk", flat=True))
@@ -528,6 +666,113 @@ def _handle_upload_final_payment(df: pd.DataFrame):
         "missing_sample": missing_sample,
     }
 
+def _handle_upload_refund_pay_expected(df: pd.DataFrame):
+    """
+    ✅ 환수지급예상 업로드 (강화 버전)
+    - 사번 컬럼명: 사번/사원코드/등록번호 등 별칭 + 부분매칭
+    - 보증(O/X) 컬럼명: '보증(O)' 문구가 조금 달라도 키워드 기반으로 자동 매칭
+    """
+
+    # 1) 사번 컬럼 자동 탐지(강화)
+    col_user = _detect_emp_id_col(df)
+    if not col_user:
+        raise ValueError("엑셀에서 사번 컬럼을 찾지 못했습니다. (사번/사원코드/등록번호/FC코드 등)")
+
+    # 2) 저장할 모델 필드 정의(고정)
+    targets = {
+        # 일반 환수/지급
+        "refund_ns":   (None, "refund", "ns"),
+        "refund_ls":   (None, "refund", "ls"),
+        "refund_expected": (None, "refund", "total"),
+
+        "pay_ns":      (None, "pay", "ns"),
+        "pay_ls":      (None, "pay", "ls"),
+        "pay_expected":    (None, "pay", "total"),
+
+        # 보증 O
+        "surety_o_refund_ns":   ("o", "refund", "ns"),
+        "surety_o_refund_ls":   ("o", "refund", "ls"),
+        "surety_o_refund_total":("o", "refund", "total"),
+
+        "surety_o_pay_ns":      ("o", "pay", "ns"),
+        "surety_o_pay_ls":      ("o", "pay", "ls"),
+        "surety_o_pay_total":   ("o", "pay", "total"),
+
+        # 보증 X
+        "surety_x_refund_ns":   ("x", "refund", "ns"),
+        "surety_x_refund_ls":   ("x", "refund", "ls"),
+        "surety_x_refund_total":("x", "refund", "total"),
+
+        "surety_x_pay_ns":      ("x", "pay", "ns"),
+        "surety_x_pay_ls":      ("x", "pay", "ls"),
+        "surety_x_pay_total":   ("x", "pay", "total"),
+    }
+
+    # 3) df에서 실제 컬럼 매칭
+    found_cols = {}
+    missing = []
+    for field, (flag, kind, line) in targets.items():
+        col = _detect_refundpay_col(df, flag, kind, line)
+        if not col:
+            missing.append((field, flag, kind, line))
+        else:
+            found_cols[field] = col
+
+    if missing:
+        pretty = []
+        for field, flag, kind, line in missing[:20]:
+            sflag = "보증(O)" if flag == "o" else ("보증(X)" if flag == "x" else "일반")
+            skind = "환수" if kind == "refund" else "지급"
+            sline = "손보" if line == "ns" else ("생보" if line == "ls" else "합계")
+            pretty.append(f"- {sflag} {skind} {sline} (필드: {field})")
+        raise ValueError("엑셀 컬럼 매칭 실패:\n" + "\n".join(pretty))
+
+    # 4) 필요한 컬럼만 추출 + rename
+    use_cols = [col_user] + list(found_cols.values())
+    df2 = df[use_cols].copy()
+
+    rename_map = {col_user: "user_id"}
+    for field, col in found_cols.items():
+        rename_map[col] = field
+    df2.rename(columns=rename_map, inplace=True)
+
+    # 5) 사번 정규화 + 숫자 변환
+    df2["user_id"] = df2["user_id"].apply(_norm_emp_id)
+    df2 = df2[df2["user_id"].astype(str).str.len() > 0].copy()
+
+    for field in targets.keys():
+        if field in df2.columns:
+            df2[field] = df2[field].apply(_to_int)
+
+    # 6) 존재 사용자만 업데이트
+    ids = df2["user_id"].tolist()
+    existing_ids = _bulk_existing_user_ids(ids)
+    missing_sample = [x for x in ids if x not in existing_ids][:10]
+
+    updated = 0
+    missing_users = 0
+
+    for _, r in df2.iterrows():
+        uid = r["user_id"]
+        if uid not in existing_ids:
+            missing_users += 1
+            continue
+
+        defaults = {f: int(r.get(f, 0) or 0) for f in targets.keys()}
+
+        DepositSummary.objects.update_or_create(
+            user_id=uid,
+            defaults=defaults,
+        )
+        updated += 1
+
+    return {
+        "updated": updated,
+        "missing_users": missing_users,
+        "existing_users": len(existing_ids),
+        "missing_sample": missing_sample,
+        "matched_columns": {k: str(v) for k, v in found_cols.items()},
+    }
 
 def _handle_upload_guarantee_increase(df: pd.DataFrame):
     col_user = (
@@ -1047,6 +1292,7 @@ def upload_excel(request):
 
     handlers = {
         "최종지급액": ("df", _handle_upload_final_payment, "✅ {n}건 업로드 완료 (final_payment만 반영)"),
+        "환수지급예상": ("df", _handle_upload_refund_pay_expected, "✅ {n}건 업로드 완료 (환수/지급예상 반영)"),
         "보증증액": ("df", _handle_upload_guarantee_increase, "✅ {n}건 업로드 완료 (보증증액 필드 반영)"),
         "응당생보": ("df", _handle_upload_ls_due, "✅ {n}건 업로드 완료 (응당생보 반영)"),
         "응당손보": ("df", _handle_upload_ns_due, "✅ {n}건 업로드 완료 (응당손보 반영)"),
@@ -1130,17 +1376,26 @@ def upload_excel(request):
 
 @grade_required(["superuser"])
 def search_user(request):
-    q = (request.GET.get("q") or "").strip()
+    # ✅ 다양한 검색 모달 구현체를 흡수 (q/keyword/query/term)
+    q = (
+        request.GET.get("q")
+        or request.GET.get("keyword")
+        or request.GET.get("query")
+        or request.GET.get("term")
+        or ""
+    ).strip()
+
     if not q:
         return _json_ok(items=[])
 
     qs = (
-        CustomUser.objects.filter(Q(id__icontains=q) | Q(name__icontains=q) | Q(branch__icontains=q))
+        CustomUser.objects.filter(
+            Q(id__icontains=q) | Q(name__icontains=q) | Q(branch__icontains=q)
+        )
         .order_by("branch", "name")[:50]
     )
     items = [{"id": str(u.id), "name": u.name, "branch": u.branch or ""} for u in qs]
     return _json_ok(items=items)
-
 
 @grade_required(["superuser"])
 def api_user_detail(request):
@@ -1310,10 +1565,33 @@ def api_deposit_summary(request):
         "inst_current": gi("inst_current", 0),
         "inst_prev": gi("inst_prev", 0),
 
-        "comm_3m": comm_3m,
-        "comm_6m": comm_6m,
-        "comm_9m": comm_9m,
-        "comm_12m": comm_12m,
+        # ✅ 수수료현황(기존 1번째 테이블용)
+        "refund_ns": gi("refund_ns", 0),
+        "refund_ls": gi("refund_ls", 0),
+        "pay_ns": gi("pay_ns", 0),
+        "pay_ls": gi("pay_ls", 0),
+
+        # ✅ 보증(O/X) 환수/지급 (추가 4개 테이블용)
+        "surety_o_refund_ns": gi("surety_o_refund_ns", 0),
+        "surety_o_refund_ls": gi("surety_o_refund_ls", 0),
+        "surety_o_refund_total": gi("surety_o_refund_total", 0),
+
+        "surety_x_refund_ns": gi("surety_x_refund_ns", 0),
+        "surety_x_refund_ls": gi("surety_x_refund_ls", 0),
+        "surety_x_refund_total": gi("surety_x_refund_total", 0),
+
+        "surety_o_pay_ns": gi("surety_o_pay_ns", 0),
+        "surety_o_pay_ls": gi("surety_o_pay_ls", 0),
+        "surety_o_pay_total": gi("surety_o_pay_total", 0),
+
+        "surety_x_pay_ns": gi("surety_x_pay_ns", 0),
+        "surety_x_pay_ls": gi("surety_x_pay_ls", 0),
+        "surety_x_pay_total": gi("surety_x_pay_total", 0),
+
+        "comm_3m": gi("comm_3m", 0),
+        "comm_6m": gi("comm_6m", 0),
+        "comm_9m": gi("comm_9m", 0),
+        "comm_12m": gi("comm_12m", 0),
 
         # ✅ 통산손보 업로드로 갱신되는 필드 포함 (문자열로 내려줌)
         "ns_13_round": gd("ns_13_round", "0.00"),
@@ -1377,6 +1655,359 @@ def api_deposit_other_list(request):
     } for x in qs]
 
     return _json_ok(items=items)
+
+# ✅ 한국어 CID 폰트(ReportLab 내장)
+def _register_korean_font():
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+        return "HYGothic-Medium"
+    except Exception:
+        return "Helvetica"
+
+def _fmt_money(n):
+    try:
+        n = int(n or 0)
+        return f"{n:,}"
+    except Exception:
+        return "0"
+
+def _retire_state(user):
+    # *재직상태: 퇴사일 있으면 '퇴사자', 없으면 '재직자'
+    # (api_user_detail에서 retire_date_display를 만들어두셨으니 그것도 활용)
+    retire_disp = ""
+    if hasattr(user, "retire_date_display"):
+        retire_disp = getattr(user, "retire_date_display") or ""
+    elif hasattr(user, "quit_display"):
+        retire_disp = getattr(user, "quit_display") or ""
+
+    # raw 필드도 fallback
+    if not retire_disp:
+        for f in ("retire_date", "quit"):
+            if hasattr(user, f) and getattr(user, f):
+                retire_disp = "Y"
+                break
+
+    return "퇴사자" if retire_disp else "재직자"
+
+@grade_required(["superuser"])
+def api_support_pdf(request):
+    """
+    ✅ 지원신청서 PDF 다운로드 (워드 양식처럼: 들여쓰기 + 표)
+    - user=사번 기준
+    - DepositSummary + DepositSurety(유지) + DepositOther(유지) 반영
+    """
+    user_id = (request.GET.get("user") or "").strip()
+    if not user_id:
+        return _json_error("user 파라미터가 필요합니다.", status=400)
+
+    u = CustomUser.objects.filter(pk=user_id).first()
+    if not u:
+        return _json_error("대상자를 찾지 못했습니다.", status=404)
+
+    s = DepositSummary.objects.filter(user_id=user_id).first()
+
+    # ✅ 보증보험(유지)만
+    sureties = (
+        DepositSurety.objects
+        .filter(user_id=user_id, status="유지", product_name="GA개인")
+        .order_by("-end_date", "-start_date", "-created_at")
+    )
+
+    # ✅ 기타채권(유지)만
+    others = (
+        DepositOther.objects
+        .filter(user_id=user_id, status="유지", product_type="수수료")
+        .order_by("-start_date", "-created_at")
+    )
+
+    # 합계 계산(현재 너의 api_deposit_summary 기준과 동일하게 맞춤)
+    surety_total = sureties.aggregate(total=Sum("amount")).get("total") or 0
+
+    other_total = (
+        DepositOther.objects
+        .filter(user_id=user_id, status="유지", product_type="수수료")
+        .aggregate(total=Sum("amount"))
+        .get("total") or 0
+    )
+
+    # ✅ GA개인/유지 보증보험은 0건 또는 1건
+    surety_obj = sureties.first()  # 없으면 None
+
+    if surety_obj:
+        surety_period_text = f"{_fmt_date(surety_obj.start_date)} ~ {_fmt_date(surety_obj.end_date)}"
+    else:
+        surety_period_text = ""
+
+    # summary 값 안전 추출
+    def gi(field, default=0):
+        if not s:
+            return default
+        v = getattr(s, field, None)
+        try:
+            return int(v) if v is not None else default
+        except Exception:
+            return default
+
+    def gd(field, default="0.00"):
+        if not s:
+            return default
+        v = getattr(s, field, None)
+        return str(v) if v is not None else default
+
+    part = (u.part or "").strip()
+    branch = (u.branch or "").strip()
+    name = (u.name or "").strip()
+    state = _retire_state(u)
+
+    # ✅ 입사일/퇴사일 표시값(문자열) 안전 추출
+    def _get_join_disp(user) -> str:
+        # display 필드 우선
+        for f in ("join_date_display", "enter_display"):
+            if hasattr(user, f) and getattr(user, f):
+                return str(getattr(user, f)).strip()
+
+        # raw date 필드 fallback
+        for f in ("join_date", "enter", "regist"):
+            if hasattr(user, f) and getattr(user, f):
+                v = getattr(user, f)
+                try:
+                    return v.strftime("%Y-%m-%d")
+                except Exception:
+                    return str(v).strip()
+
+        return "-"
+
+    def _get_retire_disp(user) -> str:
+        # display 필드 우선
+        for f in ("retire_date_display", "quit_display"):
+            if hasattr(user, f) and getattr(user, f):
+                return str(getattr(user, f)).strip()
+
+        # raw date 필드 fallback
+        for f in ("retire_date", "quit"):
+            if hasattr(user, f) and getattr(user, f):
+                v = getattr(user, f)
+                try:
+                    return v.strftime("%Y-%m-%d")
+                except Exception:
+                    return str(v).strip()
+
+        return ""  # 퇴사일 없으면 빈값
+
+    join_disp = _get_join_disp(u)
+    retire_disp = _get_retire_disp(u)   # 없으면 ""
+
+    # {현재월} 자금지급일
+    today = timezone.localdate()
+    current_month_disp = f"{today.year}년 {today.month}월"
+
+    safe_part   = escape(part)
+    safe_branch = escape(branch)
+    safe_state  = escape(state)
+    safe_name   = escape(name)
+
+    # ✅ PDF 메타(title)는 "순수 텍스트" 권장 (마크업 X)
+    doc_title_plain = f"[채권] {part} {branch} {state} {name} FA 요청의 건".strip()
+
+    # ✅ 화면에 보이는 제목(표 안)은 "한 줄 + 빨간 강조" (마크업 O)
+    title_one_line = (
+        f"[채권] {safe_part} {safe_branch} {safe_state} {safe_name} FA "
+        f'<font color="red">{{ 요청사항 }}</font> 요청의 건'
+    ).strip()
+
+    main_text = (
+        f"{safe_part} {safe_branch} {safe_state} {safe_name} FA의 "
+        f'<font color="red">{{ 요청사항 }}</font>'
+        f"을 아래와 같이 요청드리오니, 검토 후 재가 부탁드립니다."
+    )
+
+    request_text = (
+        f"나. 요청사항 : "
+        f'<font color="red">{{ 요청사항 }}</font>'
+    )
+
+    # =========================
+    # PDF 세팅
+    # =========================
+    font_name = _register_korean_font()
+    styles = getSampleStyleSheet()
+
+    base = ParagraphStyle(
+        "KBase",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=10.5,
+        leading=14.5,
+        spaceAfter=4,
+    )
+    h1 = ParagraphStyle(
+        "KH1",
+        parent=base,
+        fontSize=14.5,
+        leading=20,
+        spaceAfter=10,
+    )
+    h2 = ParagraphStyle(
+        "KH2",
+        parent=base,
+        fontSize=12,
+        leading=18,
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+
+    # 들여쓰기 스타일(가/나/다…)
+    ind1 = ParagraphStyle("IND1", parent=base, leftIndent=10)
+    ind2 = ParagraphStyle("IND2", parent=base, leftIndent=20)
+    small = ParagraphStyle("SMALL", parent=base, fontSize=9.5, leading=13, textColor=colors.grey)
+
+    resp = HttpResponse(content_type="application/pdf")
+    safe_fn = f"{part}_{branch}_{state}_{name}_지원신청서.pdf".replace(" ", "_")
+    resp["Content-Disposition"] = f'attachment; filename="{safe_fn}"'
+
+    doc = SimpleDocTemplate(
+        resp,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=16 * mm,
+        bottomMargin=16 * mm,
+        title=doc_title_plain,
+    )
+
+    elems = []
+
+    # =========================
+    # 문서 본문
+    # =========================
+
+    # =========================
+    # 세부내용(표 우측셀에 들어갈 "문장들" 묶음) — 표 추가 금지!
+    # =========================
+    detail_flow = []
+
+    detail_flow.append(Paragraph("- 아     래 -", base))
+    detail_flow.append(Spacer(1, 6))
+
+    if retire_disp:  # ✅ 퇴사자
+        detail_flow.append(
+            Paragraph(
+                f"가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} ~ {retire_disp})",
+                ind1
+            )
+        )
+    else:  # ✅ 재직자
+        detail_flow.append(
+            Paragraph(
+                f"가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} 입사)",
+                ind1
+            )
+        )
+    detail_flow.append(Spacer(1, 6))
+
+    detail_flow.append(Paragraph(request_text, ind1))
+    detail_flow.append(Spacer(1, 6))
+
+    # 다. 채권현황 (표 없이 텍스트만)
+    detail_flow.append(Paragraph("다. 채권현황", ind1))
+
+    # 1) 보증보험: 합계 + (기간) + 리스트(유지건)
+    if surety_obj:
+        detail_flow.append(
+            Paragraph(
+                f"1. 보증보험: {_fmt_money(surety_total)}원 ({surety_period_text})",
+                ind2
+            )
+        )
+    else:
+        detail_flow.append(Paragraph("1. 보증보험: 해당없음", ind2))
+
+    # 2) 기타채권: 합계 + 리스트(유지건)
+    if others.exists():
+        detail_flow.append(Paragraph(f"2. 기타채권 : {_fmt_money(other_total)}원", ind2))
+        for o in others:
+            # 양식: {상품명}({채권번호}) : {가입금액}원
+            bond_no_clean = (o.bond_no or "").replace(",", "")  # ✅ 콤마 제거
+            bond = f"{o.product_name or ''}({bond_no_clean})"
+            detail_flow.append(Paragraph(f"• {bond} : {_fmt_money(o.amount)}원", ind2))
+    else:
+        detail_flow.append(Paragraph("2. 기타채권 : 해당없음", ind2))
+
+    detail_flow.append(Spacer(1, 6))
+
+    # 라. 수수료현황 (표 없이 텍스트만)
+    detail_flow.append(Paragraph("라. 수수료현황", ind1))
+    detail_flow.append(Paragraph(f"1. 최종지급액: {_fmt_money(gi('final_payment', 0))}원", ind2))
+    detail_flow.append(Paragraph("2. 환수지급예상수수료", ind2))
+    detail_flow.append(Paragraph(f"- 환수예상수수료: {_fmt_money(gi('refund_expected', 0))}원", ind2))
+    detail_flow.append(Paragraph(f"- 지급예상수수료: {_fmt_money(gi('pay_expected', 0))}원", ind2))
+    detail_flow.append(Paragraph(f"3. 직전3개월장기총수수료: {_fmt_money(gi('comm_3m', 0))}원", ind2))
+
+    detail_flow.append(Spacer(1, 6))
+
+    # 마. 유지율/수금율현황 (표 없이 텍스트만)
+    detail_flow.append(Paragraph("마. 유지율/수금율현황", ind1))
+    detail_flow.append(Paragraph("1. 통산유지율 (25회통산)", ind2))
+    detail_flow.append(Paragraph(f"- 생보: {gd('ls_25_total', '0.00')}%", ind2))
+    detail_flow.append(Paragraph(f"- 손보: {gd('ns_25_total', '0.00')}%", ind2))
+    detail_flow.append(Paragraph("2. 응당수금율 (2-13회)", ind2))
+    detail_flow.append(Paragraph(f"- 생보: {gd('ls_2_13_due', '0.00')}%", ind2))
+    detail_flow.append(Paragraph(f"- 손보: {gd('ns_2_13_due', '0.00')}%", ind2))
+
+    detail_flow.append(Spacer(1, 6))
+
+    # 바. 첨부 (텍스트만)
+    detail_flow.append(Paragraph("바. 첨부", ind1))
+    detail_flow.append(Paragraph(f"• {branch} 업무요청서 1부.", ind2))
+    detail_flow.append(Paragraph(f"• {name} FA 지표현황 1부.", ind2))
+
+    detail_flow.append(Spacer(1, 6))
+    detail_flow.append(Paragraph("끝.", base))
+
+    # 테이블 셀에 넣을 때 넘침 방지 (A4 안에서 최대한 맞추기)
+    detail_cell = KeepInFrame(155 * mm, 240 * mm, detail_flow, mode="shrink")
+
+    # =========================
+    # 0) 상단 요약 테이블(제목 + 주요내용)
+    # =========================
+    summary_rows = [
+        [Paragraph("제목", base), Paragraph(title_one_line, base)],
+        [Paragraph("주요내용", base), Paragraph(main_text, base)],
+        [Paragraph("지원기간", base), Paragraph(f"{current_month_disp} 자금지급일", base)],
+        [Paragraph("세부내용", base), detail_cell],
+    ]
+
+    summary_tbl = Table(
+        summary_rows,
+        colWidths=[25 * mm, 155 * mm],  # 좌 25mm / 우 나머지
+    )
+
+    summary_tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), font_name),
+        ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+
+        # 좌측 라벨 컬럼 배경
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F1F1")),
+
+        # 테두리
+        ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#D2DDEC")),
+
+        # 정렬
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),  # 좌측 컬럼 가운데 정렬
+
+        # 패딩
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+
+    elems.append(summary_tbl)
+    elems.append(Spacer(1, 10))
+
+    doc.build(elems)
+    return resp
 
 
 # =========================================================

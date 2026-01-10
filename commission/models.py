@@ -50,6 +50,27 @@ class DepositSummary(models.Model):
     pay_ns = models.BigIntegerField(default=0, verbose_name="지급손보")
     pay_ls = models.BigIntegerField(default=0, verbose_name="지급생보")
 
+    # ✅ 보증(O/X) 환수/지급 (추가)
+    # 보증(O) 환수
+    surety_o_refund_ns = models.BigIntegerField(default=0, verbose_name="보증(O) 환수손보")
+    surety_o_refund_ls = models.BigIntegerField(default=0, verbose_name="보증(O) 환수생보")
+    surety_o_refund_total = models.BigIntegerField(default=0, verbose_name="보증(O) 환수합계")
+
+    # 보증(X) 환수
+    surety_x_refund_ns = models.BigIntegerField(default=0, verbose_name="보증(X) 환수손보")
+    surety_x_refund_ls = models.BigIntegerField(default=0, verbose_name="보증(X) 환수생보")
+    surety_x_refund_total = models.BigIntegerField(default=0, verbose_name="보증(X) 환수합계")
+
+    # 보증(O) 지급
+    surety_o_pay_ns = models.BigIntegerField(default=0, verbose_name="보증(O) 지급손보")
+    surety_o_pay_ls = models.BigIntegerField(default=0, verbose_name="보증(O) 지급생보")
+    surety_o_pay_total = models.BigIntegerField(default=0, verbose_name="보증(O) 지급합계")
+
+    # 보증(X) 지급
+    surety_x_pay_ns = models.BigIntegerField(default=0, verbose_name="보증(X) 지급손보")
+    surety_x_pay_ls = models.BigIntegerField(default=0, verbose_name="보증(X) 지급생보")
+    surety_x_pay_total = models.BigIntegerField(default=0, verbose_name="보증(X) 지급합계")
+
     comm_3m = models.BigIntegerField(default=0, verbose_name="3개월총수수료")
     comm_6m = models.BigIntegerField(default=0, verbose_name="6개월총수수료")
     comm_9m = models.BigIntegerField(default=0, verbose_name="9개월총수수료")

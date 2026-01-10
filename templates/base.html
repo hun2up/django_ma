@@ -3,6 +3,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}업무시스템{% endblock %}</title>
 
   <!-- =====================================================
@@ -19,7 +20,7 @@
   <style>
     /* Mobile offcanvas width */
     #mobileOffcanvas {
-      width: min(86vw, 360px);
+      width: min(60vw, 360px);
     }
     #mobileOffcanvas .accordion-button {
       padding: 14px 16px;
@@ -44,7 +45,7 @@
   {% block enable_datatables %}{% endblock %}
 </head>
 
-<body style="padding-top: 50px;">
+<body>
 
 {% if user.is_authenticated %}
   <!-- =====================================================
@@ -140,13 +141,13 @@
               <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}"
                  href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
               <ul class="dropdown-menu" aria-labelledby="joinMenu">
-                <li><a class="dropdown-item" href="{% url 'join:manual_basic' %}">업무매뉴얼</a></li>
+                <li><a class="dropdown-item" href="/join/manual/">업무매뉴얼</a></li>
                 {% if user.grade in 'superuser main_admin' %}
-                  <li><a class="dropdown-item" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a></li>
+                  <li><a class="dropdown-item" href="/join/manual/head/">업무매뉴얼(관리자)</a></li>
                 {% endif %}
-                <li><a class="dropdown-item" href="{% url 'join:rules_basic' %}">영업기준안</a></li>
+                <li><a class="dropdown-item" href="/join/rules/">영업기준안</a></li>
                 {% if user.grade in 'superuser main_admin' %}
-                  <li><a class="dropdown-item" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a></li>
+                  <li><a class="dropdown-item" href="/join/rules/head/">영업기준안(관리자)</a></li>
                 {% endif %}
               </ul>
             </li>

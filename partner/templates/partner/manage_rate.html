@@ -29,7 +29,7 @@
     data-team-c="{{ subadmin_info.team_c|default:'' }}"
     >
 
-  {% if user.grade not in 'superuser main_admin' %}
+  {% if user.grade not in 'superuser main_admin sub_admin' %}
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
   {% endif %}
 
@@ -83,11 +83,13 @@
   </div>
   {% endif %}
 
-  <!-- ✅ 내용입력 -->
+  <!-- ✅    -->
   <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
-      <div class="d-flex gap-2">
+
+    <div class="manage-input-head">
+      <h5 class="manage-input-title fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
+
+      <div class="manage-input-actions">
         <button type="button" id="btnCheckTable" class="btn btn-outline-info btn-sm">테이블 확인</button>
         <button type="button" id="btnAddRow" class="btn btn-primary btn-sm">추가</button>
         <button type="button" id="btnResetRows" class="btn btn-outline-secondary btn-sm">초기화</button>
@@ -95,27 +97,29 @@
       </div>
     </div>
 
+
     <div class="table-responsive">
       <table class="table align-middle" id="inputTable">
-        <colgroup>
-          <col style="width: 5%"> <!-- 성명(요청자) -->
-          <col style="width: 6%"> <!-- 사번(요청자) -->
-          <col style="width: 5%"> <!-- 성명(대상자) -->
-          <col style="width: 6%"> <!-- 사번(대상자) -->
-          <col style="width: 8%"> <!-- 손보테이블(변경전) -->
-          <col style="width: 5%"> <!-- 손보요율(변경전) -->
-          <col style="width: 8%"> <!-- 생보테이블(변경전) -->
-          <col style="width: 5%"> <!-- 생보요율(변경전) -->
-          <col style="width: 9%"> <!-- 손보테이블(변경후) -->          
-          <col style="width: 5%"> <!-- 손보요율(변경후) -->
-          <col style="width: 9%"> <!-- 생보테이블(변경후) -->          
-          <col style="width: 5%"> <!-- 생보요율(변경후) -->
-          <col style="width: 16%"> <!-- 비고 -->
-          <col style="width: 4%"> <!-- 검색 --> 
-          <col style="width: 4%"> <!-- 삭제 -->
+        <colgroup class="input-cols-structure">
+          <col class="c-search"> <!-- 검색 -->
+          <col class="c-rq-name"> <!-- 성명(요청자) -->
+          <col class="c-rq-id"> <!-- 사번(요청자) -->
+          <col class="c-tg-name"> <!-- 성영(대상자) -->
+          <col class="c-tg-id"> <!-- 사번(대상자) -->
+          <col class="c-before-ftable"> <!-- 손보테이블(변경전) -->
+          <col class="c-before-frate"> <!-- 손보요율(변경전) -->
+          <col class="c-after-ftable"> <!-- 손보테이블(변경후) -->
+          <col class="c-after-frate"> <!-- 손보요율(변경후) -->
+          <col class="c-before-ltable"> <!-- 생보테이블(변경전) -->
+          <col class="c-before-lrate"> <!-- 생보요율(변경전) -->
+          <col class="c-after-ltable"> <!-- 생보테이블(변경후) -->
+          <col class="c-after-lrate"> <!-- 생보요율(변경후) -->
+          <col class="c-memo">
+          <col class="c-del">
         </colgroup>
         <thead class="table-light">
           <tr>
+            <th>검색</th>
             <th>성명<br>(요청자)</th>
             <th>사번<br>(요청자)</th>
             <th>성명<br>(대상자)</th>
@@ -128,14 +132,16 @@
             <th>생보요율<br>(변경전)</th>            
             <th>생보테이블<br>(변경후)<span class="text-danger">*</span></th>
             <th>생보요율<br>(변경후)</th>
-            <th>비고</th>
-            <th>검색</th>
+            <th>비고</th>            
             <th>삭제</th>
           </tr>
         </thead>
         <tbody>
           <!-- 최초 1행 템플릿 — JS로 복제/최대 10개까지 -->
           <tr class="input-row">
+            <td class="text-center">
+              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+            </td>
             <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
             <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
             <td><input type="text" class="form-control readonly-field" name="tg_name" readonly></td>
@@ -148,13 +154,8 @@
             <td><input type="text" class="form-control readonly-field text-center" name="before_lrate" readonly></td>            
             <td><input type="text" class="form-control" name="after_ltable" placeholder="선택 또는 입력"></td>
             <td><input type="text" class="form-control readonly-field text-center" name="after_lrate" readonly></td>
-            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>
-            <td class="text-center">
-              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-            </td>
-            <td class="text-center">
-              <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
-            </td>
+            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>            
+            <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button></td>
           </tr>
         </tbody>
       </table>

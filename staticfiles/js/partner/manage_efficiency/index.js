@@ -1,9 +1,14 @@
 // django_ma/static/js/partner/manage_efficiency/index.js
-//
-// ✅ 그룹(Accordion) 렌더 기준 엔트리
-// - 검색 시 inputSection/mainSheet 오픈
-// - fetchData(ym, branch) -> 내부에서 groups + rows 렌더
-// - confirm 업로드 핸들러/입력행 이벤트 연결
+// =========================================================
+// ✅ Manage Efficiency Entry (Final Refactor)
+// - root 1회 초기화 가드
+// - ManageBoot(efficiency) 연동(실패해도 동작)
+// - 컬럼폭 적용(applyInputColWidths)
+// - 입력행/확인서 업로드 핸들러 연결
+// - 검색(runSearch): YM/Branch 검증 + inputSection/mainSheet 오픈 + fetchData
+// - 자동검색: main_admin/sub_admin 기본 autoLoad
+// - superuser: branch change 시 자동 재조회
+// =========================================================
 
 import { els } from "./dom_refs.js";
 import { initInputRowEvents } from "./input_rows.js";
@@ -12,9 +17,17 @@ import { initManageBoot } from "../../common/manage_boot.js";
 import { initConfirmUploadHandlers } from "./confirm_upload.js";
 import { applyInputColWidths } from "./col_widths.js";
 
+/* =========================================================
+   Debug
+========================================================= */
 const DEBUG = false;
-const log = (...a) => DEBUG && console.log("[efficiency/index]", ...a);
+const log = (...args) => DEBUG && console.log("[efficiency/index]", ...args);
+const warn = (...args) => console.warn("[efficiency/index]", ...args);
+const err = (...args) => console.error("[efficiency/index]", ...args);
 
+/* =========================================================
+   Small utils
+========================================================= */
 function str(v) {
   return String(v ?? "").trim();
 }
@@ -30,13 +43,15 @@ function onReady(fn) {
   }
 }
 
+/* =========================================================
+   DOM getters (safe)
+========================================================= */
 function getRoot() {
   return (
     els.root ||
     document.getElementById("manage-efficiency") ||
     document.getElementById("manage-calculate") ||
-    document.getElementById("manage-rate") ||
-    document.getElementById("manage-structure")
+    null
   );
 }
 function getInputSection() {
@@ -55,108 +70,179 @@ function getBranchEl() {
   return els.branch || document.getElementById("branchSelect");
 }
 function getSearchBtn() {
-  return els.btnSearch || document.getElementById("btnSearchPeriod") || document.getElementById("btnSearch");
+  return (
+    els.btnSearch ||
+    document.getElementById("btnSearchPeriod") ||
+    document.getElementById("btnSearch") ||
+    null
+  );
 }
 
+/* =========================================================
+   UI helpers
+========================================================= */
+function openSections() {
+  const inputSection = getInputSection();
+  const mainSheet = getMainSheet();
+  if (inputSection) inputSection.hidden = false;
+  if (mainSheet) mainSheet.hidden = false;
+}
+
+function ensureInitedOnce(root) {
+  if (!root) return false;
+  if (root.dataset.inited === "1") return false;
+  root.dataset.inited = "1";
+  return true;
+}
+
+/* =========================================================
+   Core
+========================================================= */
 onReady(() => {
   const root = getRoot();
-
-  const inputTable = document.getElementById("inputTable");
-  applyInputColWidths(root, inputTable);
-  
   if (!root) {
-    console.error("⚠️ manage-efficiency root 요소를 찾을 수 없습니다.");
+    err("⚠️ manage-efficiency root 요소를 찾을 수 없습니다.");
     return;
   }
-  if (root.dataset.inited === "1") return;
-  root.dataset.inited = "1";
+  if (!ensureInitedOnce(root)) return;
 
+  // 1) 컬럼폭(수동) 적용: dataset 기반
+  try {
+    const inputTable = document.getElementById("inputTable");
+    // applyInputColWidths(root, inputTable);
+    log("✅ applyInputColWidths OK");
+  } catch (e) {
+    warn("⚠️ applyInputColWidths 실패(무시):", e);
+  }
+
+  // 2) ManageBoot 연동(실패해도 동작)
   let ctx = {};
   try {
     ctx = initManageBoot("efficiency") || {};
   } catch (e) {
-    console.warn("⚠️ initManageBoot('efficiency') 실패(무시):", e);
+    warn("⚠️ initManageBoot('efficiency') 실패(무시):", e);
     ctx = {};
   }
 
   const boot = ctx.boot || window.ManageefficiencyBoot || {};
   const user = ctx.user || window.currentUser || {};
 
-  function getGrade() {
-    return str(user.grade || root.dataset.userGrade);
-  }
-  function getYM() {
+  /* -------------------------
+     Context getters
+  ------------------------- */
+  const getGrade = () => str(user.grade || root.dataset.userGrade);
+
+  const getYM = () => {
     const y = str(getYearEl()?.value || "");
     const m = pad2(getMonthEl()?.value || "");
     return y && m ? `${y}-${m}` : "";
-  }
-  function getBranch() {
+  };
+
+  const getBranch = () => {
     const grade = getGrade();
+    // superuser: branchSelect 값만 인정(템플릿에서 선택)
     if (grade === "superuser") return str(getBranchEl()?.value || "");
-    return str(user.branch) || str(boot.branch) || str(root.dataset.branch) || "";
-  }
+    // 그 외: 로그인 사용자/boot/dataset 순으로
+    return (
+      str(user.branch) ||
+      str(boot.branch) ||
+      str(root.dataset.branch) ||
+      str(root.dataset.userBranch) ||
+      ""
+    );
+  };
 
-  function showSections() {
-    const inputSection = getInputSection();
-    const mainSheet = getMainSheet();
-    if (inputSection) inputSection.hidden = false;
-    if (mainSheet) mainSheet.hidden = false;
-  }
-
+  /* -------------------------
+     Init modules (safe)
+  ------------------------- */
   try {
     initInputRowEvents();
     console.log("✅ [efficiency] initInputRowEvents OK");
   } catch (e) {
-    console.error("❌ [efficiency] initInputRowEvents 오류:", e);
+    err("❌ [efficiency] initInputRowEvents 오류:", e);
   }
 
   try {
     initConfirmUploadHandlers();
     console.log("✅ [efficiency] initConfirmUploadHandlers OK");
   } catch (e) {
-    console.error("❌ [efficiency] initConfirmUploadHandlers 오류:", e);
+    err("❌ [efficiency] initConfirmUploadHandlers 오류:", e);
   }
 
+  /* -------------------------
+     Search runner
+  ------------------------- */
   async function runSearch(trigger = "click") {
     const grade = getGrade();
     const ym = getYM();
     const branch = getBranch();
 
-    if (!ym) return alert("연도/월도를 확인해주세요.");
-
-    if (grade === "superuser") {
-      const branchEl = getBranchEl();
-      if (!branchEl) return alert("지점 선택 UI가 없습니다. (superuser 템플릿 조건 확인)");
-      if (!str(branchEl.value)) return alert("지점을 먼저 선택하세요.");
-    }
-    if (!branch) {
-      console.warn("⚠️ branch를 찾지 못했습니다.", { trigger, grade, ym, user, boot, dataset: root.dataset });
+    if (!ym) {
+      alert("연도/월도를 확인해주세요.");
       return;
     }
 
-    showSections();
+    // superuser는 branchSelect가 반드시 있어야 함
+    if (grade === "superuser") {
+      const branchEl = getBranchEl();
+      if (!branchEl) {
+        alert("지점 선택 UI가 없습니다. (superuser 템플릿 조건 확인)");
+        return;
+      }
+      if (!str(branchEl.value)) {
+        alert("지점을 먼저 선택하세요.");
+        return;
+      }
+    }
+
+    if (!branch) {
+      warn("⚠️ branch를 찾지 못했습니다.", {
+        trigger,
+        grade,
+        ym,
+        user,
+        boot,
+        dataset: root.dataset,
+      });
+      return;
+    }
+
+    openSections();
     log("runSearch -> fetchData", { trigger, ym, branch, grade });
 
     await fetchData(ym, branch);
   }
 
+  /* -------------------------
+     Bind events
+  ------------------------- */
   const btnSearch = getSearchBtn();
   if (btnSearch) {
-    btnSearch.addEventListener("click", () => runSearch("click").catch((e) => console.error("❌ runSearch 실패:", e)));
+    btnSearch.addEventListener("click", () => {
+      runSearch("click").catch((e) => err("❌ runSearch(click) 실패:", e));
+    });
   }
 
   const grade = getGrade();
-  const shouldAuto = typeof boot.autoLoad === "boolean" ? boot.autoLoad : ["main_admin", "sub_admin"].includes(grade);
+
+  // 자동 조회 정책:
+  // - boot.autoLoad가 boolean이면 그 값을 존중
+  // - 아니면 main_admin/sub_admin 기본 autoLoad
+  const shouldAuto =
+    typeof boot.autoLoad === "boolean"
+      ? boot.autoLoad
+      : ["main_admin", "sub_admin"].includes(grade);
 
   if (shouldAuto && ["main_admin", "sub_admin"].includes(grade)) {
-    runSearch("auto").catch((e) => console.error("❌ auto runSearch 실패:", e));
+    runSearch("auto").catch((e) => err("❌ runSearch(auto) 실패:", e));
   }
 
+  // superuser: branch 변경 시 자동 재조회(선택값 있을 때만)
   const branchEl = getBranchEl();
   if (branchEl && grade === "superuser") {
     branchEl.addEventListener("change", () => {
       if (!str(branchEl.value)) return;
-      runSearch("branch-change").catch((e) => console.error("❌ branch-change runSearch 실패:", e));
+      runSearch("branch-change").catch((e) => err("❌ runSearch(branch-change) 실패:", e));
     });
   }
 });

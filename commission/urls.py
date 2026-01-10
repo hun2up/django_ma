@@ -14,4 +14,5 @@ urlpatterns = [
     path("api/deposit-summary/", views.api_deposit_summary, name="api_deposit_summary"),
     path("api/deposit-surety/", views.api_deposit_surety_list, name="api_deposit_surety_list"),
     path("api/deposit-other/", views.api_deposit_other_list, name="api_deposit_other_list"),
+    path("api/support-pdf/", views.api_support_pdf, name="api_support_pdf"),
 ]

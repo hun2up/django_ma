@@ -1,15 +1,18 @@
+# django_ma/join/views.py
+
+import os
+import tempfile
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse, FileResponse
 from django.conf import settings
 from django.db import connection
-from join.tasks import delete_file_task
-import os
-import tempfile
-from .models import JoinInfo
-from .forms import JoinForm
+from .tasks import delete_file_task
+from .models import JoinInfo, Manual
+from .forms import JoinForm, ManualForm
 from join.tasks import generate_pdf_task
+from accounts.decorators import grade_required
 
 
 @login_required
@@ -19,12 +22,12 @@ def db_test_view(request):
 # ✅ 기본 수수료 페이지 접속 시 → 채권관리 페이지로 자동 이동
 @login_required
 def redirect_to_manual(request):
-    return redirect('manual_basic')
+    return redirect('join:manual_basic')
 
-def manual_basic(request): return render(request, "join/manual_basic.html")
-def manual_head(request): return render(request, "join/manual_head.html")
-def rules_basic(request): return render(request, "join/rules_basic.html")
-def rules_head(request): return render(request, "join/rules_head.html")
+def manual_basic(request): return render(request, "manual/manual_basic.html")
+def manual_head(request): return render(request, "manual/manual_head.html")
+def rules_basic(request): return render(request, "manual/rules_basic.html")
+def rules_head(request): return render(request, "manual/rules_head.html")
 
 @login_required
 def join_form(request):
@@ -133,8 +136,47 @@ def download_pdf(request, task_id):
     return HttpResponse("PDF 파일을 찾을 수 없습니다.", status=404)
 
 
-
 @login_required
 def success_view(request):
     """PDF 생성 완료 또는 가입 성공 후 보여줄 안내 페이지"""
     return render(request, 'join/success.html')
+
+
+def manual_list(request):
+    qs = Manual.objects.all().order_by("-updated_at")
+    is_admin = (
+        request.user.is_authenticated
+        and getattr(request.user, "grade", "") in ("superuser", "main_admin")
+    )
+    return render(request, "manual/manual_list.html", {"manuals": qs, "is_admin": is_admin})
+
+def manual_detail(request, pk):
+    manual = get_object_or_404(Manual, pk=pk)
+    # 비관리자는 비공개 접근 차단
+    if not manual.is_published:
+        if not (request.user.is_authenticated and getattr(request.user, "grade", "") in ["superuser", "main_admin"]):
+            return redirect("join:manual_list")
+    return render(request, "manual/manual_detail.html", {"manual": manual})
+
+@grade_required(["superuser"])
+def manual_create(request):
+    if request.method == "POST":
+        form = ManualForm(request.POST, request.FILES)
+        if form.is_valid():
+            manual = form.save()
+            return redirect("join:manual_detail", pk=manual.pk)
+    else:
+        form = ManualForm()
+    return render(request, "manual/manual_form.html", {"form": form, "mode": "create"})
+
+@grade_required(["superuser"])
+def manual_edit(request, pk):
+    manual = get_object_or_404(Manual, pk=pk)
+    if request.method == "POST":
+        form = ManualForm(request.POST, request.FILES, instance=manual)
+        if form.is_valid():
+            manual = form.save()
+            return redirect("manual_detail", pk=manual.pk)
+    else:
+        form = ManualForm(instance=manual)
+    return render(request, "manual/manual_form.html", {"form": form, "mode": "edit", "manual": manual})

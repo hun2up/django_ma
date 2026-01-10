@@ -1,21 +1,17 @@
 /**
- * django_ma/static/js/common/search_user_modal.js  (REFRACTOR - STRUCTURE FIX)
+ * django_ma/static/js/common/search_user_modal.js (FINAL REFACTOR)
  * -----------------------------------------------------
  * 공통 대상자 검색 모달
  * - /api/accounts/search-user/ 기반
- * - manage-structure / manage-rate 에서만 scope=branch 전송
- * - deposit-home도 root로 인식
+ * - manage-structure / manage-rate / manage-efficiency / manage-calculate 는 scope=branch 사용
  * - 결과 클릭 시 userSelected 이벤트 document + window 모두 발행
  * - resultsBox에만 클릭 위임
  *
- * ✅ FIX(편제변경 반영 불가 이슈)
- * - btnOpenSearch 클릭 시 활성 입력행을 "active" + "active-input-row" 둘 다로 표시
- *   (편제변경 input_rows.js는 보통 .input-row.active 를 기준으로 찾음)
- * - 선택 시 activeRow가 없더라도:
- *   1) .input-row.active 우선
- *   2) .input-row.active-input-row 다음
- *   3) 마지막 input-row fallback
- * - 입력 필드 탐색을 name 외에 data-field / class / id(tg_*)까지 확장(있을 때만)
+ * ✅ 주요 보강
+ * - scope/root는 submit 시점에 재판정 (DOM 늦게 로드/부분 갱신 대응)
+ * - branchSelect 후보를 다중 탐색 (템플릿 id 변형 대응)
+ * - superuser만 branch 파라미터 전송 (백엔드 정책과 일치)
+ * - 활성행 탐색을 root 내부 우선으로 (다른 테이블 오탐 방지)
  * -----------------------------------------------------
  */
 
@@ -36,27 +32,67 @@
     return (
       document.getElementById("manage-structure") ||
       document.getElementById("manage-rate") ||
+      document.getElementById("manage-efficiency") ||
+      document.getElementById("manage-calculate") ||
       document.getElementById("manage-table") ||
       document.getElementById("deposit-home") ||
+      document.getElementById("support-form") ||
       null
     );
   }
 
   function getPageScope(root) {
     const id = root?.id || "";
-    if (id === "manage-structure" || id === "manage-rate") return "branch";
+    if (
+      id === "manage-efficiency" ||
+      id === "manage-calculate" ||
+      id === "support-form"
+    ) {
+      return "branch";
+    }
     return "default";
   }
 
+  function getUserGrade(root) {
+    return toStr(root?.dataset?.userGrade || window.currentUser?.grade || "");
+  }
+
+  function findBranchSelectEl(root) {
+    // superuser 지점 선택 셀렉트는 페이지마다 id가 다를 수 있어서 후보를 넓게 잡음
+    // 우선순위: 명시적인 셀렉터 -> 흔한 id -> root 내부 -> document
+    const selectors = [
+      "#branchSelect",
+      "#branch",
+      "#id_branch",
+      "[data-branch-select]",
+      'select[name="branch"]',
+      'select[name="branchSelect"]',
+    ];
+
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+
+    // root 안에 branch 관련 select가 있는 경우(안전 fallback)
+    const inRoot = root?.querySelector?.('select[id*="branch"], select[name*="branch"]');
+    if (inRoot) return inRoot;
+
+    return null;
+  }
+
   function getEffectiveBranchForSearch(root) {
-    const grade = toStr(root?.dataset?.userGrade || window.currentUser?.grade || "");
-    const sel = document.getElementById("branchSelect");
+    const grade = getUserGrade(root);
+    const sel = findBranchSelectEl(root);
     const selectedBranch = toStr(sel?.value || "");
 
     const uBranch = toStr(window.currentUser?.branch || "");
     const dsBranch = toStr(root?.dataset?.defaultBranch || "");
 
+    // ✅ superuser는 선택지점 우선
     if (grade === "superuser") return selectedBranch || uBranch || dsBranch;
+
+    // ✅ 그 외는 본인지점 우선(서버도 그렇게 처리)
     return uBranch || dsBranch || selectedBranch;
   }
 
@@ -78,15 +114,17 @@
   }
 
   /* -----------------------------
-   * active row tracking (핵심 FIX)
-   * - 편제변경: .input-row.active 를 찾는 경우가 많음
+   * active row tracking
    * ----------------------------- */
-  function clearActiveMarks() {
+  function clearActiveMarks(root) {
     try {
-      document.querySelectorAll("tr.input-row.active, tr.input-row.active-input-row").forEach((x) => {
-        x.classList.remove("active");
-        x.classList.remove("active-input-row");
-      });
+      const scopeRoot = root || document;
+      scopeRoot
+        .querySelectorAll("tr.input-row.active, tr.input-row.active-input-row")
+        .forEach((x) => {
+          x.classList.remove("active");
+          x.classList.remove("active-input-row");
+        });
     } catch (_) {}
   }
 
@@ -94,9 +132,10 @@
     const tr = btn?.closest?.("tr");
     if (!tr) return;
 
-    clearActiveMarks();
+    const root = getActiveRoot();
+    clearActiveMarks(root);
 
-    // ✅ 둘 다 부여해서 구조/요율 어디서든 잡히게
+    // ✅ 둘 다 부여해서 구조/요율/효율 어디서든 잡히게
     try {
       tr.classList.add("active-input-row");
       if (tr.classList.contains("input-row")) tr.classList.add("active");
@@ -106,32 +145,37 @@
     log("activeRow set", tr);
   }
 
-  function getFallbackRow() {
-    const root = getActiveRoot();
+  function getFallbackRow(root) {
     const inputTable = root?.querySelector?.("#inputTable");
     const rows = inputTable?.querySelectorAll?.("tr.input-row");
     if (rows && rows.length) return rows[rows.length - 1];
     return null;
   }
 
-  function resolveTargetRow() {
-    // 1) search 버튼 클릭으로 저장된 activeRow
+  function resolveTargetRow(root) {
+    // 1) 저장된 activeRow
     if (activeRow && document.contains(activeRow)) return activeRow;
 
-    // 2) 편제/요율 input_rows.js가 붙인 .active
+    // 2) root 내부에서 우선 탐색(오탐 방지)
+    const r1 = root?.querySelector?.("tr.input-row.active");
+    if (r1) return r1;
+
+    const r2 = root?.querySelector?.("tr.input-row.active-input-row");
+    if (r2) return r2;
+
+    // 3) document fallback
     const a1 = document.querySelector("tr.input-row.active");
     if (a1) return a1;
 
-    // 3) 우리쪽 .active-input-row
     const a2 = document.querySelector("tr.input-row.active-input-row");
     if (a2) return a2;
 
     // 4) 마지막 행
-    return getFallbackRow();
+    return getFallbackRow(root);
   }
 
   /* -----------------------------
-   * robust field finder (안전)
+   * robust field finder
    * ----------------------------- */
   function findField(row, key) {
     if (!row || !key) return null;
@@ -194,11 +238,9 @@
     const modalEl = document.getElementById("searchUserModal");
     if (!modalEl) return;
 
+    // 모달 기준 1회 바인딩
     if (modalEl.dataset.bound === "true") return;
     modalEl.dataset.bound = "true";
-
-    const root = getActiveRoot();
-    const scope = getPageScope(root);
 
     const form = modalEl.querySelector("#searchUserForm");
     const input = modalEl.querySelector("#searchKeyword");
@@ -212,6 +254,7 @@
     }
 
     // ✅ btnOpenSearch 클릭 → activeRow 세팅 (capture=true)
+    // (동적 생성 행도 잡히도록 document 위임)
     document.addEventListener(
       "click",
       (e) => {
@@ -229,12 +272,20 @@
       const keyword = toStr(input?.value || "");
       if (!keyword) return window.alert("검색어를 입력하세요.");
 
+      // ✅ submit 시점에 root/scope 재판정
+      const root = getActiveRoot();
+      const scope = getPageScope(root);
+      const grade = getUserGrade(root);
+
       let branch = "";
       if (scope === "branch") {
         if (!root) return window.alert("페이지 루트를 찾을 수 없습니다.");
+
         branch = getEffectiveBranchForSearch(root);
-        if (!branch) {
-          return window.alert("지점 정보가 없습니다. (부서/지점을 먼저 선택하거나 로그인 사용자 지점 확인)");
+
+        // superuser는 branch 선택이 필수(선택지점/본인지점/기본지점 중 하나라도 있어야 함)
+        if (grade === "superuser" && !branch) {
+          return window.alert("지점 정보가 없습니다. (부서/지점을 먼저 선택해주세요)");
         }
       }
 
@@ -246,7 +297,7 @@
 
         if (scope === "branch") {
           url.searchParams.set("scope", "branch");
-          url.searchParams.set("branch", branch);
+          if (grade === "superuser") url.searchParams.set("branch", branch);
         }
 
         const res = await fetch(url.toString(), {
@@ -255,7 +306,7 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json().catch(() => ({}));
-        const list = Array.isArray(data?.results) ? data.results : [];
+        const list = Array.isArray(data?.results) ? data.results : Array.isArray(data?.items) ? data.items : [];
 
         if (!list.length) {
           resultsBox.innerHTML = `<div class="text-center py-3 text-danger">검색 결과가 없습니다.</div>`;
@@ -284,7 +335,7 @@
                 data-enter="${safeEscapeHtml(u.enter || "")}"
                 data-quit="${safeEscapeHtml(u.quit || "재직중")}">
                 <div class="d-flex justify-content-between">
-                  <span><strong>${name}</strong> (${id}) (${regist || "-"})</span>
+                  <span><strong>${name}</strong> (${id}) ${regist ? `(${regist})` : ""}</span>
                   <small class="text-muted">${branchV}</small>
                 </div>
                 <small class="text-muted">입사일: ${enter} / 퇴사일: ${quit}</small>
@@ -292,6 +343,8 @@
             `;
           })
           .join("");
+
+        log("search ok", { scope, grade, count: list.length });
       } catch (err) {
         console.error("❌ 검색 오류:", err);
         resultsBox.innerHTML = `<div class="text-center text-danger py-3">검색 실패</div>`;
@@ -314,8 +367,9 @@
         quit: toStr(item.dataset.quit),
       };
 
-      // ✅ (핵심) 편제변경/요율변경 모두에서 “활성행”을 확실히 잡아 자동 채움
-      const row = resolveTargetRow();
+      const root = getActiveRoot();
+      const row = resolveTargetRow(root);
+
       if (row) autofillSelectedUser(row, selected);
 
       // ✅ 기존 이벤트 기반 처리 로직 유지(요율/편제 input_rows.js 등)
@@ -323,10 +377,9 @@
       document.dispatchEvent(ev);
       window.dispatchEvent(ev);
 
-      tryHideModal(item.closest?.("#searchUserModal") || document.getElementById("searchUserModal"));
+      tryHideModal(document.getElementById("searchUserModal"));
 
-      const modalEl = document.getElementById("searchUserModal");
-      const input = modalEl?.querySelector?.("#searchKeyword");
+      // reset input/results
       if (input) input.value = "";
       resultsBox.innerHTML = "";
     });
@@ -335,11 +388,12 @@
     modalEl.addEventListener("hidden.bs.modal", () => {
       if (input) input.value = "";
       resultsBox.innerHTML = "";
-      // activeRow는 유지해도 되지만, 구조쪽에서 오작동하면 아래 주석 해제 가능
+      // activeRow는 유지 (여러 번 검색 시 편함)
+      // 필요 시 아래 주석 해제:
       // activeRow = null;
     });
 
-    log("bound ok", { scope, searchUrl });
+    log("bound ok", { searchUrl });
   }
 
   document.addEventListener("DOMContentLoaded", init);
