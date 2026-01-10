@@ -17,14 +17,14 @@
       data-deposit-surety-url="{% url 'commission:api_deposit_surety_list' %}"
       data-deposit-other-url="{% url 'commission:api_deposit_other_list' %}"
       data-reset-url="/commission/deposit/"
+      data-support-pdf-url="{% url 'commission:api_support_pdf' %}"
     >
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#searchUserModal">
-            대상자검색
-          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#searchUserModal">대상자검색</button>
           <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
+          <button type="button" id="supportPdfBtn" class="btn btn-success btn-sm" disabled>지원신청서</button>
         </div>
       </div>
 
@@ -49,12 +49,12 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="target_emp_id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap fw-semibold"><span id="target_name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_part">{% if target %}{{ target.part|default:"-" }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_join_date">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_retire_date">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_emp_id" data-bind="target.id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap fw-semibold"><span id="target_name" data-bind="target.name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_part" data-bind="target.part">{% if target %}{{ target.part|default:"-" }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_branch" data-bind="target.branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_join_date" data-bind="target.join_date_display">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="target_retire_date" data-bind="target.retire_date_display">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -82,11 +82,11 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_final_payment">{% if payment %}{{ payment|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_sales_total">{% if sales_total %}{{ sales_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_refund_expected">{% if refund_expected %}{{ refund_expected|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_pay_expected">{% if pay_expected %}{{ pay_expected|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_maint_total">{% if maint_total %}{{ maint_total }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_final_payment" data-bind="summary.final_payment" data-type="money">{% if payment %}{{ payment|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_sales_total" data-bind="summary.sales_total" data-type="money">{% if sales_total %}{{ sales_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_refund_expected" data-bind="summary.refund_expected" data-type="money">{% if refund_expected %}{{ refund_expected|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_pay_expected" data-bind="summary.pay_expected" data-type="money">{% if pay_expected %}{{ pay_expected|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_maint_total" data-bind="summary.maint_total">{% if maint_total %}{{ maint_total }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -105,11 +105,11 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_debt_total">{% if debt_total %}{{ debt_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_surety_total">{% if surety_total %}{{ surety_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_other_total">{% if other_total %}{{ other_total|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_required_debt">{% if required_debt %}{{ required_debt|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_final_excess_amount">{% if final_excess_amount %}{{ final_excess_amount|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_debt_total" data-bind="summary.debt_total" data-type="money">{% if debt_total %}{{ debt_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_surety_total" data-bind="summary.surety_total" data-type="money">{% if surety_total %}{{ surety_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_other_total" data-bind="summary.other_total" data-type="money">{% if other_total %}{{ other_total|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_required_debt" data-bind="summary.required_debt" data-type="money">{% if required_debt %}{{ required_debt|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_final_excess_amount" data-bind="summary.final_excess_amount" data-type="money">{% if final_excess_amount %}{{ final_excess_amount|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -128,11 +128,11 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_div_1m">{% if div_1m %}{{ div_1m }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_div_2m">{% if div_2m %}{{ div_2m }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_div_3m">{% if div_3m %}{{ div_3m }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_inst_current">{% if inst_current %}{{ inst_current|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_inst_prev">{% if inst_prev %}{{ inst_prev|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_div_1m" data-bind="summary.div_1m">{% if div_1m %}{{ div_1m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_div_2m" data-bind="summary.div_2m">{% if div_2m %}{{ div_2m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_div_3m" data-bind="summary.div_3m">{% if div_3m %}{{ div_3m }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_inst_current" data-bind="summary.inst_current" data-type="money">{% if inst_current %}{{ inst_current|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_inst_prev" data-bind="summary.inst_prev" data-type="money">{% if inst_prev %}{{ inst_prev|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -140,7 +140,7 @@
         </div>
       </div>
 
-      <!-- ✅ 수수료현황 -->
+      {# ✅ 수수료현황 #}
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
@@ -159,13 +159,99 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
-                  <td class="text-nowrap">제작중</td>
+                  <td class="text-nowrap"><span id="metric_refund_ns" data-bind="summary.refund_ns" data-type="money">{% if refund_ns %}{{ refund_ns|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_refund_ls" data-bind="summary.refund_ls" data-type="money">{% if refund_ls %}{{ refund_ls|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_pay_ns" data-bind="summary.pay_ns" data-type="money">{% if pay_ns %}{{ pay_ns|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_pay_ls" data-bind="summary.pay_ls" data-type="money">{% if pay_ls %}{{ pay_ls|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-lg-6">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 info-table">
+                  <thead>
+                    <tr>
+                      <th class="text-nowrap">보증(O) 환수손보</th>
+                      <th class="text-nowrap">보증(O) 환수생보</th>
+                      <th class="text-nowrap">보증(O) 환수합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-nowrap"><span id="metric_surety_o_refund_ns" data-bind="summary.surety_o_refund_ns" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_o_refund_ls" data-bind="summary.surety_o_refund_ls" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_o_refund_total" data-bind="summary.surety_o_refund_total" data-type="money">-</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="col-12 col-lg-6">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 info-table">
+                  <thead>
+                    <tr>
+                      <th class="text-nowrap">보증(O) 지급손보</th>
+                      <th class="text-nowrap">보증(O) 지급생보</th>
+                      <th class="text-nowrap">보증(O) 지급합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-nowrap"><span id="metric_surety_o_pay_ns" data-bind="summary.surety_o_pay_ns" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_o_pay_ls" data-bind="summary.surety_o_pay_ls" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_o_pay_total" data-bind="summary.surety_o_pay_total" data-type="money">-</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 info-table">
+                  <thead>
+                    <tr>
+                      <th class="text-nowrap">보증(X) 환수손보</th>
+                      <th class="text-nowrap">보증(X) 환수생보</th>
+                      <th class="text-nowrap">보증(X) 환수합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-nowrap"><span id="metric_surety_x_refund_ns" data-bind="summary.surety_x_refund_ns" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_x_refund_ls" data-bind="summary.surety_x_refund_ls" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_x_refund_total" data-bind="summary.surety_x_refund_total" data-type="money">-</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 info-table">
+                  <thead>
+                    <tr>
+                      <th class="text-nowrap">보증(X) 지급손보</th>
+                      <th class="text-nowrap">보증(X) 지급생보</th>
+                      <th class="text-nowrap">보증(X) 지급합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-nowrap"><span id="metric_surety_x_pay_ns" data-bind="summary.surety_x_pay_ns" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_x_pay_ls" data-bind="summary.surety_x_pay_ls" data-type="money">-</span></td>
+                      <td class="text-nowrap"><span id="metric_surety_x_pay_total" data-bind="summary.surety_x_pay_total" data-type="money">-</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <div class="table-responsive">
@@ -180,14 +266,15 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_comm_3m">{% if comm_3m %}{{ comm_3m|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_comm_6m">{% if comm_6m %}{{ comm_6m|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_comm_9m">{% if comm_9m %}{{ comm_9m|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_comm_12m">{% if comm_12m %}{{ comm_12m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_3m" data-bind="summary.comm_3m" data-type="money">{% if comm_3m %}{{ comm_3m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_6m" data-bind="summary.comm_6m" data-type="money">{% if comm_6m %}{{ comm_6m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_9m" data-bind="summary.comm_9m" data-type="money">{% if comm_9m %}{{ comm_9m|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_comm_12m" data-bind="summary.comm_12m" data-type="money">{% if comm_12m %}{{ comm_12m|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
+
         </div>
       </div>
 
@@ -211,10 +298,10 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_ns_13_round">{% if ns_13_round %}{{ ns_13_round|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ns_18_round">{% if ns_18_round %}{{ ns_18_round|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_13_round">{% if ls_13_round %}{{ ls_13_round|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_18_round">{% if ls_18_round %}{{ ls_18_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_13_round" data-bind="summary.ns_13_round" data-type="percent">{% if ns_13_round %}{{ ns_13_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_18_round" data-bind="summary.ns_18_round" data-type="percent">{% if ns_18_round %}{{ ns_18_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_13_round" data-bind="summary.ls_13_round" data-type="percent">{% if ls_13_round %}{{ ls_13_round|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_18_round" data-bind="summary.ls_18_round" data-type="percent">{% if ls_18_round %}{{ ls_18_round|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -233,10 +320,10 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_ns_18_total">{% if ns_18_total is not None %}{{ ns_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ns_25_total">{% if ns_25_total is not None %}{{ ns_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_18_total">{% if ls_18_total is not None %}{{ ls_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_25_total">{% if ls_25_total is not None %}{{ ls_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_18_total" data-bind="summary.ns_18_total" data-type="percent">{% if ns_18_total is not None %}{{ ns_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_25_total" data-bind="summary.ns_25_total" data-type="percent">{% if ns_25_total is not None %}{{ ns_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_18_total" data-bind="summary.ls_18_total" data-type="percent">{% if ls_18_total is not None %}{{ ls_18_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_25_total" data-bind="summary.ls_25_total" data-type="percent">{% if ls_25_total is not None %}{{ ls_25_total|floatformat:2 }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -255,10 +342,10 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="metric_ns_2_6_due">{% if ns_2_6_due %}{{ ns_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ns_2_13_due">{% if ns_2_13_due %}{{ ns_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_2_6_due">{% if ls_2_6_due %}{{ ls_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="metric_ls_2_13_due">{% if ls_2_13_due %}{{ ls_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_2_6_due" data-bind="summary.ns_2_6_due" data-type="percent">{% if ns_2_6_due %}{{ ns_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ns_2_13_due" data-bind="summary.ns_2_13_due" data-type="percent">{% if ns_2_13_due %}{{ ns_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_2_6_due" data-bind="summary.ls_2_6_due" data-type="percent">{% if ls_2_6_due %}{{ ls_2_6_due|intcomma }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap"><span id="metric_ls_2_13_due" data-bind="summary.ls_2_13_due" data-type="percent">{% if ls_2_13_due %}{{ ls_2_13_due|intcomma }}{% else %}-{% endif %}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -275,7 +362,7 @@
           </div>
 
           <div class="table-responsive mb-3">
-            <table class="table table-sm align-middle mb-0 info-table">
+            <table id="suretyTable" class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">상품명</th>
@@ -302,7 +389,7 @@
           </div>
 
           <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 info-table">
+            <table id="otherTable" class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
                   <th scope="col" class="text-nowrap">상품명</th>
@@ -464,44 +551,125 @@
   }
 
   /* ===============================
-  * 기타채권 테이블 컬럼 레이아웃 고정
+  * 채권현황(Deposit) - 테이블 스크롤/컬럼 정책
+  * - 테이블 폭이 화면보다 크면 table-responsive에서 가로 스크롤
+  * - 대부분 컬럼: 줄바꿈/말줄임 없음 + min-width로 폭 유지(내용 길면 테이블이 커짐)
+  * - 증권번호/비고: 고정폭 + 줄바꿈 없음 + 말줄임 + title 툴팁
   * =============================== */
 
-  /* 기타채권 테이블 한정 */
-  #otherTableBody td {
-    vertical-align: top;
+  /* 공통: 테이블을 내용 기준(max-content)으로 유지 → 화면이 좁으면 가로스크롤 */
+  #suretyTable,
+  #otherTable {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto; /* 내용 길면 테이블이 커지도록 */
   }
 
-  /* 줄바꿈 금지 컬럼들 */
-  #otherTableBody td:nth-child(1), /* 상품명 */
-  #otherTableBody td:nth-child(2), /* 보증내용 */
-  #otherTableBody td:nth-child(3), /* 가입금액 */
-  #otherTableBody td:nth-child(4), /* 상태 */
-  #otherTableBody td:nth-child(5), /* 채권번호 */
-  #otherTableBody td:nth-child(6)  /* 가입일 */
-  {
-    white-space: nowrap;        /* 줄바꿈 금지 */
+  /* 공통: 기본은 줄바꿈 금지(말줄임도 기본은 없음) */
+  #suretyTable th, #suretyTable td,
+  #otherTable th,  #otherTable td {
+    white-space: nowrap;
     word-break: keep-all;
+    overflow: visible;
+    text-overflow: clip;
+    vertical-align: middle;
   }
 
-  /* 각 컬럼 너비 설정 */
-  #otherTableBody td:nth-child(1) { min-width: 110px; } /* 상품명 */
-  #otherTableBody td:nth-child(2) { min-width: 110px; } /* 보증내용 */
-  #otherTableBody td:nth-child(3) { min-width: 100px; text-align: right; } /* 가입금액 */
-  #otherTableBody td:nth-child(4) { min-width: 80px;  } /* 상태 */
-  #otherTableBody td:nth-child(5) { min-width: 110px; } /* 채권번호 */
-  #otherTableBody td:nth-child(6) { min-width: 95px;  } /* 가입일 */
+  /* ---------- 보증보험(surety) 컬럼 폭 ---------- */
+  /* 1) 상품명 */
+  #suretyTable th:nth-child(1),
+  #suretyTable td:nth-child(1) { min-width: 110px; }
 
-  /* 비고 컬럼 (마지막 컬럼) */
-  #otherTableBody td:nth-child(7) {
-    white-space: normal;        /* ✅ 줄바꿈 허용 */
-    word-break: break-word;     /* 긴 텍스트 자동 줄바꿈 */
-    width: 100%;                /* 남는 너비 전부 사용 */
+  /* 2) 증권번호: 가입금액과 동일 폭(100px) + 말줄임 + 툴팁용 */
+  #suretyTable th:nth-child(2),
+  #suretyTable td:nth-child(2) {
+    width: 100px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 3) 가입금액 */
+  #suretyTable th:nth-child(3),
+  #suretyTable td:nth-child(3) {
+    width: 100px;
+    min-width: 100px;
+    text-align: right;
+  }
+
+  /* 4) 상태 */
+  #suretyTable th:nth-child(4),
+  #suretyTable td:nth-child(4) { min-width: 80px; }
+
+  /* 5) 보험가입일 */
+  #suretyTable th:nth-child(5),
+  #suretyTable td:nth-child(5) { min-width: 110px; }
+
+  /* 6) 보험종료일 */
+  #suretyTable th:nth-child(6),
+  #suretyTable td:nth-child(6) { min-width: 110px; }
+
+  /* 증권번호 셀 UX(툴팁이 있음을 암시) */
+  #suretyTable td:nth-child(2) {
+    cursor: help;
+  }
+
+  /* ---------- 기타채권(other) 컬럼 폭 ---------- */
+  /* 1) 상품명 */
+  #otherTable th:nth-child(1),
+  #otherTable td:nth-child(1) { min-width: 110px; }
+
+  /* 2) 보증내용 */
+  #otherTable th:nth-child(2),
+  #otherTable td:nth-child(2) { min-width: 110px; }
+
+  /* 3) 가입금액 */
+  #otherTable th:nth-child(3),
+  #otherTable td:nth-child(3) {
+    width: 100px;
+    min-width: 100px;
+    text-align: right;
+  }
+
+  /* 4) 상태 */
+  #otherTable th:nth-child(4),
+  #otherTable td:nth-child(4) { min-width: 80px; }
+
+  /* 5) 채권번호 */
+  #otherTable th:nth-child(5),
+  #otherTable td:nth-child(5) { min-width: 110px; }
+
+  /* 6) 가입일 */
+  #otherTable th:nth-child(6),
+  #otherTable td:nth-child(6) { min-width: 95px; }
+
+  /* 7) 비고: 가입금액의 2배 정도(200px) + 말줄임 + 툴팁 */
+  #otherTable th:nth-child(7),
+  #otherTable td:nth-child(7) {
+    width: 200px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #otherTable td:nth-child(7) {
+    cursor: help;
+  }
+
+  /* ✅ 말줄임 셀 내부 span: 툴팁 타겟(클릭/탭 영역 안정화) */
+  .ellipsis-cell {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 툴팁 표시가 가능한 셀임을 UX로 암시 */
+  #suretyTable td:nth-child(2),
+  #otherTable td:nth-child(7) {
+    cursor: pointer; /* help 보다 모바일에서 자연스러움 */
   }
 </style>
-
-
-
 
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
 

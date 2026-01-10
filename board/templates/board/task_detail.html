@@ -33,33 +33,49 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      {# ✅ 제목/작성일 #}
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0 text-primary">{{ task.title }}</h5>
-        <p class="text-muted small mb-0">{{ task.created_at|date:"Y-m-d H:i" }}</p>
+      {# ✅ 헤더 #}
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
+        <div class="flex-grow-1">
+          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">
+            {{ task.title }}
+          </h4>
+
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="text-muted small">
+              {{ task.category }} | {{ task.created_at|date:"Y-m-d H:i" }}
+            </span>
+
+            {% if not is_superuser %}
+              <span class="status-badge fw-semibold px-2 py-1 rounded-pill"
+                    data-status="{{ task.status|default:'' }}">
+                {{ task.status|default:"-" }}
+              </span>
+            {% endif %}
+          </div>
+        </div>
       </div>
 
       {# ✅ 본문 #}
       <div class="my-3 p-3 bg-light rounded-3">
-        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ task.content }}</p>
+        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
+          {{ task.content }}
+        </p>
       </div>
-
-
-
-      <hr class="my-3">
 
       {# ✅ 댓글 CSRF 토큰(동적 수정폼용) - 페이지에 1개만 유지 #}
       <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
 
       {# ✅ 댓글 #}
-      <div class="my-3">
-        <span class="info-value">댓글</span>
+      <div class="mt-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="fw-bold mb-0">댓글</h6>
+        </div>
 
         {% include "board/includes/_comment_list.html" with comments=comments empty_text="아직 댓글이 없습니다." %}
         {% include "board/includes/_comment_form.html" with form=form action_url=detail_url submit_label="등록" %}
       </div>
 
-      <hr class="my-3">
+      <br><br>
 
       {# ✅ 기본정보 #}
       <div class="my-3">
@@ -73,18 +89,18 @@
         </div>
       </div>
 
-      <hr class="my-3">
-
       {# ✅ 담당자/상태 #}
       <div class="my-3">
         <div class="row align-items-center">
 
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
+
             {% if is_superuser %}
               <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="handler">
+
                 <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
                   <option value="">선택</option>
                   {% for h in handlers %}
@@ -97,28 +113,28 @@
             {% endif %}
           </div>
 
-            <div class="col-md-4 mb-2">
+          <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
 
             {% if is_superuser %}
-                <form class="d-inline-block inline-update-form">
+              <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="status">
 
                 <select name="status"
                         class="form-select form-select-sm status-select d-inline-block w-auto"
                         data-status="{{ task.status|default:'' }}">
-                    {% for s in status_choices %}
+                  {% for s in status_choices %}
                     <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
-                    {% endfor %}
+                  {% endfor %}
                 </select>
-                </form>
+              </form>
             {% else %}
-                <span class="status-badge" data-status="{{ task.status|default:'' }}">
+              <span class="status-badge" data-status="{{ task.status|default:'' }}">
                 {{ task.status|default:"-" }}
-                </span>
+              </span>
             {% endif %}
-            </div>
+          </div>
 
           <div class="col-md-4 mb-2">
             <span class="info-label">상태변경</span>
@@ -130,12 +146,13 @@
         </div>
       </div>
 
-      <hr class="my-3">
+      <br><br>
 
       {# ✅ 첨부파일 #}
       {% if attachments and attachments.exists %}
         <div class="my-3">
           <span class="info-value">첨부파일</span>
+
           <ul class="list-group mt-2">
             {% for att in attachments %}
               <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -153,23 +170,26 @@
       {% endif %}
 
       {# ✅ 하단 버튼 #}
-      <div class="d-flex justify-content-between mt-4">
-        <div class="d-flex gap-2">
+      <div class="board-detail-actions mt-4">
+        <div class="board-detail-actions-left">
           <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
           {% if can_edit %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary">수정하기</a>
 
-            <form method="post" style="display:inline;"
+            <form method="post"
+                  class="board-detail-actions-form"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
               <input type="hidden" name="action_type" value="delete_task">
-              <button type="submit" class="btn btn-outline-danger">삭제하기</button>
+              <button type="submit" class="btn btn-outline-danger w-100">삭제하기</button>
             </form>
           {% endif %}
         </div>
 
-        <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+        <div class="board-detail-actions-right">
+          <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+        </div>
       </div>
 
     </div>
@@ -179,7 +199,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
-<script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
-<script src="{% static 'js/board/task_detail.js' %}?v=20260104"></script>
+  <script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
+  <script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
+  <script src="{% static 'js/board/task_detail.js' %}?v=20260104"></script>
 {% endblock %}

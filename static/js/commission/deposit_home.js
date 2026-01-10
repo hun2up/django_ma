@@ -1,15 +1,22 @@
 /* django_ma/static/js/commission/deposit_home.js
- * Deposit Home - Target selection + metrics + surety + other + excel upload
+ * Deposit Home (채권현황) - FINAL (FETCH + RENDER + SUPPORT PDF)
  *
- * REFACTOR (2026-01-02)
- * - ✅ userSelected 이벤트 수신(window+document) + 모달 클릭 fallback 유지
- * - ✅ 주요지표(분급/계속분) DOM refs 포함
- * - ✅ inst_prev 키 불일치 흡수(inst_prev/instPrev)
- * - ✅ 회차 비율 포맷: 소수 2자리 고정(fmtRate)
- * - ✅ 보증보험 증권번호(policy_no) 렌더 반영
- * - ✅ 업로드 후: 타입별 즉시 리프레시 유지 + "통산손보" summary refresh 포함
- * - ✅ 업로드 성공 시: 업로드일자(업데이트 카드) 셀 즉시 갱신(템플릿 유연 대응)
+ * ✅ 핵심
+ * - 페이지: /commission/deposit/ 단일
+ * - 대상자 선택(userSelected) → pushState로 URL만 바꾸고 즉시 fetch&render (no reload)
+ * - API 응답(권장):
+ *   - user-detail     : { ok:true, user:{...} }  (또는 data/result/item 래핑도 허용)
+ *   - deposit-summary : { ok:true, summary:{...} } (또는 data/result/item 래핑도 허용)
+ *   - surety-list     : { ok:true, items:[...] }  (또는 results/data/list/rows 래핑도 허용)
+ *   - other-list      : { ok:true, items:[...] }  (또는 results/data/list/rows 래핑도 허용)
+ *
+ * ✅ FIX
+ * - 템플릿 data-bind(legacy 키) ↔ API 키 불일치 → alias로 흡수
+ * - tbody id: suretyTableBody / otherTableBody 렌더
+ * - 분급/정상 같은 문자열이 money로 들어와도 안전 표시
+ * - ellipsis-cell 클릭 시 전체 텍스트 뷰어
  */
+
 (() => {
   "use strict";
 
@@ -22,619 +29,499 @@
   const log = (...a) => DEBUG && console.log("[DepositHome]", ...a);
 
   /* ===============================
-   * API
+   * URLs
    * =============================== */
-  const API_BASE = {
+  const URLS = {
+    page: ds.resetUrl || "/commission/deposit/",
     userDetail: ds.userDetailUrl || "/commission/api/user-detail/",
-    depositSummary: ds.depositSummaryUrl || "/commission/api/deposit-summary/",
-    depositSurety: ds.depositSuretyUrl || "/commission/api/deposit-surety/",
-    depositOther: ds.depositOtherUrl || "/commission/api/deposit-other/",
-    resetUrl: ds.resetUrl || "/commission/deposit/",
-  };
-
-  const API = {
-    userDetail: (u) => `${API_BASE.userDetail}?user=${encodeURIComponent(u)}`,
-    depositSummary: (u) => `${API_BASE.depositSummary}?user=${encodeURIComponent(u)}`,
-    depositSurety: (u) => `${API_BASE.depositSurety}?user=${encodeURIComponent(u)}`,
-    depositOther: (u) => `${API_BASE.depositOther}?user=${encodeURIComponent(u)}`,
+    summary: ds.depositSummaryUrl || "/commission/api/deposit-summary/",
+    surety: ds.depositSuretyUrl || "/commission/api/deposit-surety/",
+    other: ds.depositOtherUrl || "/commission/api/deposit-other/",
+    supportPdf: ds.supportPdfUrl || "/commission/api/support-pdf/",
   };
 
   /* ===============================
    * DOM refs
    * =============================== */
   const els = {
-    // person
-    empId: document.getElementById("target_emp_id"),
-    name: document.getElementById("target_name"),
-    part: document.getElementById("target_part"),
-    branch: document.getElementById("target_branch"),
-    joinDate: document.getElementById("target_join_date"),
-    retireDate: document.getElementById("target_retire_date"),
+    supportPdfBtn: document.getElementById("supportPdfBtn"),
+    resetBtn: document.getElementById("resetUserBtn"),
+    // (선택) 화면 어딘가에 대상 사번이 찍혀있을 수도 있으니 fallback로만 사용
+    empIdSpan: document.getElementById("target_emp_id"),
 
-    // metrics (top)
-    finalPayment: document.getElementById("metric_final_payment"),
-    salesTotal: document.getElementById("metric_sales_total"),
-    refundExpected: document.getElementById("metric_refund_expected"),
-    payExpected: document.getElementById("metric_pay_expected"),
-    maintTotal: document.getElementById("metric_maint_total"),
-
-    debtTotal: document.getElementById("metric_debt_total"),
-    suretyTotal: document.getElementById("metric_surety_total"),
-    otherTotal: document.getElementById("metric_other_total"),
-    requiredDebt: document.getElementById("metric_required_debt"),
-    finalExcessAmount: document.getElementById("metric_final_excess_amount"),
-
-    // div/inst metrics
-    div1m: document.getElementById("metric_div_1m"),
-    div2m: document.getElementById("metric_div_2m"),
-    div3m: document.getElementById("metric_div_3m"),
-    instCurrent: document.getElementById("metric_inst_current"),
-    instPrev: document.getElementById("metric_inst_prev"),
-
-    // round-rate metrics
-    ns_13_round: document.getElementById("metric_ns_13_round"),
-    ns_18_round: document.getElementById("metric_ns_18_round"),
-    ls_13_round: document.getElementById("metric_ls_13_round"),
-    ls_18_round: document.getElementById("metric_ls_18_round"),
-
-    ns_18_total: document.getElementById("metric_ns_18_total"),
-    ns_25_total: document.getElementById("metric_ns_25_total"),
-    ls_18_total: document.getElementById("metric_ls_18_total"),
-    ls_25_total: document.getElementById("metric_ls_25_total"),
-
-    // due metrics
-    ns_2_6_due: document.getElementById("metric_ns_2_6_due"),
-    ns_2_13_due: document.getElementById("metric_ns_2_13_due"),
-    ls_2_6_due: document.getElementById("metric_ls_2_6_due"),
-    ls_2_13_due: document.getElementById("metric_ls_2_13_due"),
-
-    // commission metrics
-    comm_3m: document.getElementById("metric_comm_3m"),
-    comm_6m: document.getElementById("metric_comm_6m"),
-    comm_9m: document.getElementById("metric_comm_9m"),
-    comm_12m: document.getElementById("metric_comm_12m"),
-
-    // tables
     suretyTbody: document.getElementById("suretyTableBody"),
     otherTbody: document.getElementById("otherTableBody"),
-
-    // actions / modals
-    resetBtn: document.getElementById("resetUserBtn"),
-    searchModal: document.getElementById("searchUserModal"),
-
-    // excel upload
-    uploadForm: document.getElementById("excelUploadForm"),
-    uploadResult: document.getElementById("uploadResult"),
   };
 
   /* ===============================
-   * utils
+   * Utils
    * =============================== */
-  const isNil = (v) => v === null || v === undefined;
+  const qsUser = () => new URL(window.location.href).searchParams.get("user") || "";
 
-  const setText = (el, v, fb = "-") => {
-    if (!el) return;
-    const s = isNil(v) ? "" : String(v).trim();
-    el.textContent = s || fb;
+  const toText = (v) => (v === null || v === undefined ? "" : String(v));
+
+  const readElValue = (el) => {
+    if (!el) return "";
+    if ("value" in el) {
+      const v = String(el.value || "").trim();
+      if (v) return v;
+    }
+    return String(el.textContent || "").trim();
   };
 
-  const toNum = (v) => {
-    if (isNil(v)) return NaN;
-    const s = String(v).replace(/,/g, "").trim();
-    const n = Number(s);
-    return Number.isFinite(n) ? n : NaN;
+  const comma = (n) => {
+    const s = toText(n).trim();
+    if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
+    // 숫자만 처리
+    const cleaned = s.replace(/,/g, "");
+    const num = Number(cleaned);
+    if (!Number.isFinite(num)) return s; // "정상/분급" 같은 문자열은 그대로
+    return Math.trunc(num).toLocaleString("ko-KR");
   };
 
-  const fmtInt = (v) => {
-    const n = toNum(v);
-    return Number.isFinite(n) ? new Intl.NumberFormat("ko-KR").format(n) : "-";
+  const percent = (v) => {
+    const s = toText(v).trim();
+    if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
+    const cleaned = s.replace(/,/g, "");
+    const num = Number(cleaned);
+    if (!Number.isFinite(num)) return s;
+    return `${num.toFixed(2)}%`;
   };
 
-  // 비율(예: 87.50) => 소수 2자리 고정
-  const fmtRate = (v) => {
-    if (isNil(v)) return "-";
-    const s = String(v).replace(/,/g, "").trim();
-    if (!s || s.toLowerCase() === "nan" || s.toLowerCase() === "none" || s === "-") return "-";
-    const n = Number(s);
-    return Number.isFinite(n) ? n.toFixed(2) : "-";
+  const safeSetText = (node, text) => {
+    if (!node) return;
+    node.textContent =
+      text === null || text === undefined || text === "" ? "-" : String(text);
   };
 
-  const escapeHTML = (v) => {
-    const s = isNil(v) ? "" : String(v);
-    return s
+  const setSupportEnabled = (userId) => {
+    if (!els.supportPdfBtn) return;
+    els.supportPdfBtn.disabled = !String(userId || "").trim();
+  };
+
+  const getSelectedUserIdFromEvent = (e) => {
+    const d = e?.detail || {};
+    return (
+      d.id ||
+      d.user_id ||
+      d.userId ||
+      d.user ||
+      d.empId ||
+      d.emp_id ||
+      d.employee_id ||
+      ""
+    );
+  };
+
+  function escapeHtml(str) {
+    return String(str ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
-  };
+  }
 
-  const hideModal = (m) => {
-    if (!m || !window.bootstrap) return;
-    (bootstrap.Modal.getInstance(m) || new bootstrap.Modal(m)).hide();
-  };
+  function openTextViewer(title, text) {
+    const safeTitle = title || "전체 내용";
+    const safeText = (text || "").toString();
 
-  async function fetchJson(url) {
-    let r;
-    try {
-      r = await fetch(url, { credentials: "same-origin" });
-    } catch (e) {
-      throw new Error(`NETWORK_ERROR: ${e?.message || e}`);
+    if (!window.bootstrap || !window.bootstrap.Modal) {
+      alert(`${safeTitle}\n\n${safeText || "-"}`);
+      return;
     }
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
+
+    let modal = document.getElementById("textViewerModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "textViewerModal";
+      modal.className = "modal fade";
+      modal.tabIndex = -1;
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content rounded-4">
+            <div class="modal-header">
+              <h6 class="modal-title fw-bold"></h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-word;"></pre>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    modal.querySelector(".modal-title").textContent = safeTitle;
+    modal.querySelector("pre").textContent = safeText || "-";
+    new bootstrap.Modal(modal).show();
   }
 
-  function extractSelectedUser(detail) {
-    const d = detail || {};
-    const u = d.user || d.selected || d.data || d.payload || d.item || d || {};
+  function bindEllipsisClick() {
+    if (window.__depositEllipsisBound) return;
+    window.__depositEllipsisBound = true;
 
-    const id = String(
-      u.id ||
-        u.user_id ||
-        u.pk ||
-        u.emp_id ||
-        u.employee_id ||
-        u.tg_id ||
-        u.target_id ||
-        u.userid ||
-        ""
-    ).trim();
-
-    const name = String(
-      u.name ||
-        u.user_name ||
-        u.full_name ||
-        u.emp_name ||
-        u.employee_name ||
-        u.tg_name ||
-        ""
-    ).trim();
-
-    return { id, name, raw: u };
+    document.addEventListener("click", (e) => {
+      const cell = e.target.closest(".ellipsis-cell");
+      if (!cell) return;
+      const full = String(cell.dataset.fullText || "").trim();
+      const fallback = String(cell.textContent || "").trim();
+      openTextViewer("전체 내용", full || fallback || "-");
+    });
   }
 
   /* ===============================
-   * fetchers
+   * Fetch helpers
    * =============================== */
-  const fetchUserDetail = (u) => fetchJson(API.userDetail(u)).then((d) => d.user || {});
-  const fetchSummary = (u) => fetchJson(API.depositSummary(u)).then((d) => d.summary || {});
-  const fetchSurety = (u) =>
-    fetchJson(API.depositSurety(u))
-      .then((d) => d.items || [])
-      .catch(() => []);
-  const fetchOther = (u) =>
-    fetchJson(API.depositOther(u))
-      .then((d) => d.items || [])
-      .catch(() => []);
+  async function fetchJSON(url) {
+    const res = await fetch(url, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+
+    if (!res.ok) {
+      const msg = data?.message || `요청 실패 (${res.status})`;
+      throw new Error(msg);
+    }
+
+    if (data && data.ok === false) {
+      throw new Error(data.message || "요청 실패");
+    }
+
+    return data;
+  }
+
+  // ✅ 공통 언랩(응답 구조가 달라도 최대한 흡수)
+  function unwrapFirstObject(data, candidates = []) {
+    if (!data || typeof data !== "object") return null;
+
+    // 1) 후보 키들 우선 탐색
+    for (const k of candidates) {
+      const v = data?.[k];
+      if (v && typeof v === "object") return v;
+    }
+
+    // 2) 흔한 래핑 키 fallback
+    const common = ["user", "summary", "data", "result", "payload", "item"];
+    for (const k of common) {
+      const v = data?.[k];
+      if (v && typeof v === "object") return v;
+    }
+
+    return null;
+  }
+
+  function unwrapFirstArray(data, candidates = []) {
+    if (!data || typeof data !== "object") return [];
+
+    for (const k of candidates) {
+      const v = data?.[k];
+      if (Array.isArray(v)) return v;
+    }
+
+    const common = ["items", "results", "data", "list", "rows"];
+    for (const k of common) {
+      const v = data?.[k];
+      if (Array.isArray(v)) return v;
+    }
+
+    return [];
+  }
+
+  async function loadUserDetail(userId) {
+    const url = `${URLS.userDetail}?user=${encodeURIComponent(userId)}`;
+    const data = await fetchJSON(url);
+
+    // ✅ {user:{}} / {data:{}} / {result:{}} / {item:{}} 모두 허용
+    return unwrapFirstObject(data, ["user", "data", "result", "item"]);
+  }
+
+  async function loadSummary(userId) {
+    const url = `${URLS.summary}?user=${encodeURIComponent(userId)}`;
+    const data = await fetchJSON(url);
+
+    // ✅ {summary:{}} / {data:{}} / {result:{}} 등 흡수
+    return unwrapFirstObject(data, ["summary", "data", "result", "item"]);
+  }
+
+  async function loadSurety(userId) {
+    const url = `${URLS.surety}?user=${encodeURIComponent(userId)}`;
+    const data = await fetchJSON(url);
+
+    // ✅ {items:[]} / {results:[]} / {data:[]} 등 흡수
+    return unwrapFirstArray(data, ["items", "results", "data", "list"]);
+  }
+
+  async function loadOther(userId) {
+    const url = `${URLS.other}?user=${encodeURIComponent(userId)}`;
+    const data = await fetchJSON(url);
+
+    return unwrapFirstArray(data, ["items", "results", "data", "list"]);
+  }
 
   /* ===============================
-   * renderers
+   * Render: data-bind (legacy alias)
    * =============================== */
-  function renderUser(u = {}) {
-    setText(els.empId, u.id);
-    setText(els.name, u.name);
-    setText(els.part, u.part);
-    setText(els.branch, u.branch);
-    setText(els.joinDate, u.join_date_display);
-    setText(els.retireDate, u.retire_date_display || "재직중");
+  const BIND_ALIAS = {
+    // target.*
+    "target.emp_id": "target.id",
+    "target.join_date": "target.join_date_display",
+    "target.leave_date": "target.retire_date_display",
+
+    // summary.* (템플릿 legacy)
+    "summary.final_pay": "summary.final_payment",
+    "summary.long_term": "summary.sales_total",
+    "summary.loss_asset": "summary.maint_total",
+    "summary.deposit_total": "summary.debt_total",
+    "summary.etc_total": "summary.other_total",
+    "summary.need_deposit": "summary.required_debt",
+    "summary.final_extra_pay": "summary.final_excess_amount",
+
+    "summary.month1": "summary.div_1m",
+    "summary.month2": "summary.div_2m",
+    "summary.month3": "summary.div_3m",
+  };
+
+  function getByPath(obj, path) {
+    const parts = String(path || "").split(".");
+    let cur = obj;
+    for (const p of parts) {
+      if (!cur) return undefined;
+      cur = cur[p];
+    }
+    return cur;
   }
 
-  function renderSummary(s = {}) {
-    // 주요지표
-    setText(els.finalPayment, fmtInt(s.final_payment));
-    setText(els.salesTotal, fmtInt(s.sales_total));
-    setText(els.refundExpected, fmtInt(s.refund_expected));
-    setText(els.payExpected, fmtInt(s.pay_expected));
-    setText(els.maintTotal, s.maint_total ?? "-");
-
-    setText(els.debtTotal, fmtInt(s.debt_total));
-    setText(els.suretyTotal, fmtInt(s.surety_total));
-    setText(els.otherTotal, fmtInt(s.other_total));
-    setText(els.requiredDebt, fmtInt(s.required_debt));
-    setText(els.finalExcessAmount, fmtInt(s.final_excess_amount));
-
-    // 분급/계속분(키 불일치 흡수)
-    setText(els.div1m, s.div_1m ?? s.div1m ?? "-");
-    setText(els.div2m, s.div_2m ?? s.div2m ?? "-");
-    setText(els.div3m, s.div_3m ?? s.div3m ?? "-");
-    setText(els.instCurrent, fmtInt(s.inst_current ?? s.instCurrent ?? 0));
-    setText(els.instPrev, fmtInt(s.inst_prev ?? s.instPrev ?? 0));
-
-    // 회차 비율
-    setText(els.ns_13_round, fmtRate(s.ns_13_round));
-    setText(els.ns_18_round, fmtRate(s.ns_18_round));
-    setText(els.ls_13_round, fmtRate(s.ls_13_round));
-    setText(els.ls_18_round, fmtRate(s.ls_18_round));
-
-    setText(els.ns_18_total, fmtRate(s.ns_18_total));
-    setText(els.ns_25_total, fmtRate(s.ns_25_total));
-    setText(els.ls_18_total, fmtRate(s.ls_18_total));
-    setText(els.ls_25_total, fmtRate(s.ls_25_total));
-
-    // 응당
-    setText(els.ns_2_6_due, fmtInt(s.ns_2_6_due));
-    setText(els.ns_2_13_due, fmtInt(s.ns_2_13_due));
-    setText(els.ls_2_6_due, fmtInt(s.ls_2_6_due));
-    setText(els.ls_2_13_due, fmtInt(s.ls_2_13_due));
-
-    // 수수료 지표
-    setText(els.comm_3m, fmtInt(s.comm_3m));
-    setText(els.comm_6m, fmtInt(s.comm_6m));
-    setText(els.comm_9m, fmtInt(s.comm_9m));
-    setText(els.comm_12m, fmtInt(s.comm_12m));
+  function resolveBindKey(key) {
+    return BIND_ALIAS[key] || key;
   }
 
-  function renderSuretyTable(items) {
+  function renderBinds({ target, summary }) {
+    const ctx = { target: target || {}, summary: summary || {} };
+
+    const nodes = root.querySelectorAll("[data-bind]");
+    nodes.forEach((node) => {
+      const rawKey = node.getAttribute("data-bind");
+      const key = resolveBindKey(rawKey);
+      const type = (node.getAttribute("data-type") || "").trim(); // money/percent/plain
+      const v = getByPath(ctx, key);
+
+      if (type === "percent") {
+        safeSetText(node, percent(v));
+      } else if (type === "money") {
+        // 템플릿에서 month1 같은 문자열도 money로 들어온 케이스 방어
+        safeSetText(node, comma(v));
+      } else {
+        safeSetText(node, toText(v).trim() || "-");
+      }
+    });
+
+    // support 버튼 활성화
+    const uid = String(target?.id || "").trim();
+    setSupportEnabled(uid);
+  }
+
+  function renderSurety(items) {
     if (!els.suretyTbody) return;
 
-    if (!items || !items.length) {
-      els.suretyTbody.innerHTML = `<tr><td colspan="6" class="text-center">보증보험 데이터가 없습니다.</td></tr>`;
+    if (!items || items.length === 0) {
+      els.suretyTbody.innerHTML = `
+        <tr><td class="text-nowrap text-center" colspan="6">표시할 보증보험 내역이 없습니다.</td></tr>
+      `;
       return;
     }
 
     els.suretyTbody.innerHTML = items
-      .map((r) => {
-        const product = escapeHTML(r.product_name || "-");
-        const policyNo = escapeHTML(r.policy_no || r.policyNo || r.policy_number || "-");
-        const status = escapeHTML(r.status || "-");
-        const start = escapeHTML(r.start_date || "-");
-        const end = escapeHTML(r.end_date || "-");
+      .map((x) => {
+        const policy = toText(x.policy_no || "").trim();
+        const policyCell = policy
+          ? `<span class="ellipsis-cell" data-full-text="${escapeHtml(policy)}">${escapeHtml(policy)}</span>`
+          : "-";
 
         return `
           <tr>
-            <td>${product}</td>
-            <td>${policyNo}</td>
-            <td class="text-end">${fmtInt(r.amount)}</td>
-            <td>${status}</td>
-            <td>${start}</td>
-            <td>${end}</td>
+            <td class="text-nowrap">${escapeHtml(x.product_name || "")}</td>
+            <td class="text-nowrap">${policyCell}</td>
+            <td class="text-nowrap text-end">${comma(x.amount)}</td>
+            <td class="text-nowrap">${escapeHtml(x.status || "")}</td>
+            <td class="text-nowrap">${escapeHtml(x.start_date || "-")}</td>
+            <td class="text-nowrap">${escapeHtml(x.end_date || "-")}</td>
           </tr>
         `;
       })
       .join("");
   }
 
-  function renderOtherTable(items) {
+  function renderOther(items) {
     if (!els.otherTbody) return;
 
-    if (!items || !items.length) {
-      els.otherTbody.innerHTML = `<tr><td colspan="7" class="text-center">기타채권 데이터가 없습니다.</td></tr>`;
+    if (!items || items.length === 0) {
+      els.otherTbody.innerHTML = `
+        <tr><td class="text-nowrap text-center" colspan="7">표시할 기타채권 내역이 없습니다.</td></tr>
+      `;
       return;
     }
 
     els.otherTbody.innerHTML = items
-      .map((r) => {
-        const product = escapeHTML(r.product_name || "-");
-        const type = escapeHTML(r.product_type || "-");
-        const status = escapeHTML(r.status || "-");
-        const bondNo = escapeHTML(r.bond_no || r.bond_number || r.debt_no || "-");
-        const join = escapeHTML(r.start_date || r.join_date || "-");
-        const memo = escapeHTML(r.memo || "-");
+      .map((x) => {
+        const memo = toText(x.memo || "").trim();
+        const memoCell = memo
+          ? `<span class="ellipsis-cell" data-full-text="${escapeHtml(memo)}">${escapeHtml(memo)}</span>`
+          : "-";
 
         return `
           <tr>
-            <td>${product}</td>
-            <td>${type}</td>
-            <td class="text-end">${fmtInt(r.amount)}</td>
-            <td>${status}</td>
-            <td>${bondNo}</td>
-            <td>${join}</td>
-            <td>${memo}</td>
+            <td class="text-nowrap">${escapeHtml(x.product_name || "")}</td>
+            <td class="text-nowrap">${escapeHtml(x.product_type || "")}</td>
+            <td class="text-nowrap text-end">${comma(x.amount)}</td>
+            <td class="text-nowrap">${escapeHtml(x.status || "")}</td>
+            <td class="text-nowrap">${escapeHtml(x.bond_no || "")}</td>
+            <td class="text-nowrap">${escapeHtml(x.start_date || "-")}</td>
+            <td class="text-nowrap">${memoCell}</td>
           </tr>
         `;
       })
       .join("");
   }
 
-  /* ===============================
-   * 업로드일자 UI 갱신 (유연 대응)
-   * =============================== */
-  function updateUploadDateUI(part, uploadType, dateStr) {
-    if (!part || !uploadType || !dateStr) return;
+  function clearUI() {
+    // data-bind 영역 전부 "-"
+    root.querySelectorAll("[data-bind]").forEach((n) => (n.textContent = "-"));
 
-    // 1) 가장 권장: data 속성 기반
-    // 예: <span data-upload-date data-part="MA사업1부" data-upload-type="통산손보">-</span>
-    let el =
-      document.querySelector(
-        `[data-upload-date][data-part="${CSS.escape(part)}"][data-upload-type="${CSS.escape(uploadType)}"]`
-      ) ||
-      document.querySelector(
-        `[data-upload-date][data-part="${CSS.escape(part)}"][data-upload-type="${CSS.escape(uploadType)}"] *`
-      );
-
-    // 2) id 패턴 fallback
-    // 예: id="upload_date__통산손보__MA사업1부" / "upload_date_통산손보_MA사업1부"
-    if (!el) {
-      const candidates = [
-        `upload_date__${uploadType}__${part}`,
-        `upload_date_${uploadType}_${part}`,
-        `uploadDate__${uploadType}__${part}`,
-        `uploadDate_${uploadType}_${part}`,
-      ];
-      for (const id of candidates) {
-        const found = document.getElementById(id);
-        if (found) {
-          el = found;
-          break;
-        }
-      }
+    if (els.suretyTbody) {
+      els.suretyTbody.innerHTML = `
+        <tr><td class="text-nowrap text-center" colspan="6">대상자를 선택하면 보증보험 내역이 표시됩니다.</td></tr>
+      `;
     }
 
-    // 3) 텍스트 매칭 fallback(마지막 수단)
-    // "통산손보" 행에서 part를 같이 포함한 셀을 찾아봄
-    if (!el) {
-      const nodes = Array.from(document.querySelectorAll("[data-upload-type], .upload-date, td, span, div"));
-      el =
-        nodes.find((n) => {
-          const t = (n.textContent || "").replace(/\s+/g, " ").trim();
-          return t.includes(uploadType) && t.includes(part);
-        }) || null;
+    if (els.otherTbody) {
+      els.otherTbody.innerHTML = `
+        <tr><td class="text-nowrap text-center" colspan="7">대상자를 선택하면 기타채권 내역이 표시됩니다.</td></tr>
+      `;
     }
 
-    if (el) {
-      el.textContent = dateStr;
-      log("upload date ui updated:", { part, uploadType, dateStr, el });
-    } else {
-      log("upload date ui not found:", { part, uploadType, dateStr });
-    }
+    setSupportEnabled("");
   }
 
   /* ===============================
-   * selection
+   * Main load
    * =============================== */
-  let lastUser = "";
-  let inFlight = null;
+  let currentUserId = "";
 
-  async function applySelection(uid) {
-    const id = String(uid || "").trim();
-    if (!id) return;
+  async function loadAndRender(userId) {
+    const uid = String(userId || "").trim();
+    if (!uid) {
+      currentUserId = "";
+      clearUI();
+      return;
+    }
 
-    if (id === lastUser && inFlight) return;
-    lastUser = id;
-
-    const token = Symbol("req");
-    inFlight = token;
-
-    log("applySelection:", id);
+    currentUserId = uid;
+    setSupportEnabled(uid);
 
     try {
-      const [u, s, surety, other] = await Promise.all([
-        fetchUserDetail(id),
-        fetchSummary(id),
-        fetchSurety(id),
-        fetchOther(id),
+      const [user, summary, surety, other] = await Promise.all([
+        loadUserDetail(uid),
+        loadSummary(uid),
+        loadSurety(uid),
+        loadOther(uid),
       ]);
 
-      if (inFlight !== token) return;
+      renderBinds({ target: user, summary });
+      renderSurety(surety);
+      renderOther(other);
 
-      renderUser(u);
-      renderSummary(s);
-      renderSuretyTable(surety);
-      renderOtherTable(other);
-
-      hideModal(els.searchModal);
-    } catch (e) {
-      console.error(e);
-      alert("대상자 정보를 불러오지 못했습니다.");
-    } finally {
-      if (inFlight === token) inFlight = null;
+      log("render ok", {
+        uid,
+        user,
+        summary,
+        suretyCount: surety.length,
+        otherCount: other.length,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "데이터 조회 중 오류가 발생했습니다.");
+      // 일부라도 표기된 상태를 깨지 않게 clear는 안 함
     }
   }
 
+  function pushUserToUrl(userId) {
+    const uid = String(userId || "").trim();
+    const url = new URL(window.location.href);
+    if (uid) url.searchParams.set("user", uid);
+    else url.searchParams.delete("user");
+    window.history.pushState({}, "", url.toString());
+  }
+
   /* ===============================
-   * event binding: userSelected
+   * Bindings
    * =============================== */
   function bindUserSelected() {
-    if (window.__depositUserSelectedBound) return;
-    window.__depositUserSelectedBound = true;
-
     const handler = (e) => {
-      const { id } = extractSelectedUser(e?.detail);
-      if (!id) return;
-      applySelection(id);
+      const userId = getSelectedUserIdFromEvent(e);
+      if (!userId) return;
+
+      pushUserToUrl(userId);
+      loadAndRender(userId);
     };
 
     window.addEventListener("userSelected", handler);
     document.addEventListener("userSelected", handler);
-
-    log("userSelected bound (window+document)");
   }
 
-  /* ===============================
-   * modal fallback (click-to-pick)
-   * =============================== */
-  function bindModalPickFallback() {
-    const modal = els.searchModal;
-    if (!modal) return;
-    if (window.__depositModalPickBound) return;
-    window.__depositModalPickBound = true;
-
-    const results = modal.querySelector("#searchResults") || modal;
-
-    const pickFromText = (txt) => {
-      const s = String(txt || "").replace(/\s+/g, " ").trim();
-      const m = s.match(/\b\d{4,}\b/);
-      return m ? m[0] : "";
-    };
-
-    const pickFromOnclick = (el) => {
-      const oc = el?.getAttribute?.("onclick") || "";
-      if (!oc) return "";
-      const m = oc.match(/['"](\d{4,})['"]|(\b\d{4,}\b)/);
-      return m && (m[1] || m[2]) ? String(m[1] || m[2]).trim() : "";
-    };
-
-    const pickFromAttr = (el) => {
-      if (!el?.getAttribute) return "";
-      const keys = ["data-user-id", "data-emp-id", "data-id", "data-userid", "data-pk"];
-      for (const k of keys) {
-        const v = el.getAttribute(k);
-        if (v && String(v).trim()) return String(v).trim();
-      }
-      return "";
-    };
-
-    const pickFromDataset = (el) => {
-      if (!el) return "";
-      const d = el.dataset || {};
-
-      const jsonStr = d.user || d.item || d.payload || d.data || "";
-      if (jsonStr) {
-        try {
-          const obj = JSON.parse(jsonStr);
-          const id =
-            obj?.id || obj?.user_id || obj?.pk || obj?.emp_id || obj?.employee_id || obj?.tg_id;
-          if (id) return String(id).trim();
-        } catch (_) {}
-      }
-
-      const direct =
-        d.userId ||
-        d.userid ||
-        d.user_id ||
-        d.empId ||
-        d.emp_id ||
-        d.employeeId ||
-        d.employee_id ||
-        d.pk ||
-        d.id ||
-        d.tgId ||
-        d.tg_id;
-
-      return direct ? String(direct).trim() : "";
-    };
-
-    const extractIdFromElement = (el) => {
-      if (!el) return "";
-
-      let id =
-        pickFromDataset(el) ||
-        pickFromAttr(el) ||
-        pickFromOnclick(el) ||
-        (el.value ? String(el.value).trim() : "");
-
-      if (id) return id;
-
-      let p = el;
-      for (let i = 0; i < 8 && p; i++) {
-        id = pickFromDataset(p) || pickFromAttr(p) || pickFromOnclick(p);
-        if (id) return id;
-        p = p.parentElement;
-      }
-
-      const row = el.closest?.("tr, li, .list-group-item, .card, .row, .col, .result-item");
-      id = pickFromDataset(row) || pickFromAttr(row) || pickFromOnclick(row);
-      if (id) return id;
-
-      if (row) {
-        id = pickFromText(row.textContent);
-        if (id) return id;
-      }
-      return pickFromText(el.textContent);
-    };
-
-    results.addEventListener("click", (ev) => {
-      const target = ev.target?.closest?.("*");
-      if (!target) return;
-
-      const id = extractIdFromElement(target);
-      if (!id) return;
-
-      log("picked from modal click:", id, target);
-      applySelection(id);
-    });
-
-    log("modal pick fallback bound (results delegation)");
-  }
-
-  /* ===============================
-   * reset
-   * =============================== */
   function bindReset() {
-    els.resetBtn?.addEventListener("click", () => {
-      window.location.href = API_BASE.resetUrl;
+    if (!els.resetBtn) return;
+    els.resetBtn.addEventListener("click", () => {
+      pushUserToUrl("");
+      loadAndRender("");
     });
   }
 
-  /* ===============================
-   * excel upload
-   * =============================== */
-  function bindExcelUpload() {
-    if (!els.uploadForm) return;
-    if (els.uploadForm.dataset.bound === "1") return;
-    els.uploadForm.dataset.bound = "1";
+  function bindSupportPdf() {
+    if (!els.supportPdfBtn) return;
 
-    els.uploadForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    els.supportPdfBtn.addEventListener("click", () => {
+      const uid =
+        String(currentUserId || "").trim() || qsUser() || readElValue(els.empIdSpan);
 
-      const fd = new FormData(els.uploadForm);
-
-      let r;
-      try {
-        r = await fetch(els.uploadForm.action, {
-          method: "POST",
-          body: fd,
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        });
-      } catch (err) {
-        console.error(err);
-        if (els.uploadResult) els.uploadResult.textContent = "네트워크 오류";
+      if (!uid || uid === "-") {
+        alert("대상자를 먼저 선택해주세요.");
         return;
       }
 
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
-        if (els.uploadResult) els.uploadResult.textContent = d.message || "업로드 실패";
-        return;
-      }
-
-      if (els.uploadResult) els.uploadResult.textContent = d.message || "업로드 완료";
-
-      // ✅ 업로드일자 UI 즉시 갱신
-      updateUploadDateUI(d.part, d.upload_type, d.uploaded_date);
-
-      // ✅ 업로드 후 현재 대상자 있으면 즉시 리프레시
-      try {
-        if (lastUser) {
-          const summaryRefreshTypes = new Set([
-            "최종지급액",
-            "보증증액",
-            "응당생보",
-            "응당손보",
-            "통산손보", // ✅ 추가 (summary에 들어감)
-          ]);
-
-          if (summaryRefreshTypes.has(d.upload_type)) {
-            renderSummary(await fetchSummary(lastUser));
-          } else if (d.upload_type === "보증보험") {
-            renderSuretyTable(await fetchSurety(lastUser));
-          } else if (d.upload_type === "기타채권") {
-            renderOtherTable(await fetchOther(lastUser));
-          }
-        }
-      } catch (err) {
-        console.warn("post-upload refresh failed:", err);
-      }
-
-      // 토스트
-      if (window.bootstrap) {
-        const t = document.getElementById("uploadToast");
-        if (t) new bootstrap.Toast(t).show();
-      }
+      const url = `${URLS.supportPdf}?user=${encodeURIComponent(uid)}`;
+      window.location.href = url;
     });
   }
 
+  window.addEventListener("popstate", () => {
+    // 뒤로가기/앞으로가기 시 URL의 user 기준으로 다시 렌더
+    loadAndRender(qsUser());
+  });
+
   /* ===============================
-   * init
+   * Init
    * =============================== */
   function init() {
+    bindEllipsisClick();
     bindUserSelected();
-    bindModalPickFallback();
     bindReset();
-    bindExcelUpload();
-    log("init done");
+    bindSupportPdf();
+
+    const initial = qsUser();
+    if (initial) {
+      loadAndRender(initial);
+    } else {
+      clearUI();
+    }
+
+    log("init", { URLS, initial });
   }
 
   init();

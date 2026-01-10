@@ -405,7 +405,6 @@ def task_detail(request, pk):
         return redirect("task_detail", pk=pk)
 
     task_info = {
-        "구분": task.category,
         "소속(요청자)": task.user_branch,
         "성명(요청자)": task.user_name,
         "사번(요청자)": task.user_id,
@@ -635,9 +634,6 @@ def post_detail(request, pk):
         return redirect("post_detail", pk=pk)
 
     post_info = {
-        "구분": post.category,
-        "성명(대상자)": post.fa,
-        "사번(대상자)": post.code,
         "소속(요청자)": post.user_branch,
         "성명(요청자)": post.user_name,
         "사번(요청자)": post.user_id,

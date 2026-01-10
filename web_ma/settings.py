@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     'dash',
     'partner.apps.PartnerConfig',
     'django_extensions',
+    # 'ckeditor',
+    # 'ckeditor_uploader',
 ]
 
 MIDDLEWARE = [
@@ -260,3 +262,15 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
 UPLOAD_RESULT_DIR = MEDIA_ROOT / "upload_results"
 UPLOAD_TEMP_DIR = MEDIA_ROOT / "upload_temp"
+
+# 업로드 경로 (MEDIA_ROOT 기준)
+CKEDITOR_UPLOAD_PATH = "uploads/manual/"
+
+# 에디터 툴바 (원하면 커스텀 가능)
+CKEDITOR_CONFIGS = {
+    "default": {
+        "toolbar": "full",
+        "height": 420,
+        "width": "100%",
+    }
+}

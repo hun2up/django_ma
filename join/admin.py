@@ -1,11 +1,13 @@
+# django_ma/manual/admin.py
+from openpyxl import Workbook
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path
-from openpyxl import Workbook
+from django.apps import apps
 
-from .models import JoinInfo
 from accounts.custom_admin import custom_admin_site
 
+JoinInfo = apps.get_model("join", "JoinInfo")  # ✅ 지연 로딩
 
 # ✅ 엑셀 생성 함수
 def export_joininfo_as_excel(queryset, filename="joininfo_export.xlsx"):

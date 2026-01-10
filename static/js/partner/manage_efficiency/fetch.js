@@ -6,11 +6,8 @@
 // - ✅ sub_admin 그룹삭제 버튼 숨김
 // - ✅ 그룹삭제/행삭제 이벤트 + 서버 POST + 재조회
 // - ✅ superuser/main_admin: "각 행" 처리일자(date) 수정 가능 (즉시 저장)
-// - ✅ (레이아웃 반영)
-//    1) 그룹명: bold 해제 + 폰트 한 단계 ↓
-//    2) 그룹 삭제 버튼: "삭제" 한 줄 고정(nowrap)
-//    3) 첨부파일 영역 → "확인서" UI (회색 라벨 + 파일명 readonly + 다운로드) 를 그룹 우측 상단에 배치
-//    4) '그룹행(저장된 내역)' 텍스트 제거
+// - ✅ 아코디언 헤더 내부 버튼 클릭 시 토글 방지(stopPropagation) 포함
+// - ✅ 그룹 헤더: 스크롤 영역(eff-group-scroll) 안에 메타 + 확인서 버튼 포함
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
@@ -55,7 +52,8 @@ function getRoot() {
     document.getElementById("manage-efficiency") ||
     document.getElementById("manage-calculate") ||
     document.getElementById("manage-rate") ||
-    document.getElementById("manage-structure")
+    document.getElementById("manage-structure") ||
+    null
   );
 }
 
@@ -87,7 +85,6 @@ function getDeleteGroupUrl() {
 }
 function getUpdateProcessDateUrl() {
   const root = getRoot();
-  // ✅ boot에서 updateProcessDateUrl 주입된 경우도 흡수
   const u1 = str(root?.dataset?.updateProcessDateUrl || "");
   const u2 = str(root?.dataset?.dataUpdateProcessDateUrl || "");
   const u3 = str(window?.ManageefficiencyBoot?.updateProcessDateUrl || "");
@@ -106,7 +103,6 @@ function getGroupsContainer() {
     null
   );
 }
-
 
 /* =========================
    ⭐ 컬럼 비율 설정 (MAIN TABLE)
@@ -139,7 +135,6 @@ const DEFAULT_MAIN_COL_WIDTHS = {
   remove: 8,
 };
 
-// ⭐ <colgroup> 생성
 function buildMainColGroup() {
   return `
     <colgroup>
@@ -148,7 +143,6 @@ function buildMainColGroup() {
   `;
 }
 
-// ⭐ 비율 적용
 function applyMainColWidths(root, table) {
   if (!root || !table) return;
 
@@ -169,7 +163,6 @@ function applyMainColWidths(root, table) {
     ratios[k] = (Number(v) / sum) * 100;
   }
 
-  // ✅ mismatch 경고
   const thCount = table.querySelectorAll("thead th").length;
   const colCount = table.querySelectorAll("colgroup col[data-col]").length;
   if (thCount && colCount && thCount !== colCount) {
@@ -184,14 +177,12 @@ function applyMainColWidths(root, table) {
   table.style.tableLayout = "fixed";
 }
 
-
 /* =========================
    그룹 타이틀 정규화
 ========================= */
 function normalizeGroupTitle(rawTitle, fallbackMonth, fallbackBranch) {
   const title = str(rawTitle);
 
-  // "A - B" 형태면 마지막 B만 표시
   if (title && title.includes(" - ")) {
     const parts = title
       .split(" - ")
@@ -331,7 +322,7 @@ function sumAmount(list) {
 }
 
 /* =========================
-   Confirm(확인서) 표시용: 대표 첨부 1개 선택
+   Confirm(확인서) 대표 첨부 1개 선택
 ========================= */
 function pickPrimaryAttachment(group) {
   const atts = Array.isArray(group?.attachments) ? group.attachments : [];
@@ -342,9 +333,7 @@ function pickPrimaryAttachment(group) {
   const fileUrl = str(first.file);
   const extraCount = Math.max(0, atts.length - 1);
 
-  // 여러 개인 경우 "파일명 외 n건"
   const fileName = extraCount > 0 ? `${rawName} 외 ${extraCount}건` : rawName;
-
   return { fileName, fileUrl, rawName, extraCount };
 }
 
@@ -354,24 +343,22 @@ function pickPrimaryAttachment(group) {
 function renderProcessDateCell(r) {
   const val = str(r.process_date);
 
-  // ✅ sub_admin(또는 기타): 텍스트만
   if (!canAdminEdit()) {
     return escapeHtml(val || "-");
   }
 
-  // ✅ admin: input(date) + data-row-id
-  // - value는 YYYY-MM-DD 형태여야 하므로 서버가 그렇게 내려준다고 가정
   return `
     <input type="date"
            class="form-control form-control-sm js-process-date"
            data-row-id="${escapeAttr(str(r.id))}"
+           data-prev-value="${escapeAttr(val)}"
            value="${escapeAttr(val)}"
            style="min-width:135px;" />
   `;
 }
 
 /* =========================
-   Delete / Update handlers (delegation)
+   ✅ Events (delegation) — bind once
 ========================= */
 function bindHandlersOnce() {
   const acc = getGroupsContainer();
@@ -380,7 +367,25 @@ function bindHandlersOnce() {
   if (acc.dataset.boundHandlers === "1") return;
   acc.dataset.boundHandlers = "1";
 
-  // ✅ click: delete-row / delete-group
+  /* -------------------------------------------------------
+     ✅ 0) 아코디언 헤더 내부 버튼 클릭 시 토글 방지
+     - 확인서 확인 / 다운로드 / 삭제 버튼 클릭 시
+       accordion-button까지 이벤트가 올라가면서 토글되는 문제 방지
+     - "캡처링 단계(true)"에서 먼저 막는 게 가장 안정적
+  -------------------------------------------------------- */
+  acc.addEventListener(
+    "click",
+    (e) => {
+      const btn = e.target.closest(".js-confirm-view, .js-confirm-download, .js-confirm-delete");
+      if (!btn) return;
+      e.stopPropagation(); // ✅ 토글 방지
+    },
+    true
+  );
+
+  /* -------------------------------------------------------
+     ✅ 1) click: delete-row / delete-group (data-action)
+  -------------------------------------------------------- */
   acc.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
@@ -414,7 +419,6 @@ function bindHandlersOnce() {
           throw new Error(data.message || `삭제 실패(${res.status})`);
         }
 
-        // ✅ 재조회
         if (window.__lastEfficiencyYM && window.__lastEfficiencyBranch) {
           await fetchData(window.__lastEfficiencyYM, window.__lastEfficiencyBranch);
         }
@@ -429,7 +433,7 @@ function bindHandlersOnce() {
 
     // ✅ 그룹 삭제
     if (action === "delete-group") {
-      if (isSubAdmin()) return; // 안전장치(원래 버튼 렌더 안 함)
+      if (isSubAdmin()) return;
 
       const url = getDeleteGroupUrl();
       if (!url) return alertBox("그룹삭제 URL이 없습니다. (data-data-delete-group-url 확인)");
@@ -468,7 +472,9 @@ function bindHandlersOnce() {
     }
   });
 
-  // ✅ change: process_date update (admin only)
+  /* -------------------------------------------------------
+     ✅ 2) change: process_date update (admin only)
+  -------------------------------------------------------- */
   acc.addEventListener("change", async (e) => {
     const input = e.target;
     if (!input?.classList?.contains("js-process-date")) return;
@@ -483,9 +489,7 @@ function bindHandlersOnce() {
     const process_date = str(input.value); // ""이면 NULL 처리
     const prev = str(input.dataset.prevValue);
 
-    // UX: 저장중 잠깐 비활성화
     input.disabled = true;
-
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -496,8 +500,8 @@ function bindHandlersOnce() {
         },
         body: JSON.stringify({
           id: rowId,
-          process_date: process_date, // YYYY-MM-DD or ""
-          kind: "efficiency", // ✅ 핵심
+          process_date,
+          kind: "efficiency",
         }),
       });
 
@@ -506,14 +510,13 @@ function bindHandlersOnce() {
         throw new Error(data.message || `저장 실패(${res.status})`);
       }
 
-      // 성공 시 prevValue 업데이트
       input.dataset.prevValue = process_date;
     } catch (err) {
       console.error("❌ update process_date error:", err);
       alertBox(err?.message || "처리일자 저장 중 오류가 발생했습니다.");
 
       // 실패 시 롤백
-      if (prev !== undefined) input.value = prev;
+      input.value = prev;
     } finally {
       input.disabled = false;
     }
@@ -548,76 +551,56 @@ function renderGroups(groups, rowsByGroup) {
       const gid = str(g.group_key) || `g${idx}`;
       const gidPk = g.group_pk !== null ? String(g.group_pk) : "";
 
-      const headerTitle = escapeHtml(normalizeGroupTitle(g.title, g.month, g.branch));
+      const headingId = `heading_${escapeAttr(gid)}_${idx}`;
+      const collapseId = `collapse_${escapeAttr(gid)}_${idx}`;
 
-      const rows =
-        (rowsByGroup?.[gid] || []) ||
-        (gidPk ? rowsByGroup?.[gidPk] || [] : []);
+      const titleText = normalizeGroupTitle(g.title, g.month, g.branch);
+      const headerTitle = escapeHtml(titleText);
 
+      const rows = (rowsByGroup?.[gid] || []) || (gidPk ? rowsByGroup?.[gidPk] || [] : []);
       const rowCount = fmtNumber(g.row_count || rows.length || 0);
       const totalAmt = fmtNumber(
         (Number(g.total_amount) || 0) > 0 ? g.total_amount : sumAmount(rows)
       );
 
-      const headingId = `heading_${escapeAttr(gid)}_${idx}`;
-      const collapseId = `collapse_${escapeAttr(gid)}_${idx}`;
+      const monthText = escapeHtml(str(g.month || ""));
+      const branchText = escapeHtml(str(g.branch || ""));
 
-      // ✅ 확인서(첨부) UI: 그룹 우측 상단
+      // ✅ 확인서(대표 첨부) 표시
       const { fileName, fileUrl, rawName } = pickPrimaryAttachment(g);
       const fileNameEsc = escapeAttr(fileName);
       const rawNameEsc = escapeAttr(rawName);
 
+      // 다운로드 버튼(파일 없으면 disabled)
       const downloadBtnHtml = fileUrl
         ? `
-          <a class="btn btn-outline-primary btn-sm"
+          <a class="btn btn-outline-success btn-sm js-confirm-download"
              href="${escapeAttr(fileUrl)}"
              download="${rawNameEsc}"
-             style="white-space:nowrap;">
+             data-group-id="${escapeAttr(gid)}">
             다운로드
           </a>
         `
         : `
-          <button type="button" class="btn btn-outline-primary btn-sm" disabled style="white-space:nowrap;">
+          <button type="button" class="btn btn-outline-success btn-sm js-confirm-download" disabled
+                  data-group-id="${escapeAttr(gid)}">
             다운로드
           </button>
         `;
 
-      // ✅ 그룹 삭제 버튼: 한 줄 고정 + sub_admin 숨김
+      // 그룹 삭제 버튼: sub_admin 숨김
       const deleteGroupBtnHtml = canDeleteGroup
         ? `
           <button type="button"
-                  class="btn btn-danger btn-sm px-3"
+                  class="btn btn-outline-danger btn-sm js-confirm-delete"
                   data-action="delete-group"
-                  data-group-id="${escapeHtml(gid)}"
+                  data-group-id="${escapeAttr(gid)}"
                   style="white-space:nowrap;">
             삭제
           </button>
         `
         : ``;
 
-      // ✅ 그룹 우측 상단 툴바(확인서 + 다운로드 + (관리자)삭제)
-      // - accordion-button 내부에 input을 넣으면 구조 깨질 수 있으니, 버튼 "옆"에 배치
-      const toolsHtml = `
-        <div class="d-flex align-items-center gap-2 ms-2 py-2 pe-2 flex-nowrap"
-             style="white-space:nowrap; flex:0 0 auto;">
-          <div class="input-group input-group-sm flex-nowrap"
-               style="width:360px; max-width:360px; white-space:nowrap;">
-            <span class="input-group-text bg-light"
-                  style="font-weight:600; white-space:nowrap;">확인서</span>
-            <input type="text"
-                   class="form-control text-truncate"
-                   value="${fileNameEsc}"
-                   placeholder="업로드 된 확인서 파일명"
-                   readonly
-                   style="min-width:0;">
-          </div>
-
-          ${downloadBtnHtml}
-          ${deleteGroupBtnHtml}
-        </div>
-      `;
-
-      // ✅ rows table (요구사항 #4: '그룹행(저장된 내역)' 문구 제거)
       const rowsHtml = rows.length
         ? `
           <div class="table-responsive">
@@ -632,7 +615,7 @@ function renderGroups(groups, rowsByGroup) {
                   <th class="text-center">세액</th>
                   <th class="text-center">공제자</th>
                   <th class="text-center">지급자</th>
-                  <th class="text-center">내용</th>
+                  <th class="text-center td-content">내용</th>
                   <th class="text-center">요청일</th>
                   <th class="text-center">처리일자</th>
                   <th class="text-center">삭제</th>
@@ -645,7 +628,6 @@ function renderGroups(groups, rowsByGroup) {
 
                     const amountNum = Number(r.amount || 0);
 
-                    // ✅ tax는 서버값 우선 사용, 없으면 계산 fallback
                     const taxFromServer = Number(r.tax);
                     const taxNum = Number.isFinite(taxFromServer)
                       ? taxFromServer
@@ -661,18 +643,12 @@ function renderGroups(groups, rowsByGroup) {
 
                     const rowDeleteDisabled = subAdmin ? "disabled" : "";
 
-                    // ✅ process_date: admin이면 input(date)
                     const processDateCell = renderProcessDateCell(r);
 
-                    // input(date) 초기 prevValue 저장(롤백용)
-                    // - 문자열 replace로 DOM 생성 후 dataset.prevValue를 set하기 어려우므로
-                    //   value에 맞춰 data-prev-value를 같이 넣어준다.
-                    const processDateCellFixed = canAdminEdit()
-                      ? processDateCell.replace(
-                          'class="form-control form-control-sm js-process-date"',
-                          `class="form-control form-control-sm js-process-date" data-prev-value="${escapeAttr(str(r.process_date || ""))}"`
-                        )
-                      : processDateCell;
+                    // title에는 escape, 본문은 escapeHtml로 출력(ellipsis + hover 확장 대응)
+                    const contentText = str(r.content);
+                    const contentTitle = escapeAttr(contentText);
+                    const contentBody = escapeHtml(contentText);
 
                     return `
                       <tr>
@@ -685,18 +661,20 @@ function renderGroups(groups, rowsByGroup) {
 
                         <td class="text-center">${ded || "-"}</td>
                         <td class="text-center">${pay || "-"}</td>
-                        <td class="text-center td-content">${escapeHtml(str(r.content))}</td>
+
+                        <td class="td-content" title="${contentTitle}">${contentBody || "-"}</td>
+
                         <td class="text-center">${escapeHtml(str(r.request_date))}</td>
 
                         <td class="text-center">
-                          ${processDateCellFixed}
+                          ${processDateCell}
                         </td>
 
                         <td class="text-center">
                           <button type="button"
                                   class="btn btn-outline-danger btn-sm"
                                   data-action="delete-row"
-                                  data-row-id="${escapeHtml(rowId)}"
+                                  data-row-id="${escapeAttr(rowId)}"
                                   style="white-space:nowrap;"
                                   ${rowDeleteDisabled}>
                             삭제
@@ -716,32 +694,49 @@ function renderGroups(groups, rowsByGroup) {
           </div>
         `;
 
-      // ✅ (레이아웃 #1) 그룹명: bold 해제 + 폰트 한 단계 ↓
-      // - fw-normal + fs-6 적용
+      // ✅ 그룹 헤더(스크롤 영역 안에 메타 + 확인서 UI 포함)
+      // - 아코디언 토글은 accordion-button 자체 클릭으로만 동작
+      // - 내부 버튼들은 bindHandlersOnce()에서 stopPropagation 처리됨
       return `
         <div class="accordion-item">
           <h2 class="accordion-header" id="${headingId}">
-            <div class="d-flex align-items-center flex-nowrap" style="white-space:nowrap;">
-              <button class="accordion-button collapsed flex-grow-1"
-                      type="button"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#${collapseId}"
-                      aria-expanded="false"
-                      aria-controls="${collapseId}"
-                      style="min-width:0;">
-                <div class="w-100 d-flex flex-column flex-lg-row justify-content-between gap-1 pe-2"
-                     style="min-width:0;">
-                  <div class="fw-normal fs-6 text-truncate" style="min-width:0;">
-                    ${headerTitle}
-                  </div>
-                  <div class="text-muted small" style="white-space:nowrap;">
-                    행 ${rowCount}건 · 합계 ${totalAmt}
-                  </div>
-                </div>
-              </button>
+            <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#${collapseId}"
+                    aria-expanded="false"
+                    aria-controls="${collapseId}">
 
-              ${toolsHtml}
-            </div>
+              <div class="eff-group-scroll">
+                <div class="eff-group-meta">
+                  <span class="badge bg-light text-dark border">월도: ${monthText || "-"}</span>
+                  <span class="badge bg-light text-dark border">소속: ${branchText || "-"}</span>
+                  <span class="badge bg-light text-dark border">건수: ${rowCount}</span>
+                  <span class="badge bg-light text-dark border">합계: ${totalAmt}</span>
+                  <span class="badge bg-white text-dark border">${headerTitle}</span>
+                </div>
+
+                <div class="eff-group-confirm">
+                  <button type="button"
+                          class="btn btn-outline-secondary btn-sm js-confirm-view"
+                          data-group-id="${escapeAttr(gid)}">
+                    확인서 확인
+                  </button>
+
+                  <div class="input-group input-group-sm flex-nowrap" style="width:320px; max-width:320px;">
+                    <span class="input-group-text bg-light" style="font-weight:600;">확인서</span>
+                    <input type="text"
+                           class="form-control text-truncate"
+                           value="${fileNameEsc}"
+                           placeholder="업로드 된 확인서 파일명"
+                           readonly>
+                  </div>
+
+                  ${downloadBtnHtml}
+                  ${deleteGroupBtnHtml}
+                </div>
+              </div>
+
+            </button>
           </h2>
 
           <div id="${collapseId}" class="accordion-collapse collapse"
@@ -786,7 +781,9 @@ export async function fetchData(ym, branch) {
   showLoading("조회 중...");
 
   try {
-    const fullUrl = `${url}?month=${encodeURIComponent(month)}&branch=${encodeURIComponent(br)}&grouped=1`;
+    const fullUrl = `${url}?month=${encodeURIComponent(month)}&branch=${encodeURIComponent(
+      br
+    )}&grouped=1`;
     log("fetchData ->", fullUrl);
 
     const res = await fetch(fullUrl, {
@@ -804,7 +801,7 @@ export async function fetchData(ym, branch) {
 
     renderGroups(groups, rowsByGroup);
 
-    // ✅ 삭제 + 처리일자 변경 이벤트 (한 번만)
+    // ✅ 이벤트(삭제/처리일자/토글방지) 1회 바인딩
     bindHandlersOnce();
   } catch (e) {
     console.error("❌ efficiency fetchData error:", e);

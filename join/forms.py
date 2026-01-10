@@ -1,6 +1,6 @@
-# join/forms.py
+# django_ma/manual/forms.py
 from django import forms
-from .models import JoinInfo
+from .models import JoinInfo, Manual
 
 class JoinForm(forms.ModelForm):
     email = forms.EmailField(required=False, label='이메일 (선택)')  # 선택항목
@@ -25,3 +25,8 @@ class JoinForm(forms.ModelForm):
             'address': forms.TextInput(attrs={'class': 'form-control', 'readonly': True, 'required': True, 'id': 'address'}),
             'address_detail': forms.TextInput(attrs={'class': 'form-control', 'id': 'address_detail'}),
         }
+
+class ManualForm(forms.ModelForm):
+    class Meta:
+        model = Manual
+        fields = ["title", "content", "is_published"]
