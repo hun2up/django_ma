@@ -1006,7 +1006,33 @@ textarea[name="content"] {
 
 
 /* ==========================================================
- 6) PLUGINS / FIXES
+ 6) PAGES / MANUAL
+========================================================== */
+.manual-badge-admin{
+  background: var(--inka-blue) !important;
+  color: #fff !important;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.manual-badge-staff{
+  background: #dc3545 !important; /* bootstrap danger red */
+  color: #fff !important;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.sortable-ghost {
+  opacity: 0.6;
+}
+a.manual-item.manual-editing {
+  background: #fbfdff;
+}
+
+/* ==========================================================
+ 7) PLUGINS / FIXES
 ========================================================== */
 #mainSheet { min-width: 0; }
 

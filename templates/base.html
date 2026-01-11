@@ -129,7 +129,6 @@
                  href="#" id="commissionMenu" data-bs-toggle="dropdown">수수료</a>
               <ul class="dropdown-menu" aria-labelledby="commissionMenu">
                 <li><a class="dropdown-item" href="{% url 'commission:deposit_home' %}">채권관리</a></li>
-                <li><a class="dropdown-item" href="{% url 'commission:support_home' %}">지원신청서</a></li>
                 <li><a class="dropdown-item" href="{% url 'commission:approval_home' %}">수수료결재</a></li>
               </ul>
             </li>
@@ -141,14 +140,7 @@
               <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}"
                  href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
               <ul class="dropdown-menu" aria-labelledby="joinMenu">
-                <li><a class="dropdown-item" href="/join/manual/">업무매뉴얼</a></li>
-                {% if user.grade in 'superuser main_admin' %}
-                  <li><a class="dropdown-item" href="/join/manual/head/">업무매뉴얼(관리자)</a></li>
-                {% endif %}
-                <li><a class="dropdown-item" href="/join/rules/">영업기준안</a></li>
-                {% if user.grade in 'superuser main_admin' %}
-                  <li><a class="dropdown-item" href="/join/rules/head/">영업기준안(관리자)</a></li>
-                {% endif %}
+                <li><a class="dropdown-item" href="{% url 'manual:manual_list' %}">업무매뉴얼</a></li>
               </ul>
             </li>
           {% endif %}

@@ -59,10 +59,11 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'commission',
     'dash',
+    'manual',
     'partner.apps.PartnerConfig',
     'django_extensions',
-    # 'ckeditor',
-    # 'ckeditor_uploader',
+    'ckeditor',
+    'ckeditor_uploader',
 ]
 
 MIDDLEWARE = [
