@@ -1,16 +1,15 @@
 /* django_ma/static/css/base.css
-/* ===========================================================
- 🎨 base.css — 공통 스타일 시트 (FINAL REFACTORED)
- - 목표: 유지보수성(섹션화/중복제거/명명정리/주석) + 기능변경 ❌
- - 범위: 공용 + Board + Partner(Structure/Rate/Efficiency) + Fixes
- - 규칙:
-   1) Tokens(변수) → Base → Components → Utilities → Pages → Fixes 순서
-   2) 공통은 “낮은 특이성” 우선, 페이지별은 컨테이너(#manage-*)로 제한
-=========================================================== */
+==========================================================
+🎨 base.css — 공통 스타일 시트 (REFAC, “당시 레이아웃” 복원 버전)
+- 목표: 유지보수성(섹션화/중복제거/명명정리) + 기능변경 ❌
+- 범위: 공용 + Board + Partner(Structure/Rate/Efficiency) + Fixes
+- 핵심 복원: Efficiency 아코디언 "헤더 자체" 가로 스크롤 컨테이너
+========================================================== */
 
-/* ===========================================================
- 0) TOKENS — Design Tokens / Root Variables
-=========================================================== */
+
+/* ==========================================================
+ 0) TOKENS: Design Tokens / Root Variables
+========================================================== */
 :root {
   /* Brand */
   --inka-blue: #005BAC;
@@ -21,18 +20,18 @@
   --bg-app: #f9fbfd;
   --border-soft: #d2ddec;
 
-  /* Shadow */
+  /* Shadow / Radius */
   --shadow-card: 0 6px 15px rgba(0, 0, 0, 0.1);
   --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.05);
 
-  /* Radius */
   --radius-card: 15px;
   --radius-soft: 10px;
 }
 
-/* ===========================================================
- 1) BASE — Typography / Global Layout
-=========================================================== */
+
+/* ==========================================================
+ 1) BASE: Typography / Global Layout
+========================================================== */
 html { font-size: 16px; }
 
 html, body, button, input, textarea, select {
@@ -44,19 +43,20 @@ body {
   padding-top: 70px;
 }
 
-/* Mobile: top padding reduced */
+/* 모바일: 상단바 높이/여백 축소 */
 @media (max-width: 576px) {
   body { padding-top: 56px !important; }
 }
 
-/* ===========================================================
+
+/* ==========================================================
  2) COMPONENTS (COMMON)
   - Navbar / Buttons / Forms / Cards / Small UI Blocks
-=========================================================== */
+========================================================== */
 
-/* -----------------------------------------------------------
+/* -----------------------
  2-1) Navbar
------------------------------------------------------------ */
+------------------------ */
 .navbar {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
@@ -92,7 +92,7 @@ body {
   box-shadow: 0 0 0 0.2rem rgba(0, 91, 172, 0.25);
 }
 
-/* Navbar — Mobile */
+/* 모바일: 로고/토글 버튼 축소 */
 @media (max-width: 576px) {
   .navbar {
     padding-top: 6px;
@@ -116,9 +116,9 @@ body {
   }
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  2-2) Buttons
------------------------------------------------------------ */
+------------------------ */
 .btn-primary {
   background: linear-gradient(135deg, var(--inka-blue), var(--inka-blue2));
   border: none;
@@ -140,7 +140,7 @@ body {
   padding: 6px 14px;
 }
 
-/* Partner controls (공용 버튼) */
+/* Partner controls 등 */
 .btn-search,
 .btn-remove {
   white-space: nowrap;
@@ -148,16 +148,15 @@ body {
   font-size: 0.9rem;
 }
 
-/* Disabled buttons */
 button[disabled],
 .btn[disabled] {
   opacity: 0.85;
   cursor: not-allowed;
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  2-3) Forms / Inputs
------------------------------------------------------------ */
+------------------------ */
 .form-control {
   border-radius: var(--radius-soft);
   border: 1px solid var(--border-soft);
@@ -181,18 +180,18 @@ input[name^="premium_"],
   text-align: right;
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  2-4) Cards
------------------------------------------------------------ */
+------------------------ */
 .card {
   border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  2-5) Common info chips
------------------------------------------------------------ */
+------------------------ */
 .info-row {
   display: flex;
   gap: 10px;
@@ -215,14 +214,15 @@ input[name^="premium_"],
   font-weight: 600;
 }
 
-/* ===========================================================
+
+/* ==========================================================
  3) UTILITIES (COMMON)
   - Loading / Disabled / Search hover / Emphasis / Status UI
-=========================================================== */
+========================================================== */
 
-/* -----------------------------------------------------------
+/* -----------------------
  3-1) Loading overlay
------------------------------------------------------------ */
+------------------------ */
 .loading-overlay {
   position: fixed;
   inset: 0;
@@ -233,18 +233,18 @@ input[name^="premium_"],
   z-index: 2000;
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  3-2) Disabled mode
------------------------------------------------------------ */
+------------------------ */
 .disabled-mode {
   opacity: 0.6;
   pointer-events: none;
   filter: grayscale(0.8);
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  3-3) Search result hover (common modal)
------------------------------------------------------------ */
+------------------------ */
 #searchResults .search-result {
   border-radius: 8px;
   transition: 0.2s;
@@ -254,17 +254,17 @@ input[name^="premium_"],
   transform: translateY(-1px);
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  3-4) Emphasis
------------------------------------------------------------ */
+------------------------ */
 .cell-after {
   color: var(--inka-blue);
   font-weight: 600;
 }
 
-/* -----------------------------------------------------------
+/* -----------------------
  3-5) Status UI (Post/Task 공용)
------------------------------------------------------------ */
+------------------------ */
 .status-badge,
 .status-select {
   font-weight: 700;
@@ -342,14 +342,12 @@ input[name^="premium_"],
   border-color: #dee2e6 !important;
 }
 
-/* ===========================================================
- 4) PAGES: BOARD
-  - Wide layout / Comment UI / Mobile list / Filter / Detail actions
-=========================================================== */
 
-/* -----------------------------------------------------------
- 4-1) Board wide layout
------------------------------------------------------------ */
+/* ==========================================================
+ 4) PAGES: BOARD
+========================================================== */
+
+/* ---------- Board wide layout ---------- */
 .board-container-wide {
   width: 78vw;
   max-width: 1500px;
@@ -373,11 +371,9 @@ input[name^="premium_"],
   .pagination { flex-wrap: wrap; }
 }
 
-/* -----------------------------------------------------------
- 4-2) Comment UI
------------------------------------------------------------ */
+/* ---------- Comment UI ---------- */
 .comment-meta { gap: 8px; }
-.comment-author,
+.comment-author { font-size: 12px; }
 .comment-created-at { font-size: 12px; }
 .comment-meta-dot { margin: 0 6px; color: #bbb; }
 
@@ -403,35 +399,29 @@ textarea[name="content"] {
   gap: 8px;
   width: 100%;
 }
-
 .comment-edit-textarea {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 82%;
   resize: vertical;
 }
-
 .comment-edit-actions {
   flex: 0 0 auto;
   display: flex;
   gap: 6px;
   white-space: nowrap;
 }
-
 .edit-comment-btn,
 .edit-delete-btns .btn {
   font-size: 12px;
 }
 
-/* -----------------------------------------------------------
- 4-3) Mobile List UI
------------------------------------------------------------ */
+/* ---------- Mobile List UI ---------- */
 .board-mobile-list {
   border-radius: 14px;
   overflow: hidden;
   box-shadow: var(--shadow-soft);
 }
-
 .board-mobile-item {
   border: 0;
   border-bottom: 1px solid #e9ecef;
@@ -463,14 +453,11 @@ textarea[name="content"] {
   .board-mobile-title { font-size: 14.5px; }
 }
 
-/* -----------------------------------------------------------
- 4-4) Mobile Filter UI
------------------------------------------------------------ */
+/* ---------- Mobile Filter UI ---------- */
 .board-mobile-filter {
   border-radius: 14px;
   overflow: hidden;
 }
-
 .board-filter-toggle {
   background: #fff;
   padding: 12px 14px;
@@ -480,34 +467,28 @@ textarea[name="content"] {
 .board-filter-toggle:focus {
   box-shadow: none;
 }
-
 .board-mobile-filter .form-select-sm,
 .board-mobile-filter .form-control-sm {
   border-radius: 12px;
 }
 
-/* -----------------------------------------------------------
- 4-5) Detail bottom actions (Mobile Fix)
------------------------------------------------------------ */
+/* ---------- Detail bottom actions (Mobile Fix) ---------- */
 .board-detail-actions {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
 }
-
 .board-detail-actions-left {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
 }
-
 .board-detail-actions-right {
   display: flex;
   align-items: center;
 }
-
 .board-detail-actions-form { margin: 0; }
 
 @media (max-width: 576px) {
@@ -515,19 +496,16 @@ textarea[name="content"] {
     flex-direction: column;
     align-items: stretch;
   }
-
   .board-detail-actions-left,
   .board-detail-actions-right {
     width: 100%;
     flex-direction: column;
     align-items: stretch;
   }
-
   .board-detail-actions-left .btn,
   .board-detail-actions-right .btn {
     width: 100%;
   }
-
   .board-detail-actions .btn {
     padding: 10px 12px;
     font-size: 0.95rem;
@@ -535,15 +513,12 @@ textarea[name="content"] {
   }
 }
 
-/* -----------------------------------------------------------
- 4-6) Support Form mobile horizontal scroll
------------------------------------------------------------ */
+/* ---------- Support Form mobile horizontal scroll ---------- */
 .support-user-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 6px;
 }
-
 @media (max-width: 576px) {
   #support-form .user-row {
     flex-wrap: nowrap;
@@ -551,43 +526,34 @@ textarea[name="content"] {
     margin-left: 0;
     margin-right: 0;
   }
-
   #support-form .user-row .equal-field {
     flex: 0 0 140px;
     max-width: 140px;
   }
-
   #support-form .user-row .col-auto {
     flex: 0 0 76px;
     max-width: 76px;
   }
-
   #support-form .btn-open-search {
     white-space: nowrap;
     width: 100%;
     padding: 8px 10px;
   }
-
   #support-form .user-row .col-md-1 {
     flex: 0 0 64px;
     max-width: 64px;
   }
-
   #support-form .user-row .form-label {
     white-space: nowrap;
   }
 }
 
-/* ===========================================================
- 5) PAGES: PARTNER (Structure/Rate/Efficiency)
-  - 레이아웃 확장
-  - input header 공통
-  - inputTable 정책 + mainSheet nowrap 정책
-=========================================================== */
 
-/* -----------------------------------------------------------
- 5-0) Partner wide layout (공통 컨테이너 확장)
------------------------------------------------------------ */
+/* ==========================================================
+ 5) PAGES: PARTNER (Structure/Rate/Efficiency)
+========================================================== */
+
+/* ---------- Partner wide layout ---------- */
 #manage-structure,
 #manage-rate,
 #manage-efficiency {
@@ -596,7 +562,7 @@ textarea[name="content"] {
   margin-left: calc(-43vw + 50%);
 }
 
-/* Partner tables basic */
+/* ---------- Partner tables basic ---------- */
 #manage-structure table,
 #manage-rate table,
 #manage-efficiency table {
@@ -612,9 +578,7 @@ textarea[name="content"] {
   text-align: center;
 }
 
-/* -----------------------------------------------------------
- 5-1) Input header (공통)
------------------------------------------------------------ */
+/* ---------- Input header (공통) ---------- */
 #manage-structure .manage-input-head,
 #manage-rate .manage-input-head,
 #manage-efficiency .manage-input-head {
@@ -651,15 +615,9 @@ textarea[name="content"] {
   white-space: nowrap;
 }
 
-/* (optional) scroll bar height for actions row */
-#manage-structure .manage-input-actions::-webkit-scrollbar,
-#manage-rate .manage-input-actions::-webkit-scrollbar {
-  height: 6px;
-}
-
-/* ===========================================================
- 5-A) PARTNER: inputTable 공통 정책 (Structure/Rate)
-=========================================================== */
+/* ==========================================================
+ 5-A) Structure/Rate inputTable 공통 정책
+========================================================== */
 #manage-structure #inputSection .table-responsive,
 #manage-rate #inputSection .table-responsive {
   overflow-x: auto;
@@ -698,9 +656,9 @@ textarea[name="content"] {
   white-space: nowrap;
 }
 
-/* ===========================================================
- 5-B) PARTNER: Structure 수동 컬럼폭 변수
-=========================================================== */
+/* ==========================================================
+ 5-B) Structure 수동 컬럼폭 변수
+========================================================== */
 #manage-structure {
   --c-search: 74px;
   --c-rq-name: 90px;
@@ -731,9 +689,9 @@ textarea[name="content"] {
 #manage-structure #inputTable col.c-memo { width: var(--c-memo); }
 #manage-structure #inputTable col.c-del { width: var(--c-del); }
 
-/* ===========================================================
- 5-C) PARTNER: Rate 수동 컬럼폭 변수
-=========================================================== */
+/* ==========================================================
+ 5-C) Rate 수동 컬럼폭 변수
+========================================================== */
 #manage-rate {
   --c-search: 74px;
   --c-rq-name: 90px;
@@ -774,17 +732,15 @@ textarea[name="content"] {
 #manage-rate #inputTable col.c-memo { width: var(--c-memo); }
 #manage-rate #inputTable col.c-del { width: var(--c-del); }
 
-/* ===========================================================
- 5-D) PARTNER: MainSheet nowrap 정책 (Structure / Rate)
-=========================================================== */
-/* 공통: mainSheet 스크롤 컨테이너 */
+/* ==========================================================
+ 5-D) MainSheet nowrap 정책 (Structure / Rate)
+========================================================== */
 #manage-structure #mainSheet .table-responsive,
 #manage-rate #mainSheet .table-responsive {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* 공통: mainTable “줄지 말고 스크롤” */
 #manage-structure #mainTable,
 #manage-rate #mainTable {
   table-layout: auto !important;
@@ -802,7 +758,7 @@ textarea[name="content"] {
   vertical-align: middle;
 }
 
-/* Structure: 메모 컬럼(11)만 줄바꿈 */
+/* structure: memo col(11) wrap */
 #manage-structure #mainTable th:nth-child(11),
 #manage-structure #mainTable td:nth-child(11) {
   white-space: normal;
@@ -810,7 +766,7 @@ textarea[name="content"] {
 }
 #manage-structure #mainTable td:nth-child(11) { line-height: 1.4; }
 
-/* Rate: 메모 컬럼(13)만 줄바꿈 */
+/* rate: memo col(13) wrap */
 #manage-rate #mainTable th:nth-child(13),
 #manage-rate #mainTable td:nth-child(13) {
   white-space: normal;
@@ -818,95 +774,21 @@ textarea[name="content"] {
 }
 #manage-rate #mainTable td:nth-child(13) { line-height: 1.4; }
 
-/* Rate: table check modal */
+/* rate: table check modal */
 #tableCheckModal table th,
 #tableCheckModal table td {
   white-space: nowrap;
 }
 
-/* ===========================================================
- 5-E) PARTNER: Efficiency (manage_efficiency)
-  - inputTable 고정폭 + 수동폭(col[data-col]) + ellipsis
-  - mainSheet(Accordion) “줄지 말고 스크롤”
-  - group header도 스크롤(확인서/버튼 포함)
-=========================================================== */
 
-/* -----------------------------------------------------------
- 5-E-1) Efficiency: Accordion Header (scroll + sticky icon)
------------------------------------------------------------ */
-/* 헤더/버튼 자체 스크롤 허용 */
-#manage-efficiency #confirmGroupsAccordion .accordion-header,
-#manage-efficiency #confirmGroupsAccordion .accordion-button {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+/* ==========================================================
+ 5-E) Efficiency (manage_efficiency)
+  - “당시 레이아웃” 복원: 헤더 자체가 스크롤 컨테이너
+  - inputTable: 고정폭 + 수동폭 + ellipsis
+  - accordion body/table: “줄지 말고 스크롤”
+========================================================== */
 
-/* 버튼 기본 레이아웃 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button {
-  padding-right: 44px;     /* 오른쪽 화살표 공간 확보 */
-  white-space: nowrap;     /* 줄바꿈 방지 */
-  gap: 10px;
-  min-width: 1100px;       /* “깨지지 않고 스크롤” 기준 */
-}
-
-/* 내부 컨텐츠는 줄어들지 않게 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button > * {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* 오른쪽 토글 아이콘이 스크롤로 가려지지 않게 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button::after {
-  position: sticky;
-  right: 12px;
-  margin-left: 12px;
-}
-
-/* 헤더 내부 확인서 파일명/텍스트 말줄임 방어 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button input,
-#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-file,
-#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-text {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* JS에서 넣는 스크롤 컨테이너 */
-#manage-efficiency .eff-group-scroll {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
-
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-
-  white-space: nowrap;
-  min-width: 1100px;
-  width: max-content;
-}
-
-/* meta/confirm 영역은 줄지 않게 */
-#manage-efficiency .eff-group-scroll > * { flex: 0 0 auto; }
-
-#manage-efficiency .eff-group-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-#manage-efficiency .eff-group-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-#manage-efficiency .eff-group-confirm .btn { white-space: nowrap; }
-
-/* -----------------------------------------------------------
- 5-E-2) Efficiency: Input Table (scroll + fixed + ellipsis)
------------------------------------------------------------ */
+/* ---------- Efficiency inputTable ---------- */
 #manage-efficiency #inputSection .table-responsive {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -938,7 +820,7 @@ textarea[name="content"] {
   padding-right: 6px;
 }
 
-/* Efficiency: manual input col widths */
+/* efficiency: manual input col widths */
 #manage-efficiency {
   --c-rq_name: 90px;
   --c-rq_id: 100px;
@@ -960,6 +842,9 @@ textarea[name="content"] {
   --c-remove: 80px;
 
   --main-content-width: 320px;
+
+  /* ✅ “당시 헤더” 기준 최소폭(필요시 1200/1400으로 조정) */
+  --eff-header-minw: 1100px;
 }
 
 #manage-efficiency #inputTable col[data-col="rq_name"] { width: var(--c-rq_name); }
@@ -980,20 +865,20 @@ textarea[name="content"] {
 #manage-efficiency #inputTable col[data-col="content"] { width: var(--c-content); }
 #manage-efficiency #inputTable col[data-col="remove"] { width: var(--c-remove); }
 
-/* -----------------------------------------------------------
- 5-E-3) Efficiency: MainSheet (Accordion body scroll + table fixed)
------------------------------------------------------------ */
-#manage-efficiency #mainSheet { min-width: 0; } /* flex/카드 내부 overflow 방지 */
+/* ---------- Efficiency mainSheet (Accordion) ---------- */
+/* flex/카드 내부 overflow 문제 방지 */
+#manage-efficiency #mainSheet { min-width: 0; }
 
+/* accordion body가 가로 스크롤 컨테이너 */
 #manage-efficiency #confirmGroupsAccordion .accordion-body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* main group table: “줄지 말고 스크롤” */
+/* 그룹 테이블: “줄지 말고 스크롤” */
 #manage-efficiency #confirmGroupsAccordion .main-group-table {
   width: max-content;
-  min-width: 1100px;
+  min-width: var(--eff-header-minw);
   table-layout: fixed;
 }
 
@@ -1005,11 +890,10 @@ textarea[name="content"] {
   text-overflow: ellipsis;
 }
 
-/* 기존 정책 유지용 보강 */
 #manage-efficiency .main-group-table td { max-width: none; }
-#manage-efficiency .main-table-fixed { min-width: 1100px; }
+#manage-efficiency .main-table-fixed { min-width: var(--eff-header-minw); }
 
-/* 내용 컬럼(td-content)만 폭 고정 + 말줄임 + hover 확장 */
+/* 내용 컬럼(td-content): 폭 고정 + 말줄임 + hover 확장 */
 #manage-efficiency #confirmGroupsAccordion .main-group-table td.td-content,
 #manage-efficiency #confirmGroupsAccordion .main-group-table th.td-content {
   max-width: var(--main-content-width);
@@ -1020,7 +904,6 @@ textarea[name="content"] {
   vertical-align: middle;
 }
 
-/* hover 시 박스처럼 전체 텍스트 노출 */
 #manage-efficiency #confirmGroupsAccordion .main-group-table td.td-content:hover {
   white-space: normal;
   overflow: visible;
@@ -1032,7 +915,7 @@ textarea[name="content"] {
   padding: 8px 10px;
 }
 
-/* Efficiency actions bar */
+/* ---------- Efficiency actions bar ---------- */
 #manage-efficiency .efficiency-actions-bar {
   display: flex;
   gap: 8px;
@@ -1040,12 +923,120 @@ textarea[name="content"] {
   overflow-x: auto;
 }
 
-/* ===========================================================
- 6) PLUGINS / FIXES (전역 영향 규칙은 여기로 격리)
-=========================================================== */
+/* ==========================================================
+ 5-E-2) ✅ Efficiency Accordion Header — “당시 레이아웃” 핵심 복원
+  - 헤더(accordion-button) 자체가 스크롤 컨테이너
+  - 내부 컨텐츠는 flex nowrap + min-width 유지
+  - 토글 아이콘은 sticky(right)로 고정 느낌
+========================================================== */
+
+/* 1) 헤더/버튼 자체: 가로 스크롤 */
+#manage-efficiency #confirmGroupsAccordion .accordion-header,
+#manage-efficiency #confirmGroupsAccordion .accordion-button {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 2) 버튼: 줄바꿈 금지 + 최소폭 유지 */
+#manage-efficiency #confirmGroupsAccordion .accordion-button {
+  white-space: nowrap;
+  gap: 10px;
+  min-width: var(--eff-header-minw);
+
+  /* 토글 아이콘 공간 확보 */
+  padding-right: 44px;
+}
+
+/* 3) 버튼 내부 항목: “줄어들지 않게” */
+#manage-efficiency #confirmGroupsAccordion .accordion-button > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 4) 토글 아이콘: 스크롤해도 오른쪽에 붙어 보이게 */
+#manage-efficiency #confirmGroupsAccordion .accordion-button::after {
+  position: sticky;
+  right: 12px;
+  margin-left: 12px;
+}
+
+/* 5) (권장 래퍼) JS에서 .eff-group-scroll 사용 시: 한 줄 + 스크롤 + 최소폭 */
+#manage-efficiency .eff-group-scroll {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  white-space: nowrap;
+  min-width: var(--eff-header-minw);
+  width: max-content;
+}
+
+/* meta/confirm 영역은 줄지 않게 */
+#manage-efficiency .eff-group-scroll > * { flex: 0 0 auto; }
+
+#manage-efficiency .eff-group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#manage-efficiency .eff-group-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#manage-efficiency .eff-group-confirm .btn {
+  white-space: nowrap;
+}
+
+/* 6) 헤더 안에 input/text(확인서 파일명 등) 말줄임 방어 */
+#manage-efficiency #confirmGroupsAccordion .accordion-button input,
+#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-file,
+#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-text {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================
+ 6) PAGES / MANUAL
+========================================================== */
+.manual-badge-admin{
+  background: var(--inka-blue) !important;
+  color: #fff !important;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.manual-badge-staff{
+  background: #dc3545 !important; /* bootstrap danger red */
+  color: #fff !important;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.sortable-ghost {
+  opacity: 0.6;
+}
+a.manual-item.manual-editing {
+  background: #fbfdff;
+}
+
+/* ==========================================================
+ 7) PLUGINS / FIXES
+========================================================== */
 #mainSheet { min-width: 0; }
 
-/* ❌ 전역 #mainTable 금지: manage-efficiency 페이지만 방어 */
+/* ❌ 전역 #mainTable 금지: 페이지별로만 방어 */
 #manage-efficiency #mainTable {
   width: 100% !important;
   table-layout: fixed;

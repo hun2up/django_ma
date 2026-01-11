@@ -43,6 +43,7 @@ urlpatterns = [
     path('dash/', include('dash.urls')),
     path('partner/', include('partner.urls')),
     path("api/accounts/", include("accounts.urls")),
+    path('manual/', include('manual.urls')),
     # path("ckeditor/", include("ckeditor_uploader.urls")),
 ]
 
