@@ -924,127 +924,148 @@ textarea[name="content"] {
 }
 
 /* ==========================================================
- 5-E-2) ✅ Efficiency Accordion Header — “당시 레이아웃” 핵심 복원
-  - 헤더(accordion-button) 자체가 스크롤 컨테이너
-  - 내부 컨텐츠는 flex nowrap + min-width 유지
-  - 토글 아이콘은 sticky(right)로 고정 느낌
+ 5-E-2) ✅ Efficiency Accordion Header (REFAC FINAL)
+  - 토글(▼) 아이콘: "헤더 좌측" 고정
+  - 헤더 자체는 스크롤 금지(overflow hidden) → 파란 인디케이터 방지
+  - 헤더 내부 텍스트만 .eff-group-scroll 에서 필요 시 가로 스크롤
+  - 우측 확인서 영역(.eff-acc-confirm)은 별도 박스로 고정
 ========================================================== */
 
-/* 1) 헤더/버튼 자체: 가로 스크롤 */
-#manage-efficiency #confirmGroupsAccordion .accordion-header,
-#manage-efficiency #confirmGroupsAccordion .accordion-button {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+/* -----------------------
+ 0) Variables (필요 시 조정)
+------------------------ */
+#manage-efficiency{
+  --eff-header-minh: 46px;   /* 헤더 높이(파란 표시 방지용) */
+  --eff-toggle-left-pad: 44px; /* 좌측 토글 아이콘 공간 */
+  --eff-confirm-gap: 8px;
+  --eff-confirm-file-w: 260px;
 }
 
-/* 2) 버튼: 줄바꿈 금지 + 최소폭 유지 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button {
-  white-space: nowrap;
-  gap: 10px;
-  min-width: var(--eff-header-minw);
-
-  /* 토글 아이콘 공간 확보 */
-  padding-right: 44px;
-}
-
-/* 3) 버튼 내부 항목: “줄어들지 않게” */
-#manage-efficiency #confirmGroupsAccordion .accordion-button > * {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* 4) 토글 아이콘: 스크롤해도 오른쪽에 붙어 보이게 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button::after {
-  position: sticky;
-  right: 12px;
-  margin-left: 12px;
-}
-
-/* 5) (권장 래퍼) JS에서 .eff-group-scroll 사용 시: 한 줄 + 스크롤 + 최소폭 */
-#manage-efficiency .eff-group-scroll {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
-
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-
-  white-space: nowrap;
-  min-width: var(--eff-header-minw);
-  width: max-content;
-}
-
-/* meta/confirm 영역은 줄지 않게 */
-#manage-efficiency .eff-group-scroll > * { flex: 0 0 auto; }
-
-#manage-efficiency .eff-group-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-#manage-efficiency .eff-group-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-#manage-efficiency .eff-group-confirm .btn {
-  white-space: nowrap;
-}
-
-/* 6) 헤더 안에 input/text(확인서 파일명 등) 말줄임 방어 */
-#manage-efficiency #confirmGroupsAccordion .accordion-button input,
-#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-file,
-#manage-efficiency #confirmGroupsAccordion .accordion-button .confirm-text {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ✅ 헤더를 '왼쪽 토글 + 오른쪽 확인서영역' 2칼럼으로 */
+/* -----------------------
+ 1) Header layout: 2 columns
+  - 좌: 토글 버튼(제목)
+  - 우: 확인서 영역
+------------------------ */
 #manage-efficiency .eff-acc-head{
   display: flex;
   align-items: stretch;
   gap: 10px;
 }
 
-/* 토글 버튼은 남는 공간 채우기 */
+/* 좌측: 토글 버튼 */
 #manage-efficiency .eff-acc-toggle{
   flex: 1 1 auto;
   min-width: 0;
+
+  /* ✅ 헤더 자체 스크롤 금지 */
+  overflow: hidden;
+
+  /* 높이/정렬 */
+  min-height: var(--eff-header-minh);
+  align-items: center;
+
   border-radius: 12px;
+  position: relative;
+
+  /* ✅ 토글 아이콘(왼쪽) 자리 */
+  padding-left: var(--eff-toggle-left-pad);
+  padding-right: 14px;
+
+  /* Bootstrap 기본 nowrap 성향 유지 */
+  white-space: nowrap;
 }
 
-/* 오른쪽 확인서 영역은 고정폭 느낌으로 */
+/* ✅ 토글 아이콘(accordion-button::after)을 "왼쪽"으로 이동 */
+#manage-efficiency .eff-acc-toggle::after{
+  position: absolute;
+  left: 12px;
+  right: auto;
+  margin: 0;
+}
+
+/* -----------------------
+ 2) Header inner scroll area
+  - 제목/서브텍스트가 길면 여기서만 가로 스크롤
+  - 스크롤바 숨김(휠/트랙패드로는 스크롤 가능)
+------------------------ */
+#manage-efficiency .eff-group-scroll{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+
+  width: 100%;
+  min-width: 0;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  white-space: nowrap;
+}
+
+/* 스크롤바 숨김 */
+#manage-efficiency .eff-group-scroll::-webkit-scrollbar{ display:none; }
+#manage-efficiency .eff-group-scroll{ scrollbar-width:none; }
+
+/* 내부 아이템은 줄지 않게 */
+#manage-efficiency .eff-group-scroll > *{
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 제목/서브 텍스트 */
+#manage-efficiency .eff-group-meta{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+#manage-efficiency .eff-group-title{
+  font-weight: 800;
+}
+#manage-efficiency .eff-group-sub{
+  font-size: 12px;
+  color: #6c757d;
+}
+
+/* -----------------------
+ 3) Right confirm box
+------------------------ */
 #manage-efficiency .eff-acc-confirm{
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--eff-confirm-gap);
+
   padding: 8px 10px;
   background: #fff;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
 }
 
-/* 파일명 input 말줄임 */
+/* 확인서 파일명 말줄임 */
 #manage-efficiency .eff-acc-confirm .confirm-file{
-  width: 260px;
-  max-width: 260px;
+  width: var(--eff-confirm-file-w);
+  max-width: var(--eff-confirm-file-w);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* ✅ Bootstrap 기본 after(화살표) 유지하되, 토글 버튼 안에서만 보이게 */
-#manage-efficiency .eff-acc-toggle::after{
-  margin-left: 10px;
+/* 헤더 안 input/text 말줄임(방어) */
+#manage-efficiency .eff-acc-toggle input,
+#manage-efficiency .eff-acc-toggle .confirm-file,
+#manage-efficiency .eff-acc-toggle .confirm-text{
+  max-width: var(--eff-confirm-file-w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 모바일에서는 확인서 영역이 아래로 내려가도 OK */
+/* -----------------------
+ 4) Mobile: confirm box can wrap down
+------------------------ */
 @media (max-width: 576px){
   #manage-efficiency .eff-acc-head{
     flex-wrap: wrap;
@@ -1060,6 +1081,69 @@ textarea[name="content"] {
   }
 }
 
+/* 1) accordion-header / toggle 버튼에서 Y 스크롤 완전 차단 */
+#manage-efficiency #confirmGroupsAccordion .accordion-header,
+#manage-efficiency #confirmGroupsAccordion .accordion-button,
+#manage-efficiency #confirmGroupsAccordion .eff-acc-toggle{
+  overflow-y: hidden !important;
+}
+
+/* 2) 토글 버튼(좌측) 높이 고정 + 중앙정렬
+   - min-height만 주면 내부가 커질 때 높이가 늘 수 있으니
+     height도 같이 주고, 내부 요소는 max-height로 제어 */
+#manage-efficiency .eff-acc-toggle{
+  height: var(--eff-header-minh);
+  min-height: var(--eff-header-minh);
+  line-height: 1.2;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+/* 3) 토글 내부 스크롤 영역도 세로는 절대 안 생기게 */
+#manage-efficiency .eff-group-scroll{
+  overflow-y: hidden !important;
+  max-height: calc(var(--eff-header-minh) - 16px); /* padding(8+8) 감안 */
+  align-items: center;
+}
+
+/* 4) 제목/서브텍스트가 헤더 높이를 키우지 않게 라인 고정 */
+#manage-efficiency .eff-group-title{
+  line-height: 1.15;
+}
+#manage-efficiency .eff-group-sub{
+  line-height: 1.15;
+}
+
+/* 5) 우측 확인서 박스도 같은 높이로 맞추고 내부 요소 높이 제한 */
+#manage-efficiency .eff-acc-confirm{
+  min-height: var(--eff-header-minh);
+  height: var(--eff-header-minh);
+  align-items: center;
+  overflow-y: hidden !important;
+}
+
+/* input이 헤더 높이를 밀어올리는 경우 방지 */
+#manage-efficiency .eff-acc-confirm .confirm-file{
+  height: 30px;
+  line-height: 1.1;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* 버튼들도 높이 맞춤(bootstrap btn-sm이 브라우저별로 미묘하게 커지는 경우 방지) */
+#manage-efficiency .eff-acc-confirm .btn.btn-sm{
+  height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  line-height: 1.1;
+}
+
+/* 6) (중요) accordion-button 자체에 혹시 남아있는 overflow-x:auto 같은 과거 코드 무력화 */
+#manage-efficiency #confirmGroupsAccordion .accordion-button{
+  overflow-x: hidden !important; /* 가로 스크롤은 eff-group-scroll에서만 */
+}
 
 /* ==========================================================
  6) PAGES / MANUAL

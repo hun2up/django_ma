@@ -171,3 +171,91 @@ class DepositUploadLog(models.Model):
         unique_together = ("part", "upload_type")
         verbose_name = "채권 업로드 로그"
         verbose_name_plural = "채권 업로드 로그"
+
+
+class ApprovalExcelUploadLog(models.Model):
+    KIND_CHOICES = (
+        ("efficiency", "지점효율"),
+        ("approval", "수수료결재"),
+    )
+
+    ym = models.CharField(max_length=7, db_index=True, verbose_name="월도(YYYY-MM)")
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, db_index=True, verbose_name="구분")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="approval_excel_upload_logs",
+        verbose_name="업로드 사용자"
+    )
+
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="업로드 일시")
+    row_count = models.IntegerField(default=0, verbose_name="행 수(추정)")
+    file_name = models.CharField(max_length=255, blank=True, default="", verbose_name="파일명")
+
+    class Meta:
+        db_table = "approval_excel_upload_log"
+        verbose_name = "결재/효율 엑셀 업로드 로그"
+        verbose_name_plural = "결재/효율 엑셀 업로드 로그"
+        ordering = ["-uploaded_at"]
+        unique_together = ("ym", "kind")  # 월도+구분별 “마지막 업로드” 1개만 유지하고 싶으면 유지
+
+    def __str__(self):
+        return f"{self.ym} / {self.kind} / {self.file_name}"
+
+
+class CommissionApprovalPending(models.Model):
+    """
+    수수료 미결현황 (월도별)
+    - 업로드 엑셀에서 사번(C열) 기준으로 users(CustomUser) 매칭
+    - part/branch/name/regist 는 user에서 조인으로 표시(중복 저장 최소화)
+    """
+    ym = models.CharField(max_length=7, db_index=True, verbose_name="월도(YYYY-MM)")
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="commission_approval_pendings",
+        verbose_name="사번",
+    )
+
+    emp_name = models.CharField(max_length=200, blank=True, default="", verbose_name="사원명(엑셀)")
+    actual_paid = models.BigIntegerField(default=0, verbose_name="실지급액")
+    approval = models.CharField(max_length=50, blank=True, default="", verbose_name="결재")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "commission_approval_pending"
+        verbose_name = "수수료 미결현황"
+        verbose_name_plural = "수수료 미결현황"
+        ordering = ["-ym", "user_id"]
+        unique_together = ("ym", "user")  # 월도+사번 1행
+
+
+class ApprovalPending(models.Model):
+    """
+    ✅ 수수료 미결현황 (월도별)
+    - 엑셀 업로드(kind=approval)로 채워짐
+    """
+    ym = models.CharField(max_length=7, db_index=True, verbose_name="월도(YYYY-MM)")
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approval_pendings",
+        verbose_name="사번",
+    )
+
+    emp_name = models.CharField(max_length=200, blank=True, default="", verbose_name="사원명(B열)")
+    actual_pay = models.BigIntegerField(default=0, verbose_name="실지급액(N열)")
+    approval_flag = models.CharField(max_length=20, blank=True, default="", verbose_name="결재(O열)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "approval_pending"
+        verbose_name = "수수료 미결현황"
+        verbose_name_plural = "수수료 미결현황"
+        unique_together = ("ym", "user")   # 월도+사번 1행 유지
+        ordering = ["ym", "user_id"]

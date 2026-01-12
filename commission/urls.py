@@ -15,4 +15,5 @@ urlpatterns = [
     path("api/deposit-surety/", views.api_deposit_surety_list, name="api_deposit_surety_list"),
     path("api/deposit-other/", views.api_deposit_other_list, name="api_deposit_other_list"),
     path("api/support-pdf/", views.api_support_pdf, name="api_support_pdf"),
+    path("approval/upload-excel/", views.approval_upload_excel, name="approval_upload_excel"),
 ]

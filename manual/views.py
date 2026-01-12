@@ -3,6 +3,7 @@ import os
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -122,6 +123,21 @@ def manual_list(request):
         qs = qs.filter(admin_only=False)
 
     qs = qs.order_by("sort_order", "-updated_at")
+
+    section_qs = (
+        ManualSection.objects
+        .only("id", "manual_id", "title", "sort_order")
+        .order_by("sort_order", "id")
+    )
+
+    manuals = (
+        Manual.objects
+        # ✅ 기존 grade 기반 필터 그대로 두고
+        # .filter(...)
+        .prefetch_related(Prefetch("sections", queryset=section_qs))
+        .order_by("sort_order", "id")
+    )
+
     return render(request, "manual/manual_list.html", {"manuals": qs})
 
 

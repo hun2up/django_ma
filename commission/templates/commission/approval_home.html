@@ -1,10 +1,230 @@
-<!--django_ma/commission/templates/commission/approval_home.html-->
-{% extends 'base.html' %}
+{# django_ma/commission/templates/commission/approval_home.html #}
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
 {% block title %}수수료결재{% endblock %}
 
 {% block content %}
-<div class="container text-center mt-5">
-  <h2 class="fw-bold" style="color:#003f7d;">수수료결재 페이지</h2>
-  <p class="text-muted mt-3">🚧 제작중입니다 🚧</p>
+<div class="container my-4">
+
+  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">수수료 결재 페이지</h3>
+
+  <!-- ✅ Top Controls (연/월 + 부서) -->
+  <div class="card shadow p-3 border-0 rounded-4 mb-3" style="max-width:1100px; margin:0 auto;">
+    <form id="controlsForm" class="row g-2 align-items-end" method="get">
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">연도</label>
+        <select id="yearSelect" name="year" class="form-select">
+          {% for y in years %}
+            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">월도</label>
+        <select id="monthSelect" name="month" class="form-select">
+          <option value="1"  {% if selected_month == 1 %}selected{% endif %}>01</option>
+          <option value="2"  {% if selected_month == 2 %}selected{% endif %}>02</option>
+          <option value="3"  {% if selected_month == 3 %}selected{% endif %}>03</option>
+          <option value="4"  {% if selected_month == 4 %}selected{% endif %}>04</option>
+          <option value="5"  {% if selected_month == 5 %}selected{% endif %}>05</option>
+          <option value="6"  {% if selected_month == 6 %}selected{% endif %}>06</option>
+          <option value="7"  {% if selected_month == 7 %}selected{% endif %}>07</option>
+          <option value="8"  {% if selected_month == 8 %}selected{% endif %}>08</option>
+          <option value="9"  {% if selected_month == 9 %}selected{% endif %}>09</option>
+          <option value="10" {% if selected_month == 10 %}selected{% endif %}>10</option>
+          <option value="11" {% if selected_month == 11 %}selected{% endif %}>11</option>
+          <option value="12" {% if selected_month == 12 %}selected{% endif %}>12</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label mb-1">부서</label>
+        <select id="partSelect" name="part" class="form-select">
+          <option value="" {% if not selected_part %}selected{% endif %}>전체</option>
+          {% for p in parts %}
+            <option value="{{ p }}" {% if p == selected_part %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-2 d-grid">
+        <button type="submit" class="btn btn-primary">조회</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ✅ 기존 내용(제작중 영역) -->
+  <div class="card shadow p-3 border-0 rounded-4" style="max-width:1100px; margin:0 auto;">
+    <!-- 상단 헤더 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <button type="button"
+              class="btn btn-primary btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#approvalExcelUploadModal">
+        엑셀업로드
+      </button>
+    </div>
+
+    <!-- ✅ 테이블 소제목 -->
+    <div class="text-center fw-bold mb-2" style="font-size:1.05rem; color:#333;">
+      지점효율지급 초과현황
+    </div>
+
+    <!-- ✅ 업로드 결과 테이블 -->
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm align-middle text-center mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>부서</th>
+            <th>영업가족명</th>
+            <th>사원명</th>
+            <th>성명</th>
+            <th>사번</th>
+            <th>지급금액합계</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# 🔹 초기 상태: 데이터 없음 #}
+        </tbody>
+      </table>
+    </div>
+
+    <br>
+
+    <!-- ✅ 테이블 소제목 -->
+    <div class="text-center fw-bold mb-2" style="font-size:1.05rem; color:#333;">
+      수수료 미결현황
+    </div>
+
+    <!-- ✅ 업로드 결과 테이블 -->
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm align-middle text-center mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>부서</th>
+            <th>영업가족명</th>
+            <th>사원명</th>
+            <th>성명</th>
+            <th>사번</th>
+            <th>유자격(사용인)</th>
+            <th>실지급액</th>
+            <th>결재</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in pending_rows %}
+            <tr>
+              <td>{{ r.user.part }}</td>
+              <td>{{ r.user.branch }}</td>
+              <td>{{ r.emp_name }}</td>
+              <td>{{ r.user.name }}</td>
+              <td>{{ r.user.id }}</td>
+              <td>{{ r.user.regist }}</td>
+              <td>{{ r.actual_pay|intcomma }}</td>
+              <td>{{ r.approval_flag }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-muted py-3">데이터가 없습니다.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
+
+<!-- ✅ 엑셀 업로드 모달 (월도+구분+파일) -->
+<div class="modal fade" id="approvalExcelUploadModal" tabindex="-1" aria-labelledby="approvalExcelUploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header bg-light">
+        <h6 class="modal-title fw-bold" id="approvalExcelUploadModalLabel">엑셀 업로드</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="approvalExcelUploadForm"
+              method="POST"
+              enctype="multipart/form-data"
+              action="{% url 'commission:approval_upload_excel' %}">
+          {% csrf_token %}
+
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small fw-bold">연도</label>
+              <select name="year" class="form-select form-select-sm" required>
+                {% for y in years %}
+                  <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label small fw-bold">월도</label>
+              <select name="month" class="form-select form-select-sm" required>
+                {% for mm in "123456789101112"|make_list %}
+                  {# make_list는 문자 단위라 여기선 아래처럼 고정 옵션이 더 안전합니다 #}
+                {% endfor %}
+                <option value="1"  {% if selected_month == 1 %}selected{% endif %}>01</option>
+                <option value="2"  {% if selected_month == 2 %}selected{% endif %}>02</option>
+                <option value="3"  {% if selected_month == 3 %}selected{% endif %}>03</option>
+                <option value="4"  {% if selected_month == 4 %}selected{% endif %}>04</option>
+                <option value="5"  {% if selected_month == 5 %}selected{% endif %}>05</option>
+                <option value="6"  {% if selected_month == 6 %}selected{% endif %}>06</option>
+                <option value="7"  {% if selected_month == 7 %}selected{% endif %}>07</option>
+                <option value="8"  {% if selected_month == 8 %}selected{% endif %}>08</option>
+                <option value="9"  {% if selected_month == 9 %}selected{% endif %}>09</option>
+                <option value="10" {% if selected_month == 10 %}selected{% endif %}>10</option>
+                <option value="11" {% if selected_month == 11 %}selected{% endif %}>11</option>
+                <option value="12" {% if selected_month == 12 %}selected{% endif %}>12</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label small fw-bold">구분</label>
+            <select name="kind" class="form-select form-select-sm" required>
+              <option value="">-- 선택 --</option>
+              <option value="efficiency">지점효율</option>
+              <option value="approval">수수료결재</option>
+            </select>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label small fw-bold">엑셀 파일</label>
+            <input class="form-control form-control-sm"
+                   type="file"
+                   name="excel_file"
+                   accept=".xlsx,.xls"
+                   required>
+          </div>
+
+          <div class="text-end mt-4">
+            <button type="submit" class="btn btn-primary btn-sm">업로드</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+          </div>
+        </form>
+
+        <div id="approvalUploadResult" class="mt-3 small text-center"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ 업로드 완료 토스트 -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+  <div id="approvalUploadToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body fw-bold">✅ 업로드가 성공적으로 완료되었습니다!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/commission/approval_excel_upload.js' %}"></script>
+
 {% endblock %}
