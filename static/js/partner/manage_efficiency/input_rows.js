@@ -1,13 +1,15 @@
 // django_ma/static/js/partner/manage_efficiency/input_rows.js
-//
-// ✅ (기존 코드 유지) + reset 시 confirmGroupId도 같이 초기화
-// ✅ amount 입력 시 콤마 + caret 유지
-// ✅ content/amount 변화 시 tax 자동 계산
-// ✅ user pick(검색모달) 이벤트 흡수
+// =========================================================
+// ✅ Input rows (Final)
+// - reset 시 confirmGroupId 포함 확인서 UI 초기화
+// - amount 콤마 + caret 유지
+// - content/amount 변화 시 tax 자동 계산
+// - user pick(검색모달) 이벤트 흡수
+// =========================================================
 
 import { els } from "./dom_refs.js";
 import { alertBox } from "./utils.js";
-import { saveRows } from "./save.js";
+import { saveRows } from "./save.js"; // ✅ 통일
 
 const W = window;
 
@@ -65,7 +67,9 @@ function fillRequesterInfo(row) {
   setVal(row, "rq_branch", user.branch || "");
 }
 
-/* amount comma */
+/* -------------------------
+   amount comma
+-------------------------- */
 function digitsOnly(v) {
   return str(v).replace(/[^\d]/g, "");
 }
@@ -156,7 +160,9 @@ function attachAmountCommaFormatter() {
   );
 }
 
-/* tax */
+/* -------------------------
+   tax auto
+-------------------------- */
 function calcTaxInt(amountInt) {
   return Math.floor(Number(amountInt || 0) * 0.033);
 }
@@ -172,7 +178,6 @@ function updateTaxForRow(row) {
   const amountDigits = digitsOnly(getVal(row, "amount"));
   const content = getVal(row, "content");
 
-  // content 비었으면 세액도 비움(기존 UX 유지)
   if (!content) {
     taxEl.value = "";
     return;
@@ -220,7 +225,9 @@ function attachTaxAutoCalculator() {
   );
 }
 
-/* user pick hooks */
+/* -------------------------
+   user pick hooks
+-------------------------- */
 function setActiveRowAndTarget(row, target) {
   if (!row) return;
   W.__efficiencyActiveRow = row;
@@ -232,7 +239,9 @@ function extractSelectedUser(detail) {
   const d = detail || {};
   const u = d.user || d.selected || d.data || d.payload || d.result || d.item || d;
 
-  const id = str(u.id || u.user_id || u.pk || u.emp_id || u.employee_id || u.userid || u.code || u.value || "");
+  const id = str(
+    u.id || u.user_id || u.pk || u.emp_id || u.employee_id || u.userid || u.code || u.value || ""
+  );
   const name = str(
     u.name || u.username || u.full_name || u.emp_name || u.employee_name || u.user_name || u.label || u.text || ""
   );
@@ -280,7 +289,9 @@ function attachUserPickHandlers() {
   });
 }
 
-/* reset */
+/* -------------------------
+   reset
+-------------------------- */
 export function resetInputSection() {
   const tbody = els.inputTable?.querySelector("tbody");
   if (!tbody) return;
@@ -304,6 +315,9 @@ function clearConfirmGroupUI() {
   if (els.confirmFileInput) els.confirmFileInput.value = "";
 }
 
+/* -------------------------
+   init
+-------------------------- */
 export function initInputRowEvents() {
   if (W.__efficiencyInputRowsBound) return;
   W.__efficiencyInputRowsBound = true;
@@ -312,6 +326,7 @@ export function initInputRowEvents() {
   attachTaxAutoCalculator();
   attachUserPickHandlers();
 
+  // 공제자/지급자 검색 버튼: active row 지정만(모달 오픈은 공통 search_user_modal.js가 담당)
   document.addEventListener("click", (e) => {
     const dedBtn = e.target?.closest?.(".btnSearchDed");
     const payBtn = e.target?.closest?.(".btnSearchPay");
@@ -324,6 +339,7 @@ export function initInputRowEvents() {
     setActiveRowAndTarget(row, dedBtn ? "ded" : "pay");
   });
 
+  // 행 추가
   els.btnAddRow?.addEventListener("click", () => {
     const tbody = els.inputTable?.querySelector("tbody");
     if (!tbody) return;
@@ -343,12 +359,14 @@ export function initInputRowEvents() {
     updateTaxForRow(newRow);
   });
 
+  // 입력 초기화 + 확인서 UI 초기화
   els.btnResetRows?.addEventListener("click", () => {
     if (!confirm("입력 내용을 모두 초기화하시겠습니까?")) return;
     resetInputSection();
     clearConfirmGroupUI();
   });
 
+  // 행 삭제(최소 1행 유지)
   document.addEventListener("click", (e) => {
     const btn = e.target?.closest?.(".btnRemoveRow");
     if (!btn) return;
@@ -365,10 +383,12 @@ export function initInputRowEvents() {
     row.remove();
   });
 
+  // 저장
   els.btnSaveRows?.addEventListener("click", async () => {
     await saveRows();
   });
 
+  // 첫 행 기본 셋업
   const firstRow = els.inputTable?.querySelector(".input-row");
   if (firstRow) {
     fillRequesterInfo(firstRow);

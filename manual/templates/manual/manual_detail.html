@@ -1,25 +1,285 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}매뉴얼{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1000px;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="fw-bold" style="color:#003f7d;">{{ m.title }}</h2>
+<style>
+  /* (기존 스타일 유지) */
+  #manual-detail {
+    width: 86vw;
+    max-width: none;
+    margin-left: calc(-43vw + 50%);
+  }
+  #manual-detail .manual-section { width: 100%; position: relative; }
+  @media (max-width: 576px) {
+    #manual-detail { width: 100%; margin-left: 0; }
+  }
 
-    {% if user.is_authenticated and user.grade == "superuser" %}
-      <a class="btn btn-outline-primary" href="{% url 'manual:manual_edit' m.pk %}">수정</a>
-    {% endif %}
+  .sec-card-actions{
+    position:absolute; top:14px; right:14px;
+    display:flex; gap:8px; z-index:2;
+  }
+
+  .sec-title-row{
+    display:flex; align-items:center; justify-content:flex-start;
+    gap:10px; margin-bottom:10px; flex-wrap:wrap;
+  }
+  .sec-title{
+    font-weight:800; color:#003f7d; margin:0;
+    font-size:1.2rem; line-height:1.2; word-break:break-word;
+  }
+  .sec-title.empty{ color:#6c757d; font-weight:700; }
+  .sec-title-actions{ display:flex; gap:6px; flex:0 0 auto; white-space:nowrap; }
+
+  .manual-block-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 768px){
+    .manual-block-grid{ grid-template-columns: 1fr; }
+  }
+
+  .manual-block-media{
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    background: #f8f9fa;
+    overflow: hidden;
+    min-height: 120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .manual-block-thumb{
+    width: 100%;
+    height: auto;
+    display:block;
+    object-fit: contain;
+    cursor: zoom-in;
+  }
+
+  .manual-block-text{
+    width:100%;
+    overflow-wrap: anywhere;
+  }
+
+  .manual-block-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .manual-fab{
+    position:fixed; right:18px; bottom:18px; z-index:1080;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .manual-fab a, .manual-fab button{
+    width:64px; height:64px; padding:0; border:none; background:transparent;
+    border-radius:50%; box-shadow:0 6px 18px rgba(0,0,0,0.18);
+    overflow:hidden; cursor:pointer;
+  }
+  .manual-fab img{ width:100%; height:100%; object-fit:cover; display:block; }
+</style>
+
+<div class="container-fluid my-5">
+  <div id="manual-detail">
+    <div id="manualDetailTop">
+
+      <div class="d-flex justify-content-center align-items-center mb-3 gap-2">
+        <h3 class="fw-bold mb-0 text-center" style="color:#003f7d;">{{ m.title }}</h3>
+        {% if m.admin_only %}<span class="badge manual-badge-admin">관리자 전용</span>{% endif %}
+        {% if not m.is_published %}<span class="badge manual-badge-staff">직원 전용</span>{% endif %}
+      </div>
+
+      {% if user.is_authenticated and user.grade == "superuser" %}
+        <div id="manualDetailBoot"
+             data-section-title-update-url="{% url 'manual:manual_section_title_update_ajax' %}"
+             data-section-delete-url="{% url 'manual:manual_section_delete_ajax' %}"
+             data-block-delete-url="{% url 'manual:manual_block_delete_ajax' %}">
+        </div>
+      {% else %}
+        <div id="manualDetailBoot"
+             data-section-title-update-url=""
+             data-section-delete-url=""
+             data-block-delete-url="">
+        </div>
+      {% endif %}
+
+      <div id="manualSections">
+        {% for sec in sections %}
+          <div class="card p-4 mb-3 manual-section" data-section-id="{{ sec.id }}">
+
+            {% if user.is_authenticated and user.grade == "superuser" %}
+              <div class="sec-card-actions">
+                <button type="button" class="btn btn-sm btn-danger btnDeleteSection">카드 삭제</button>
+              </div>
+            {% endif %}
+
+            <div class="sec-title-row">
+              <h5 class="sec-title {% if not sec.title %}empty{% endif %}" data-role="secTitleText">
+                {% if sec.title %}{{ sec.title }}{% else %}(소제목 없음){% endif %}
+              </h5>
+
+              {% if user.is_authenticated and user.grade == "superuser" %}
+                <div class="sec-title-actions">
+                  <button type="button" class="btn btn-sm btn-outline-secondary btnEditSectionTitle">소제목 수정</button>
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="manualBlocks" id="manualBlocks-{{ sec.id }}">
+              {% for b in sec.blocks.all %}
+                <div class="border rounded-3 p-3 mb-3 manual-block"
+                     data-block-id="{{ b.id }}"
+                     data-image-url="{% if b.image %}{{ b.image.url }}{% else %}{% endif %}">
+                  <div class="manual-block-grid">
+                    <div class="manual-block-media">
+                      {% if b.image %}
+                        <img src="{{ b.image.url }}" class="manual-block-thumb jsManualImg" alt="manual image">
+                      {% else %}
+                        <div class="text-muted small py-4">이미지 없음</div>
+                      {% endif %}
+                    </div>
+
+                    <div class="manual-block-text manual-block-content">
+                      {{ b.content|safe }}
+                    </div>
+                  </div>
+
+                  {% if user.is_authenticated and user.grade == "superuser" %}
+                    <div class="manual-block-actions">
+                      <button type="button"
+                              class="btn btn-sm btn-outline-secondary btn-edit-block"
+                              data-bs-toggle="modal"
+                              data-bs-target="#manualBlockModal">
+                        수정
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-danger btn-delete-block">삭제</button>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+
+            {% if user.is_authenticated and user.grade == "superuser" %}
+              <div class="d-flex justify-content-end mt-2">
+                <button type="button"
+                        class="btn btn-sm btn-primary btn-add-block"
+                        data-bs-toggle="modal"
+                        data-bs-target="#manualBlockModal"
+                        data-section-id="{{ sec.id }}">
+                  +내용추가
+                </button>
+              </div>
+            {% endif %}
+
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if user.is_authenticated and user.grade == "superuser" %}
+        <div class="d-flex justify-content-end mt-2">
+          <button type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  id="btnAddManualSection"
+                  data-section-add-url="{% url 'manual:manual_section_add_ajax' %}"
+                  data-manual-id="{{ m.id }}">
+            +구역추가
+          </button>
+        </div>
+      {% endif %}
+
+    </div>
   </div>
+</div>
 
-  <div class="card p-4">
-    <div class="text-muted small mb-3">수정일: {{ m.updated_at|date:"Y-m-d H:i" }}</div>
-    <div class="manual-content">
-      {{ m.content|safe }}
+<div class="manual-fab">
+  <a href="{% url 'manual:manual_list' %}" title="매뉴얼 목록으로">
+    <img src="{% static 'images/manual/manual_home.png' %}" alt="HOME">
+  </a>
+  <button type="button" id="btnManualGoTop" title="맨 위로">
+    <img src="{% static 'images/manual/manual_top.png' %}" alt="TOP">
+  </button>
+</div>
+
+{% if user.is_authenticated and user.grade == "superuser" %}
+  <form id="manualBlockCsrfForm" class="d-none">{% csrf_token %}</form>
+
+  <!-- ✅ 이미지 원본 팝업 모달 -->
+  <div class="modal fade" id="manualImageViewer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+      <div class="modal-content bg-dark">
+        <div class="modal-header border-0">
+          <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body d-flex align-items-center justify-content-center">
+          <img id="manualViewerImg" src="" alt="full image" style="max-width:95vw; max-height:85vh; object-fit:contain;">
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="mt-3">
-    <a class="btn btn-secondary" href="{% url 'manual:manual_list' %}">목록</a>
+  <!-- ✅ 블록 add/edit 모달 -->
+  <div class="modal fade"
+       id="manualBlockModal"
+       tabindex="-1"
+       aria-hidden="true"
+       data-add-url="{% url 'manual:manual_block_add_ajax' %}"
+       data-update-url="{% url 'manual:manual_block_update_ajax' %}"
+       data-attach-upload-url="{% url 'manual:manual_block_attachment_upload_ajax' %}"
+       data-manual-id="{{ m.id }}">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content" style="border-radius:14px;">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" style="color:#003f7d;" id="manualBlockModalTitle">내용 추가</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="alert alert-danger py-2 d-none" id="manualBlockError"></div>
+
+          <!-- ✅ 이미지 업로드 + 미리보기 -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">이미지</label>
+            <input type="file" class="form-control" id="manualBlockImageInput" accept="image/*">
+
+            <div class="mt-2 border rounded-3 p-2 bg-light" id="manualBlockImagePreviewWrap" style="display:none;">
+              <img id="manualBlockImagePreview" src="" alt="preview" style="width:100%; height:auto; object-fit:contain;">
+            </div>
+
+            <div class="form-check mt-2 d-none" id="manualBlockRemoveImageWrap">
+              <input class="form-check-input" type="checkbox" value="1" id="manualBlockRemoveImage">
+              <label class="form-check-label" for="manualBlockRemoveImage">기존 이미지 삭제</label>
+            </div>
+          </div>
+
+          <!-- ✅ Quill 첨부용 hidden input -->
+          <input type="file" id="manualQuillAttachInput" class="d-none">
+
+          <!-- ✅ 텍스트(Quill) -->
+          <label class="form-label fw-bold">텍스트</label>
+          <div id="manualQuillEditor" style="height:320px;"></div>
+          <div class="form-text mt-2">
+            📎 첨부 버튼으로 파일을 업로드하면 본문에 링크가 자동 삽입됩니다.
+            (새 블록은 먼저 저장 후 첨부 가능)
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+          <button type="button" class="btn btn-primary" id="btnManualBlockSave">저장</button>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
+
+  <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+
+  <script src="{% static 'js/manual/manual_detail_block.js' %}?v=20260112_attach_01"></script>
+{% endif %}
 {% endblock %}
