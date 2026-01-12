@@ -4,35 +4,66 @@
 
 {% block content %}
 <style>
-  /* (기존 스타일 유지) */
+  /* =========================================================
+   * Layout
+   * ========================================================= */
   #manual-detail {
-    width: 86vw;
+    width: 72vw;
     max-width: none;
-    margin-left: calc(-43vw + 50%);
+    margin-left: calc(-36vw + 50%);
   }
   #manual-detail .manual-section { width: 100%; position: relative; }
+
   @media (max-width: 576px) {
     #manual-detail { width: 100%; margin-left: 0; }
   }
 
+  /* =========================================================
+   * ✅ Navbar dropdown이 Subnav에 가려지지 않도록(모달 z-index는 유지)
+   * - Bootstrap modal: 1055
+   * - dropdown-menu: 기본 1000 → subnav보다 위로 올림
+   * ========================================================= */
+  .navbar .dropdown-menu{
+    z-index: 1040 !important;
+  }
+
+  /* =========================================================
+   * Section 카드 헤더 액션
+   * ========================================================= */
   .sec-card-actions{
-    position:absolute; top:14px; right:14px;
-    display:flex; gap:8px; z-index:2;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
   }
 
   .sec-title-row{
-    display:flex; align-items:center; justify-content:flex-start;
-    gap:10px; margin-bottom:10px; flex-wrap:wrap;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
   }
-  .sec-title{
-    font-weight:800; color:#003f7d; margin:0;
-    font-size:1.2rem; line-height:1.2; word-break:break-word;
-  }
-  .sec-title.empty{ color:#6c757d; font-weight:700; }
-  .sec-title-actions{ display:flex; gap:6px; flex:0 0 auto; white-space:nowrap; }
 
+  .sec-title{
+    font-weight: 800;
+    color: #003f7d;
+    margin: 0;
+    font-size: 1.2rem;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+  .sec-title.empty{ color: #6c757d; font-weight: 700; }
+  .sec-title-actions{ display: flex; gap: 6px; flex: 0 0 auto; white-space: nowrap; }
+
+  /* =========================================================
+   * Block (이미지 + 텍스트)
+   * ========================================================= */
   .manual-block-grid{
-    display:grid;
+    display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
     align-items: start;
@@ -48,51 +79,182 @@
     background: #f8f9fa;
     overflow: hidden;
     min-height: 120px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    max-height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .manual-block-thumb{
     width: 100%;
     height: auto;
-    display:block;
+    display: block;
+    max-height: 320px;
     object-fit: contain;
     cursor: zoom-in;
   }
 
   .manual-block-text{
-    width:100%;
+    width: 100%;
     overflow-wrap: anywhere;
   }
 
   .manual-block-actions{
-    display:flex;
-    justify-content:flex-end;
+    display: flex;
+    justify-content: flex-end;
     gap: 10px;
     margin-top: 10px;
   }
 
+  /* =========================================================
+   * Floating Actions (FAB)
+   * ========================================================= */
   .manual-fab{
-    position:fixed; right:18px; bottom:18px; z-index:1080;
-    display:flex; flex-direction:column; gap:10px;
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
-  .manual-fab a, .manual-fab button{
-    width:64px; height:64px; padding:0; border:none; background:transparent;
-    border-radius:50%; box-shadow:0 6px 18px rgba(0,0,0,0.18);
-    overflow:hidden; cursor:pointer;
+
+  .manual-fab a,
+  .manual-fab button{
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    cursor: pointer;
   }
-  .manual-fab img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .manual-fab img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* =========================================================
+   * Sub Nav (Manual TOC)
+   * - ✅ 제목 아래로 이동
+   * - ✅ radius/padding으로 자연스럽게
+   * - ✅ z-index를 navbar dropdown보다 낮게(가려짐 방지)
+   * ========================================================= */
+  .manual-subnav{
+    position: sticky;
+    top: 70px;                 /* base.html navbar 높이(대략) */
+    z-index: 1020;             /* dropdown-menu(1040)보다 낮게 */
+    padding: 8px 0 10px;
+    background: transparent;
+  }
+
+  .manual-subnav .subnav-inner{
+    width: 72vw;
+    margin-left: calc(-36vw + 50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    /* ✅ 자연스러운 박스 */
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 16px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+  }
+
+  .manual-subnav .subnav-title{
+    font-weight: 800;
+    color: #003f7d;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    padding-left: 4px;
+  }
+
+  .manual-subnav .subnav-links{
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 4px;
+    flex: 1 1 auto;
+    scrollbar-width: thin;
+  }
+
+  .manual-subnav .subnav-links::-webkit-scrollbar{ height: 6px; }
+  .manual-subnav .subnav-links::-webkit-scrollbar-thumb{
+    background: #d2ddec;
+    border-radius: 10px;
+  }
+
+  .manual-subnav .subnav-links a{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 11px;         /* ✅ 살짝 넉넉하게 */
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    white-space: nowrap;
+  }
+
+  .manual-subnav .subnav-links a:hover{
+    border-color: #005BAC;
+    color: #005BAC;
+    background: #fff;
+  }
+
+  .manual-subnav .subnav-links a.active{
+    border-color: #005BAC;
+    color: #fff;
+    background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+  }
+
+  @media (max-width: 576px){
+    .manual-subnav{ top: 70px; }
+    .manual-subnav .subnav-inner{
+      width: 100%;
+      margin-left: 0;
+      padding: 10px 12px;
+      border-radius: 14px;
+    }
+  }
 </style>
 
 <div class="container-fluid my-5">
   <div id="manual-detail">
     <div id="manualDetailTop">
 
-      <div class="d-flex justify-content-center align-items-center mb-3 gap-2">
+      <!-- ✅ 제목(상단) -->
+      <div class="d-flex justify-content-center align-items-center mb-2 gap-2">
         <h3 class="fw-bold mb-0 text-center" style="color:#003f7d;">{{ m.title }}</h3>
         {% if m.admin_only %}<span class="badge manual-badge-admin">관리자 전용</span>{% endif %}
         {% if not m.is_published %}<span class="badge manual-badge-staff">직원 전용</span>{% endif %}
+      </div>
+
+      <!-- ✅ 보조 네비게이션 바 (섹션 목차) : 제목 아래로 이동 -->
+      <div class="manual-subnav" id="manualSubnav">
+        <div class="subnav-inner">
+          <div class="subnav-title">{{ m.title }}</div>
+
+          <nav class="subnav-links" aria-label="섹션 목차">
+            {% for sec in sections %}
+              <a href="#sec-{{ sec.id }}"
+                 class="jsSubnavLink"
+                 data-target="sec-{{ sec.id }}">
+                {% if sec.title %}{{ sec.title }}{% else %}(소제목 없음){% endif %}
+              </a>
+            {% endfor %}
+          </nav>
+        </div>
       </div>
 
       {% if user.is_authenticated and user.grade == "superuser" %}
@@ -109,9 +271,11 @@
         </div>
       {% endif %}
 
-      <div id="manualSections">
+      <div id="manualSections" class="mt-3">
         {% for sec in sections %}
-          <div class="card p-4 mb-3 manual-section" data-section-id="{{ sec.id }}">
+          <div class="card p-4 mb-3 manual-section"
+               id="sec-{{ sec.id }}"
+               data-section-id="{{ sec.id }}">
 
             {% if user.is_authenticated and user.grade == "superuser" %}
               <div class="sec-card-actions">
@@ -135,7 +299,7 @@
               {% for b in sec.blocks.all %}
                 <div class="border rounded-3 p-3 mb-3 manual-block"
                      data-block-id="{{ b.id }}"
-                     data-image-url="{% if b.image %}{{ b.image.url }}{% else %}{% endif %}">
+                     data-image-url="{% if b.image %}{{ b.image.url }}{% endif %}">
                   <div class="manual-block-grid">
                     <div class="manual-block-media">
                       {% if b.image %}
@@ -217,7 +381,10 @@
           <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body d-flex align-items-center justify-content-center">
-          <img id="manualViewerImg" src="" alt="full image" style="max-width:95vw; max-height:85vh; object-fit:contain;">
+          <img id="manualViewerImg"
+               src=""
+               alt="full image"
+               style="max-width:95vw; max-height:85vh; object-fit:contain;">
         </div>
       </div>
     </div>
@@ -248,7 +415,10 @@
             <input type="file" class="form-control" id="manualBlockImageInput" accept="image/*">
 
             <div class="mt-2 border rounded-3 p-2 bg-light" id="manualBlockImagePreviewWrap" style="display:none;">
-              <img id="manualBlockImagePreview" src="" alt="preview" style="width:100%; height:auto; object-fit:contain;">
+              <img id="manualBlockImagePreview"
+                   src=""
+                   alt="preview"
+                   style="width:100%; height:auto; object-fit:contain;">
             </div>
 
             <div class="form-check mt-2 d-none" id="manualBlockRemoveImageWrap">
@@ -281,5 +451,64 @@
   <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 
   <script src="{% static 'js/manual/manual_detail_block.js' %}?v=20260112_attach_01"></script>
+
+  <script>
+    (() => {
+      const subnav = document.getElementById("manualSubnav");
+      if (!subnav) return;
+
+      const links = Array.from(document.querySelectorAll(".jsSubnavLink"));
+      if (!links.length) return;
+
+      function getOffsetTop() {
+        const mainNavH = 70; // base.html padding-top 기준
+        const subNavH = subnav.getBoundingClientRect().height || 0;
+        return mainNavH + subNavH + 10;
+      }
+
+      links.forEach((a) => {
+        a.addEventListener("click", (e) => {
+          const id = a.dataset.target;
+          const target = document.getElementById(id);
+          if (!target) return;
+
+          e.preventDefault();
+          const y = window.scrollY + target.getBoundingClientRect().top - getOffsetTop();
+          window.scrollTo({ top: y, behavior: "smooth" });
+        });
+      });
+
+      const sections = links
+        .map((a) => document.getElementById(a.dataset.target))
+        .filter(Boolean);
+
+      const linkById = new Map(links.map((a) => [a.dataset.target, a]));
+
+      const clearActive = () => links.forEach((a) => a.classList.remove("active"));
+      const setActive = (id) => {
+        clearActive();
+        const a = linkById.get(id);
+        if (a) a.classList.add("active");
+      };
+
+      const io = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((en) => en.isIntersecting)
+            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+          if (visible.length) setActive(visible[0].target.id);
+        },
+        {
+          root: null,
+          rootMargin: `-${getOffsetTop()}px 0px -70% 0px`,
+          threshold: [0.1, 0.2, 0.3],
+        }
+      );
+
+      sections.forEach((sec) => io.observe(sec));
+      setActive(sections[0]?.id);
+    })();
+  </script>
 {% endif %}
 {% endblock %}

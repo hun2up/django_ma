@@ -1,16 +1,99 @@
-<!-- django_ma/manual/templates/manual/manual_list.html -->
-
 {% extends "base.html" %}
 {% block title %}업무매뉴얼{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1000px;">
-<!-- ✅ 타이틀: 페이지 정중앙 -->
+<style>
+  /* =========================================================
+   * Manual List: Title(좌) + Chips(우) 완전 분리 레이아웃
+   * - 칩이 줄바꿈되면 "칩 영역 내부"에서만 줄바꿈 (타이틀 아래로 내려가지 않음)
+   * ========================================================= */
+  .manual-title-row{
+    display: grid;
+    grid-template-columns: max-content 1fr; /* 좌: 타이틀(내용폭), 우: 칩영역 */
+    column-gap: 32px;
+    row-gap: 8px;
+    align-items: start;
+    width: 100%;
+    min-width: 0; /* grid overflow 방지 */
+  }
+
+  .manual-title-col{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;          /* 타이틀 영역은 한 줄 유지 */
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  /* 타이틀이 너무 길면 말줄임 */
+  .manual-title-text{
+    /* color: #005BAC; */
+    font-weight: 700;
+    max-width: 520px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 편집모드 input */
+  .manual-title-input{
+    min-width: 260px;
+    max-width: 520px;
+  }
+
+  /* ✅ 칩 영역: 우측 컬럼에서만 wrap */
+  .manual-section-chips{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;                 /* 타이틀 아래로 내리던 margin 제거 */
+    min-width: 0;
+    align-content: flex-start;
+  }
+
+  .manual-section-chip{
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    background: #f8f9fa;
+    color: #333;
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1;
+    max-width: 100%;
+  }
+
+  .manual-section-chip.empty{
+    color: #6c757d;
+    font-weight: 700;
+  }
+
+  /* ✅ 작은 화면에서는 세로로(가독성) */
+  @media (max-width: 576px){
+    .manual-title-row{
+      grid-template-columns: 1fr;  /* 한 컬럼 */
+      row-gap: 10px;
+    }
+    .manual-title-col{
+      white-space: normal;
+    }
+    .manual-title-text{
+      max-width: 100%;
+    }
+    .manual-title-input{
+      max-width: 100%;
+    }
+  }
+</style>
+
+<div class="container" style="max-width: 800px;">
   <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">
     업무매뉴얼
   </h3>
 
-  <!-- 버튼 영역 -->
   <div class="d-flex justify-content-end mb-3 gap-2">
     {% if user.is_authenticated and user.grade == "superuser" %}
       <button type="button"
@@ -20,12 +103,10 @@
         + 새 매뉴얼
       </button>
 
-      <!-- ✅ superuser 전용 편집 버튼 (새 매뉴얼 우측) -->
       <button type="button" class="btn btn-outline-secondary" id="btnManualEditMode">
         편집
       </button>
 
-      <!-- ✅ 편집모드 저장/완료 버튼(처음엔 숨김) -->
       <button type="button" class="btn btn-success d-none" id="btnManualSaveOrder">
         저장
       </button>
@@ -33,7 +114,6 @@
         완료
       </button>
 
-      <!-- ✅ CSRF 토큰 확보용(HTTPONLY 대비) -->
       <form id="manualEditCsrfForm" class="d-none">{% csrf_token %}</form>
     {% endif %}
   </div>
@@ -41,44 +121,57 @@
   <div class="list-group shadow-sm" id="manualListGroup" style="border-radius:14px; overflow:hidden;">
     {% for m in manuals %}
       <a class="list-group-item list-group-item-action py-3 manual-item"
-        data-id="{{ m.id }}"
-        data-access="{% if m.admin_only %}admin{% elif not m.is_published %}staff{% else %}normal{% endif %}"
-        data-href="{% url 'manual:manual_detail' m.pk %}"
-        href="{% url 'manual:manual_detail' m.pk %}">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center gap-2">
+         data-id="{{ m.id }}"
+         data-access="{% if m.admin_only %}admin{% elif not m.is_published %}staff{% else %}normal{% endif %}"
+         data-href="{% url 'manual:manual_detail' m.pk %}"
+         href="{% url 'manual:manual_detail' m.pk %}">
 
-            <!-- ✅ 편집모드에서 보일 드래그 핸들(기본 숨김) -->
-            <span class="manual-drag-handle d-none" title="드래그로 순서 변경"
-                  style="cursor: grab; user-select:none;">☰</span>
-                  
-            <!-- 기본 표시 -->
-            <span class="fw-semibold manual-title-text">{{ m.title }}</span>
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="flex-grow-1" style="min-width:0;">
 
-            <!-- 편집모드 입력 -->
-            <input type="text"
-                  class="form-control form-control-sm manual-title-input d-none"
-                  value="{{ m.title|escape }}"
-                  maxlength="80"
-                  style="max-width: 520px;">
+            <!-- ✅ 타이틀(좌) + 칩(우) -->
+            <div class="manual-title-row">
 
-            {% if m.admin_only %}
-              <span class="badge manual-badge-admin">관리자 전용</span>
-            {% endif %}
+              <!-- 좌측: 타이틀/배지/셀렉트 -->
+              <div class="manual-title-col">
+                <span class="manual-drag-handle d-none"
+                      title="드래그로 순서 변경"
+                      style="cursor: grab; user-select:none;">☰</span>
 
-            {% if not m.is_published %}
-              <span class="badge manual-badge-staff">직원 전용</span>
-            {% endif %}
+                <span class="fw-semibold manual-title-text">{{ m.title }}</span>
 
-            <select class="form-select form-select-sm manual-access-select d-none" style="width: 140px;">
-              <option value="normal">일반</option>
-              <option value="admin">관리자 전용</option>
-              <option value="staff">직원 전용</option>
-            </select>
+                <input type="text"
+                       class="form-control form-control-sm manual-title-input d-none"
+                       value="{{ m.title|escape }}"
+                       maxlength="80">
+
+                {% if m.admin_only %}
+                  <span class="badge manual-badge-admin">관리자 전용</span>
+                {% endif %}
+                {% if not m.is_published %}
+                  <span class="badge manual-badge-staff">직원 전용</span>
+                {% endif %}
+
+                <select class="form-select form-select-sm manual-access-select d-none" style="width: 140px;">
+                  <option value="normal">일반</option>
+                  <option value="admin">관리자 전용</option>
+                  <option value="staff">직원 전용</option>
+                </select>
+              </div>
+
+              <!-- 우측: 섹션 소제목 칩(표시만, 링크 없음) -->
+              <div class="manual-section-chips" aria-label="섹션 소제목 목록">
+                {% for sec in m.sections.all %}
+                  {% if sec.title %}
+                    <span class="manual-section-chip">{{ sec.title }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+
+            </div>
           </div>
 
           <div class="d-flex align-items-center gap-2">
-            <!-- ✅ 편집모드 삭제 버튼(기본 숨김) -->
             {% if user.is_authenticated and user.grade == "superuser" %}
               <button type="button"
                       class="btn btn-sm btn-outline-danger d-none btn-manual-delete">
@@ -110,34 +203,31 @@
           <label class="form-label fw-semibold">매뉴얼 이름</label>
           <input type="text" class="form-control" id="manualTitleInput">
 
-            <div class="mt-3">
-              <label class="form-label fw-semibold mb-2">공개 범위</label>
+          <div class="mt-3">
+            <label class="form-label fw-semibold mb-2">공개 범위</label>
+            <div class="d-flex flex-column gap-2">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessNormal" value="normal" checked>
+                <label class="form-check-label fw-semibold" for="manualAccessNormal">일반</label>
+              </div>
 
-              <div class="d-flex flex-column gap-2">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessNormal" value="normal" checked>
-                  <label class="form-check-label fw-semibold" for="manualAccessNormal">일반</label>
-                </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessAdmin" value="admin">
+                <label class="form-check-label fw-semibold" for="manualAccessAdmin">관리자 전용</label>
+              </div>
 
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessAdmin" value="admin">
-                  <label class="form-check-label fw-semibold" for="manualAccessAdmin">관리자 전용</label>
-                </div>
-
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessStaff" value="staff">
-                  <label class="form-check-label fw-semibold" for="manualAccessStaff">직원 전용</label>
-                </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="manualAccess" id="manualAccessStaff" value="staff">
+                <label class="form-check-label fw-semibold" for="manualAccessStaff">직원 전용</label>
               </div>
             </div>
+          </div>
 
           <div class="alert alert-danger py-2 mt-3 d-none" id="manualCreateError"></div>
 
           <div class="d-flex gap-2 justify-content-end mt-3">
             <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
-            <button type="submit" class="btn btn-primary" id="btnCreateManualConfirm">
-              만들기
-            </button>
+            <button type="submit" class="btn btn-primary" id="btnCreateManualConfirm">만들기</button>
           </div>
         </form>
       </div>
@@ -146,11 +236,8 @@
 </div>
 
 {% load static %}
-
-<!-- ✅ SortableJS -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-<!-- ✅ Boot 데이터 -->
 <script>
   window.ManualListBoot = {
     reorderUrl: "{% url 'manual:manual_reorder_ajax' %}",
@@ -159,13 +246,7 @@
   };
 </script>
 
-<!-- ✅ 편집모드 JS -->
 <script src="{% static 'js/manual/manual_list_edit.js' %}"></script>
-
-<!-- 기존: 생성 모달 JS -->
 <script src="{% static 'js/manual/create_manual_modal.js' %}"></script>
-
 {% endif %}
-
-
 {% endblock %}

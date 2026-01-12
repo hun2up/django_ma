@@ -11,6 +11,7 @@ from html.parser import HTMLParser
 from xml.sax.saxutils import escape
 
 from django.http import JsonResponse, HttpResponse
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 from django.db import transaction
@@ -29,7 +30,8 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 
-from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOther
+from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOther, ApprovalExcelUploadLog, CommissionApprovalPending, ApprovalPending
+
 
 # =========================================================
 # Constants
@@ -2051,6 +2053,326 @@ def support_home(request):
     return render(request, "commission/support_home.html")
 
 
+@login_required
 @grade_required(["superuser"])
 def approval_home(request):
-    return render(request, "commission/approval_home.html")
+    # 현재 연/월
+    now = timezone.localtime(timezone.now())
+    current_year = now.year
+    current_month = now.month
+
+    # 선택값 (GET)
+    try:
+        selected_year = int((request.GET.get("year") or current_year))
+    except ValueError:
+        selected_year = current_year
+
+    try:
+        selected_month = int((request.GET.get("month") or current_month))
+    except ValueError:
+        selected_month = current_month
+
+    selected_part = (request.GET.get("part") or "").strip()  # "" 이면 전체
+
+    # ✅ 부서 목록: CustomUser에서 distinct로 추출 + "전체"
+    exclude_list = ["1인GA사업부", "MA사업0부"]  # 필요 없으면 제거 가능
+    parts_qs = (
+        CustomUser.objects.exclude(part__isnull=True)
+        .exclude(part__exact="")
+        .exclude(part__in=exclude_list)
+        .values_list("part", flat=True)
+        .distinct()
+        .order_by("part")
+    )
+    parts = list(parts_qs)
+
+    # (선택) 년도 범위: 현재 기준 -2 ~ +1
+    years = list(range(current_year - 2, current_year + 2))  # +2는 파이썬 range 특성상 +1까지
+
+    ym = f"{selected_year}-{_pad2(selected_month)}"
+
+    pending_qs = ApprovalPending.objects.select_related("user").filter(ym=ym)
+
+    # 부서 필터(“전체”면 패스)
+    if selected_part:
+        pending_qs = pending_qs.filter(user__part=selected_part)
+
+    pending_rows = list(pending_qs)
+
+    ctx = {
+        "current_year": current_year,
+        "current_month": current_month,
+        "selected_year": selected_year,
+        "selected_month": selected_month,
+        "selected_part": selected_part,  # ""면 전체
+        "parts": parts,
+        "years": years,
+        "ym": ym,
+        "pending_rows": pending_rows,
+    }
+    return render(request, "commission/approval_home.html", ctx)
+
+
+def _pad2(n: int) -> str:
+    return f"{n:02d}"
+
+@csrf_exempt
+@grade_required(["superuser"])
+def approval_upload_excel(request):
+    if request.method != "POST":
+        return _json_error("잘못된 요청 방식입니다.", status=405)
+
+    # month/year (월도)
+    year = (request.POST.get("year") or "").strip()
+    month = (request.POST.get("month") or "").strip()
+    kind = (request.POST.get("kind") or "").strip()  # efficiency / approval
+    excel_file = request.FILES.get("excel_file")
+
+    if not year.isdigit():
+        return _json_error("연도를 선택해주세요.", status=400)
+    if not month.isdigit():
+        return _json_error("월도를 선택해주세요.", status=400)
+
+    y = int(year)
+    m = int(month)
+    if m < 1 or m > 12:
+        return _json_error("월도는 1~12 범위여야 합니다.", status=400)
+
+    ym = f"{y}-{_pad2(m)}"
+
+    if kind not in ("efficiency", "approval"):
+        return _json_error("구분(kind)을 선택해주세요. (지점효율/수수료결재)", status=400)
+
+    if not excel_file:
+        return _json_error("엑셀 파일이 전달되지 않았습니다.", status=400)
+
+    fs = FileSystemStorage()
+    filename = fs.save(excel_file.name, excel_file)
+    file_path = fs.path(filename)
+
+    try:
+        with transaction.atomic():
+            df = _read_excel_safely(file_path, original_name=excel_file.name)
+            row_count = int(len(df.index)) if df is not None else 0
+
+            if kind == "approval":
+                result = _handle_upload_commission_approval(
+                    file_path=file_path,
+                    original_name=excel_file.name,
+                    ym=ym,
+                )
+                inserted = result["inserted_or_updated"]
+            else:
+                # (추후 efficiency도 동일 패턴으로 구현)
+                inserted = 0
+
+            ApprovalExcelUploadLog.objects.update_or_create(
+                ym=ym,
+                kind=kind,
+                defaults={
+                    "uploaded_by": request.user,
+                    "row_count": row_count,
+                    "file_name": excel_file.name,
+                    "uploaded_at": timezone.now(),
+                },
+            )
+
+        return _json_ok(
+            "✅ 업로드가 완료되었습니다.",
+            ym=ym,
+            kind=kind,
+            row_count=row_count,
+            file_name=excel_file.name,
+            inserted=inserted,
+            missing_users=(result.get("missing_users", 0) if kind == "approval" else 0),
+            missing_sample=(result.get("missing_sample", []) if kind == "approval" else []),
+        )
+
+
+    except ValueError as ve:
+        # 컬럼 진단 용도
+        detected_columns = []
+        try:
+            detected_columns = [str(c) for c in df.columns]  # noqa: F821
+        except Exception:
+            detected_columns = []
+        return _json_error(str(ve), status=400, detected_columns=detected_columns)
+
+    except Exception as e:
+        return _json_error(f"⚠️ 업로드 실패: {e}", status=500)
+
+    finally:
+        try:
+            fs.delete(filename)
+        except Exception:
+            pass
+
+
+def _handle_upload_commission_approval_pending(file_path: str, original_name: str, ym: str):
+    """
+    수수료결재(approval) 업로드
+    - B열(2번째) : 사원명 (엑셀 원문)
+    - C열(3번째) : 사번 (users 매칭키)
+    - N열(14번째): 실지급액
+    - O열(15번째): 결재
+    """
+    # ✅ "위치 기반"이므로 raw matrix로 읽기
+    df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=0, header_none=True)
+
+    IDX_B = 1
+    IDX_C = 2
+    IDX_N = 13
+    IDX_O = 14
+
+    bucket = {}  # user_id -> {emp_name, paid_sum, approval}
+
+    for _, row in df.iterrows():
+        # 길이 부족 방어
+        if len(row) <= IDX_O:
+            continue
+
+        raw_emp_name = row[IDX_B] if len(row) > IDX_B else None
+        raw_user_id  = row[IDX_C] if len(row) > IDX_C else None
+        raw_paid     = row[IDX_N] if len(row) > IDX_N else None
+        raw_appr     = row[IDX_O] if len(row) > IDX_O else None
+
+        user_id = _norm_emp_id(raw_user_id)
+        if not user_id or not user_id.isdigit():
+            continue  # 사번 아닌 행(헤더/합계/코드 등) 제외
+
+        # 실지급액: 숫자 아닌 값/NaN 제외
+        paid = _to_int(raw_paid, default=0)
+
+        # 결재 값: 빈칸이면 ""
+        appr = ("" if raw_appr is None else str(raw_appr)).strip()
+        if appr.lower() in ("nan", "none"):
+            appr = ""
+
+        # ✅ "실지급액이 있는 행" 중심으로 집계
+        # (파일 구조상 자동차/일반 등 분개행 중 금액 있는 행만 의미 있음)
+        if paid == 0 and appr == "":
+            continue
+
+        emp_name = ("" if raw_emp_name is None else str(raw_emp_name)).strip()
+        if emp_name.lower() in ("nan", "none"):
+            emp_name = ""
+
+        rec = bucket.get(user_id)
+        if not rec:
+            bucket[user_id] = {
+                "emp_name": emp_name,
+                "paid_sum": paid,
+                "approval": appr,
+            }
+        else:
+            # 사원명은 있으면 유지(빈칸이면 기존 유지)
+            if emp_name and not rec["emp_name"]:
+                rec["emp_name"] = emp_name
+            # 실지급액은 누적(동일 사번에 금액행 여러개면 합산)
+            rec["paid_sum"] += paid
+            # 결재는 마지막 유효값 우선
+            if appr:
+                rec["approval"] = appr
+
+    if not bucket:
+        return {"updated": 0, "missing_users": 0, "existing_users": 0, "missing_sample": []}
+
+    ids = list(bucket.keys())
+    existing_ids = _bulk_existing_user_ids(ids)
+    missing_sample = [x for x in ids if x not in existing_ids][:10]
+
+    updated = 0
+    missing_users = 0
+
+    # ✅ 월도(ym) 기준: 같은 달 재업로드 시 update_or_create로 덮어쓰기
+    for uid, rec in bucket.items():
+        if uid not in existing_ids:
+            missing_users += 1
+            continue
+
+        CommissionApprovalPending.objects.update_or_create(
+            ym=ym,
+            user_id=uid,
+            defaults={
+                "emp_name": rec["emp_name"] or "",
+                "actual_paid": int(rec["paid_sum"] or 0),
+                "approval": rec["approval"] or "",
+            }
+        )
+        updated += 1
+
+    return {
+        "updated": updated,
+        "missing_users": missing_users,
+        "existing_users": len(existing_ids),
+        "missing_sample": missing_sample,
+    }
+
+
+def _handle_upload_commission_approval(file_path: str, original_name: str, ym: str):
+    """
+    ✅ 수수료결재(kind=approval) 업로드
+    - B열(1): 사원명
+    - C열(2): 사번(매칭키)
+    - N열(13): 실지급액
+    - O열(14): 결재
+    """
+    df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=0, header_none=True)
+
+    IDX_EMP_NAME = 1   # B
+    IDX_USER_ID  = 2   # C
+    IDX_PAY      = 13  # N
+    IDX_APPR     = 14  # O
+
+    rows = []
+    user_ids = []
+
+    for _, row in df.iterrows():
+        uid = _norm_emp_id(row[IDX_USER_ID] if len(row) > IDX_USER_ID else "")
+        if not uid:
+            continue
+
+        emp_name = str(row[IDX_EMP_NAME]).strip() if len(row) > IDX_EMP_NAME and row[IDX_EMP_NAME] is not None else ""
+        pay = _to_int(row[IDX_PAY] if len(row) > IDX_PAY else 0)
+        appr = str(row[IDX_APPR]).strip() if len(row) > IDX_APPR and row[IDX_APPR] is not None else ""
+
+        user_ids.append(uid)
+        rows.append((uid, emp_name, pay, appr))
+
+    if not rows:
+        return {"inserted_or_updated": 0, "missing_users": 0, "missing_sample": []}
+
+    # 존재 유저만 반영
+    user_map = CustomUser.objects.in_bulk(set(user_ids))  # {pk: user}
+    missing = [uid for uid in set(user_ids) if uid not in user_map]
+    missing_sample = missing[:10]
+
+    objs = []
+    for uid, emp_name, pay, appr in rows:
+        u = user_map.get(uid)
+        if not u:
+            continue
+        objs.append(
+            ApprovalPending(
+                ym=ym,
+                user=u,
+                emp_name=emp_name,
+                actual_pay=int(pay or 0),
+                approval_flag=appr or "",
+            )
+        )
+
+    # ym+user 충돌 시 업데이트 (Django 5.x + PostgreSQL에서 사용 가능)
+    ApprovalPending.objects.bulk_create(
+        objs,
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["ym", "user"],
+        update_fields=["emp_name", "actual_pay", "approval_flag", "updated_at"],
+    )
+
+    return {
+        "inserted_or_updated": len(objs),
+        "missing_users": len(missing),
+        "missing_sample": missing_sample,
+    }

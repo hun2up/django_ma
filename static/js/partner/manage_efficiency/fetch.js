@@ -1,6 +1,6 @@
 // django_ma/static/js/partner/manage_efficiency/fetch.js
 // =========================================================
-// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL
+// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL (REFAC)
 // - grouped=1 응답(groups + rows 플랫) 지원
 // - group_key(문자열) / group_pk(숫자) 모두 매칭
 // - sub_admin: 그룹삭제 버튼 숨김 + 행삭제 disabled
@@ -11,6 +11,10 @@
 //   · "월도/소속 badge" 제거
 //   · 일반 텍스트로 "요청일자 / 소속" 표기 (예: 2026-01-06 / 프로사업단총괄 다미본부)
 //   · 작은 텍스트로 "건수 / 합계금액" 표기 (예: 1건 / 666,666원)
+// - ✅ 헤더 UI 리팩토링:
+//   · 토글 아이콘(▼) 좌측 고정 (CSS에서 ::after left)
+//   · 헤더 스크롤 인디케이터 방지: 버튼 자체 overflow hidden, 내부만 scroll
+//   · 좌(토글) + 우(확인서박스) 2컬럼
 // =========================================================
 
 import { els } from "./dom_refs.js";
@@ -72,7 +76,6 @@ function isSubAdmin() {
 
 /**
  * ✅ dataset key들은 “여러 후보를 OR”로 흡수
- * 템플릿에서 data-fetch-url / data-delete-row-url … 등으로 바뀌어도 대응
  */
 function dsPick(root, keys) {
   for (const k of keys) {
@@ -84,7 +87,7 @@ function dsPick(root, keys) {
 
 function getFetchUrl() {
   const root = getRoot();
-  return dsPick(root, ["fetchUrl", "dataFetchUrl", "dataFetch", "dataFetchUrl1", "dataDataFetchUrl"]);
+  return dsPick(root, ["fetchUrl", "dataFetchUrl", "dataFetch", "dataDataFetchUrl"]);
 }
 function getDeleteRowUrl() {
   const root = getRoot();
@@ -502,9 +505,9 @@ function renderGroups(groups, rowsByGroup) {
       const headingId = `heading_${escapeAttr(gid)}_${idx}`;
       const collapseId = `collapse_${escapeAttr(gid)}_${idx}`;
 
-      // ✅ 타이틀: (예) 2026-01-06 / 프로사업단총괄 다미본부
+      // ✅ 타이틀: "요청일자 / 소속"
       const titleText = normalizeGroupTitle(g.title, g.month, g.branch);
-      const headerMain = escapeHtml(titleText || ""); // 일반 텍스트
+      const headerMain = escapeHtml(titleText || "-");
 
       const rows = (rowsByGroup?.[gid] || []) || (gidPk ? rowsByGroup?.[gidPk] || [] : []);
       const rowCountNum = Number(g.row_count || rows.length || 0);
@@ -514,12 +517,20 @@ function renderGroups(groups, rowsByGroup) {
         (Number(g.total_amount) || 0) > 0 ? Number(g.total_amount) : Number(sumAmount(rows) || 0);
       const totalAmtText = `${fmtNumber(totalAmtNum)}원`;
 
-      // ✅ 작은 텍스트: (예) 1건 / 666,666원
+      // ✅ 작은 텍스트: "건수 / 합계금액"
       const headerSub = escapeHtml(`${rowCountText} / ${totalAmtText}`);
 
       const { fileName, fileUrl, rawName } = pickPrimaryAttachment(g);
       const fileNameEsc = escapeAttr(fileName);
       const rawNameEsc = escapeAttr(rawName);
+
+      const confirmFileHtml = `
+        <input type="text"
+               class="form-control form-control-sm confirm-file"
+               value="${fileNameEsc}"
+               placeholder="업로드 된 확인서 파일명"
+               readonly>
+      `;
 
       const downloadBtnHtml = fileUrl
         ? `
@@ -575,7 +586,6 @@ function renderGroups(groups, rowsByGroup) {
                     const rowId = str(r.id);
 
                     const amountNum = Number(r.amount || 0);
-
                     const taxFromServer = Number(r.tax);
                     const taxNum = Number.isFinite(taxFromServer)
                       ? taxFromServer
@@ -590,7 +600,6 @@ function renderGroups(groups, rowsByGroup) {
                     }`.trim();
 
                     const rowDeleteDisabled = subAdmin ? "disabled" : "";
-
                     const processDateCell = renderProcessDateCell(r);
 
                     const contentText = str(r.content);
@@ -639,50 +648,40 @@ function renderGroups(groups, rowsByGroup) {
           </div>
         `;
 
-      // ✅ 헤더: eff-group-scroll 내부에 "일반 텍스트 타이틀" + "작은 텍스트 서브"
+      // ✅ 핵심: 헤더 구조 리팩토링 (좌 토글 / 우 확인서)
       return `
         <div class="accordion-item">
           <h2 class="accordion-header" id="${headingId}">
-            <button class="accordion-button collapsed" type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#${collapseId}"
-                    aria-expanded="false"
-                    aria-controls="${collapseId}">
+            <div class="eff-acc-head">
 
-              <div class="eff-group-scroll">
+              <!-- 좌: 토글(제목) -->
+              <button class="accordion-button collapsed eff-acc-toggle" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#${collapseId}"
+                      aria-expanded="false"
+                      aria-controls="${collapseId}">
 
-                <div class="eff-group-meta">
-                  <div class="eff-group-title" style="font-weight:700;">
-                    ${headerMain || "-"}
-                  </div>
-                  <div class="eff-group-sub small text-muted">
-                    ${headerSub}
+                <!-- 헤더 텍스트는 여기에서만 scroll (스크롤바 숨김은 CSS) -->
+                <div class="eff-group-scroll">
+                  <div class="eff-group-meta">
+                    <span class="eff-group-title">${headerMain}</span>
+                    <span class="eff-group-sub">${headerSub}</span>
                   </div>
                 </div>
 
-                <div class="eff-group-confirm">
-                  <button type="button"
-                          class="btn btn-outline-secondary btn-sm js-confirm-view"
-                          data-group-id="${escapeAttr(gid)}">
-                    확인서 확인
-                  </button>
+              </button>
 
-                  <div class="input-group input-group-sm flex-nowrap" style="width:320px; max-width:320px;">
-                    <span class="input-group-text bg-light" style="font-weight:600;">확인서</span>
-                    <input type="text"
-                           class="form-control text-truncate"
-                           value="${fileNameEsc}"
-                           placeholder="업로드 된 확인서 파일명"
-                           readonly>
-                  </div>
+              <!-- 우: 확인서 박스(토글과 분리) -->
+              <div class="eff-acc-confirm">
 
-                  ${downloadBtnHtml}
-                  ${deleteGroupBtnHtml}
-                </div>
+                ${confirmFileHtml}
+
+                ${downloadBtnHtml}
+                ${deleteGroupBtnHtml}
 
               </div>
 
-            </button>
+            </div>
           </h2>
 
           <div id="${collapseId}" class="accordion-collapse collapse"
