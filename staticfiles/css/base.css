@@ -1004,6 +1004,62 @@ textarea[name="content"] {
   white-space: nowrap;
 }
 
+/* ✅ 헤더를 '왼쪽 토글 + 오른쪽 확인서영역' 2칼럼으로 */
+#manage-efficiency .eff-acc-head{
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* 토글 버튼은 남는 공간 채우기 */
+#manage-efficiency .eff-acc-toggle{
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 12px;
+}
+
+/* 오른쪽 확인서 영역은 고정폭 느낌으로 */
+#manage-efficiency .eff-acc-confirm{
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+/* 파일명 input 말줄임 */
+#manage-efficiency .eff-acc-confirm .confirm-file{
+  width: 260px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ✅ Bootstrap 기본 after(화살표) 유지하되, 토글 버튼 안에서만 보이게 */
+#manage-efficiency .eff-acc-toggle::after{
+  margin-left: 10px;
+}
+
+/* 모바일에서는 확인서 영역이 아래로 내려가도 OK */
+@media (max-width: 576px){
+  #manage-efficiency .eff-acc-head{
+    flex-wrap: wrap;
+  }
+  #manage-efficiency .eff-acc-confirm{
+    width: 100%;
+    justify-content: flex-end;
+  }
+  #manage-efficiency .eff-acc-confirm .confirm-file{
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+  }
+}
+
 
 /* ==========================================================
  6) PAGES / MANUAL
@@ -1030,6 +1086,31 @@ textarea[name="content"] {
 a.manual-item.manual-editing {
   background: #fbfdff;
 }
+
+/* ==========================================================
+ 6) PAGES / MANUAL
+========================================================== */
+
+/* ✅ manual_detail 페이지를 partner(지점효율)처럼 wide layout 적용 */
+#manual-detail{
+  width: 86vw;
+  max-width: none;
+  margin-left: calc(-43vw + 50%);
+}
+
+/* 섹션 카드가 부모 폭을 100% 사용하도록 */
+#manual-detail .manual-section{
+  width: 100%;
+}
+
+/* (선택) 모바일에서는 그냥 100%로 복귀 */
+@media (max-width: 576px){
+  #manual-detail{
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 
 /* ==========================================================
  7) PLUGINS / FIXES

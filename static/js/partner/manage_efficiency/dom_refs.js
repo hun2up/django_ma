@@ -1,6 +1,12 @@
 // django_ma/static/js/partner/manage_efficiency/dom_refs.js
+// =========================================================
+// ✅ DOM references (Manage Efficiency)
+// - confirmGroupId 신규 추가
+// - 페이지별 element id 기반으로 안전 참조
+// =========================================================
 
 export const els = {
+  // root
   root: document.getElementById("manage-efficiency"),
 
   // top controls
@@ -31,9 +37,9 @@ export const els = {
   confirmFileInput: document.getElementById("confirmFileInput"),
   confirmFileName: document.getElementById("confirmFileName"),
 
-  // ✅ NEW
+  // ✅ NEW: group id hidden
   confirmGroupId: document.getElementById("confirmGroupId"),
 
-  // (legacy)
+  // legacy
   confirmAttachmentId: document.getElementById("confirmAttachmentId"),
 };

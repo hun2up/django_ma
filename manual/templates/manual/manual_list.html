@@ -27,7 +27,7 @@
 
       <!-- ✅ 편집모드 저장/완료 버튼(처음엔 숨김) -->
       <button type="button" class="btn btn-success d-none" id="btnManualSaveOrder">
-        순서 저장
+        저장
       </button>
       <button type="button" class="btn btn-light d-none" id="btnManualDone">
         완료
@@ -40,7 +40,11 @@
 
   <div class="list-group shadow-sm" id="manualListGroup" style="border-radius:14px; overflow:hidden;">
     {% for m in manuals %}
-      <a class="list-group-item list-group-item-action py-3 manual-item" data-id="{{ m.id }}" href="{% url 'manual:manual_detail' m.pk %}">
+      <a class="list-group-item list-group-item-action py-3 manual-item"
+        data-id="{{ m.id }}"
+        data-access="{% if m.admin_only %}admin{% elif not m.is_published %}staff{% else %}normal{% endif %}"
+        data-href="{% url 'manual:manual_detail' m.pk %}"
+        href="{% url 'manual:manual_detail' m.pk %}">
         <div class="d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-2">
 
@@ -48,7 +52,15 @@
             <span class="manual-drag-handle d-none" title="드래그로 순서 변경"
                   style="cursor: grab; user-select:none;">☰</span>
                   
-            <div class="fw-semibold">{{ m.title }}</div>
+            <!-- 기본 표시 -->
+            <span class="fw-semibold manual-title-text">{{ m.title }}</span>
+
+            <!-- 편집모드 입력 -->
+            <input type="text"
+                  class="form-control form-control-sm manual-title-input d-none"
+                  value="{{ m.title|escape }}"
+                  maxlength="80"
+                  style="max-width: 520px;">
 
             {% if m.admin_only %}
               <span class="badge manual-badge-admin">관리자 전용</span>
@@ -57,6 +69,12 @@
             {% if not m.is_published %}
               <span class="badge manual-badge-staff">직원 전용</span>
             {% endif %}
+
+            <select class="form-select form-select-sm manual-access-select d-none" style="width: 140px;">
+              <option value="normal">일반</option>
+              <option value="admin">관리자 전용</option>
+              <option value="staff">직원 전용</option>
+            </select>
           </div>
 
           <div class="d-flex align-items-center gap-2">
@@ -137,6 +155,7 @@
   window.ManualListBoot = {
     reorderUrl: "{% url 'manual:manual_reorder_ajax' %}",
     deleteUrl: "{% url 'manual:manual_delete_ajax' %}",
+    bulkUpdateUrl: "{% url 'manual:manual_bulk_update_ajax' %}",
   };
 </script>
 

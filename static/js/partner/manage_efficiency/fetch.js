@@ -1,13 +1,17 @@
 // django_ma/static/js/partner/manage_efficiency/fetch.js
-//
-// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL (REFAC)
+// =========================================================
+// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL
 // - grouped=1 응답(groups + rows 플랫) 지원
-// - group_key(문자열) / group_pk(숫자) 둘 다로 매칭
-// - ✅ sub_admin 그룹삭제 버튼 숨김
-// - ✅ 그룹삭제/행삭제 이벤트 + 서버 POST + 재조회
-// - ✅ superuser/main_admin: "각 행" 처리일자(date) 수정 가능 (즉시 저장)
-// - ✅ 아코디언 헤더 내부 버튼 클릭 시 토글 방지(stopPropagation) 포함
-// - ✅ 그룹 헤더: 스크롤 영역(eff-group-scroll) 안에 메타 + 확인서 버튼 포함
+// - group_key(문자열) / group_pk(숫자) 모두 매칭
+// - sub_admin: 그룹삭제 버튼 숨김 + 행삭제 disabled
+// - 그룹삭제/행삭제 이벤트 + 서버 POST + 재조회
+// - superuser/main_admin: 각 행 처리일자(date) 수정 가능(즉시 저장)
+// - 아코디언 헤더 내부 버튼 클릭 시 토글 방지(stopPropagation)
+// - ✅ 그룹 헤더 타이틀 리뉴얼:
+//   · "월도/소속 badge" 제거
+//   · 일반 텍스트로 "요청일자 / 소속" 표기 (예: 2026-01-06 / 프로사업단총괄 다미본부)
+//   · 작은 텍스트로 "건수 / 합계금액" 표기 (예: 1건 / 666,666원)
+// =========================================================
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
@@ -15,9 +19,9 @@ import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
 const DEBUG = false;
 const log = (...a) => DEBUG && console.log("[efficiency/fetch]", ...a);
 
-/* =========================
+/* -------------------------
    Small helpers
-========================= */
+-------------------------- */
 function str(v) {
   return String(v ?? "").trim();
 }
@@ -43,25 +47,20 @@ function escapeAttr(s) {
   return escapeHtml(s);
 }
 
-/* =========================
-   Root / Dataset helpers
-========================= */
+/* -------------------------
+   Root / grade / dataset
+-------------------------- */
 function getRoot() {
   return (
     els.root ||
     document.getElementById("manage-efficiency") ||
     document.getElementById("manage-calculate") ||
-    document.getElementById("manage-rate") ||
-    document.getElementById("manage-structure") ||
     null
   );
 }
-
 function getUserGrade() {
   const root = getRoot();
-  const g1 = str(root?.dataset?.userGrade);
-  const g2 = str(window?.currentUser?.grade);
-  return g1 || g2;
+  return str(root?.dataset?.userGrade) || str(window?.currentUser?.grade);
 }
 function canAdminEdit() {
   const g = getUserGrade();
@@ -71,42 +70,45 @@ function isSubAdmin() {
   return getUserGrade() === "sub_admin";
 }
 
+/**
+ * ✅ dataset key들은 “여러 후보를 OR”로 흡수
+ * 템플릿에서 data-fetch-url / data-delete-row-url … 등으로 바뀌어도 대응
+ */
+function dsPick(root, keys) {
+  for (const k of keys) {
+    const v = str(root?.dataset?.[k]);
+    if (v) return v;
+  }
+  return "";
+}
+
 function getFetchUrl() {
   const root = getRoot();
-  return str(root?.dataset?.dataFetchUrl || "");
+  return dsPick(root, ["fetchUrl", "dataFetchUrl", "dataFetch", "dataFetchUrl1", "dataDataFetchUrl"]);
 }
 function getDeleteRowUrl() {
   const root = getRoot();
-  return str(root?.dataset?.dataDeleteRowUrl || "");
+  return dsPick(root, ["deleteRowUrl", "dataDeleteRowUrl", "dataDeleteRow", "dataDataDeleteRowUrl"]);
 }
 function getDeleteGroupUrl() {
   const root = getRoot();
-  return str(root?.dataset?.dataDeleteGroupUrl || "");
+  return dsPick(root, ["deleteGroupUrl", "dataDeleteGroupUrl", "dataDeleteGroup", "dataDataDeleteGroupUrl"]);
 }
 function getUpdateProcessDateUrl() {
   const root = getRoot();
-  const u1 = str(root?.dataset?.updateProcessDateUrl || "");
-  const u2 = str(root?.dataset?.dataUpdateProcessDateUrl || "");
-  const u3 = str(window?.ManageefficiencyBoot?.updateProcessDateUrl || "");
-  return u1 || u2 || u3;
-}
-
-function getGroupsContainer() {
   return (
-    els.groupsContainer ||
-    document.getElementById("confirmGroupsAccordion") ||
-    document.getElementById("confirmGroups") ||
-    document.getElementById("efficiencyConfirmGroups") ||
-    document.getElementById("groupsContainer") ||
-    document.querySelector("[data-role='confirm-groups']") ||
-    document.querySelector(".confirm-groups") ||
-    null
+    dsPick(root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDate", "dataUpdateProcessDate"]) ||
+    str(window?.ManageefficiencyBoot?.updateProcessDateUrl)
   );
 }
 
-/* =========================
-   ⭐ 컬럼 비율 설정 (MAIN TABLE)
-========================= */
+function getGroupsContainer() {
+  return els.accordion || document.getElementById("confirmGroupsAccordion");
+}
+
+/* -------------------------
+   MAIN table colgroup widths
+-------------------------- */
 const MAIN_COL_KEYS = [
   "requester",
   "requester_id",
@@ -159,15 +161,7 @@ function applyMainColWidths(root, table) {
   if (!sum) return;
 
   const ratios = {};
-  for (const [k, v] of entries) {
-    ratios[k] = (Number(v) / sum) * 100;
-  }
-
-  const thCount = table.querySelectorAll("thead th").length;
-  const colCount = table.querySelectorAll("colgroup col[data-col]").length;
-  if (thCount && colCount && thCount !== colCount) {
-    console.warn("[efficiency] colgroup/th count mismatch", { thCount, colCount });
-  }
+  for (const [k, v] of entries) ratios[k] = (Number(v) / sum) * 100;
 
   table.querySelectorAll("colgroup col[data-col]").forEach((col) => {
     const key = col.dataset.col;
@@ -177,12 +171,13 @@ function applyMainColWidths(root, table) {
   table.style.tableLayout = "fixed";
 }
 
-/* =========================
-   그룹 타이틀 정규화
-========================= */
+/* -------------------------
+   Normalize group/title/rows
+-------------------------- */
 function normalizeGroupTitle(rawTitle, fallbackMonth, fallbackBranch) {
   const title = str(rawTitle);
 
+  // 기존: ".... - ...." 형식이면 마지막 토큰만 사용
   if (title && title.includes(" - ")) {
     const parts = title
       .split(" - ")
@@ -201,9 +196,6 @@ function normalizeGroupTitle(rawTitle, fallbackMonth, fallbackBranch) {
   return "그룹";
 }
 
-/* =========================
-   Normalize helpers
-========================= */
 function normalizeAttachment(a) {
   if (!a || typeof a !== "object") return {};
   return {
@@ -213,13 +205,9 @@ function normalizeAttachment(a) {
   };
 }
 
-/**
- * ✅ row 그룹키 후보(문자열/숫자) 모두 흡수
- */
 function pickRowGroupKeys(r) {
   const keys = [];
 
-  // 문자열
   const sCandidates = [
     r?.group_key,
     r?.confirm_group_id,
@@ -231,14 +219,7 @@ function pickRowGroupKeys(r) {
     if (v) keys.push(v);
   }
 
-  // 숫자 pk
-  const pkCandidates = [
-    r?.group_pk,
-    r?.confirm_group_pk,
-    r?.confirm_group,
-    r?.group_id,
-    r?.group,
-  ];
+  const pkCandidates = [r?.group_pk, r?.confirm_group_pk, r?.confirm_group, r?.group_id, r?.group];
   for (const c of pkCandidates) {
     const n = numOrNull(c);
     if (n !== null) keys.push(String(n));
@@ -267,14 +248,9 @@ function normalizeRow(r) {
   };
 }
 
-/**
- * ✅ group_key(문자열)을 최우선
- */
 function normalizeGroup(g) {
   if (!g || typeof g !== "object") return {};
-  const attachments = Array.isArray(g.attachments)
-    ? g.attachments.map(normalizeAttachment)
-    : [];
+  const attachments = Array.isArray(g.attachments) ? g.attachments.map(normalizeAttachment) : [];
 
   const groupKey = str(g.group_key || g.confirm_group_id || g.confirm_group_key || "");
   const groupPk = numOrNull(g.group_pk ?? g.id);
@@ -291,9 +267,6 @@ function normalizeGroup(g) {
   };
 }
 
-/* =========================
-   rows -> groupKey 기준으로 묶기
-========================= */
 function buildRowsByGroup(rows) {
   const map = Object.create(null);
   const list = Array.isArray(rows) ? rows.map(normalizeRow) : [];
@@ -321,9 +294,6 @@ function sumAmount(list) {
   return s;
 }
 
-/* =========================
-   Confirm(확인서) 대표 첨부 1개 선택
-========================= */
 function pickPrimaryAttachment(group) {
   const atts = Array.isArray(group?.attachments) ? group.attachments : [];
   if (!atts.length) return { fileName: "", fileUrl: "", rawName: "", extraCount: 0 };
@@ -337,15 +307,12 @@ function pickPrimaryAttachment(group) {
   return { fileName, fileUrl, rawName, extraCount };
 }
 
-/* =========================
-   Row process_date cell
-========================= */
+/* -------------------------
+   Process date cell
+-------------------------- */
 function renderProcessDateCell(r) {
   const val = str(r.process_date);
-
-  if (!canAdminEdit()) {
-    return escapeHtml(val || "-");
-  }
+  if (!canAdminEdit()) return escapeHtml(val || "-");
 
   return `
     <input type="date"
@@ -357,9 +324,9 @@ function renderProcessDateCell(r) {
   `;
 }
 
-/* =========================
-   ✅ Events (delegation) — bind once
-========================= */
+/* -------------------------
+   Events (delegation) bind once
+-------------------------- */
 function bindHandlersOnce() {
   const acc = getGroupsContainer();
   if (!acc) return;
@@ -367,39 +334,31 @@ function bindHandlersOnce() {
   if (acc.dataset.boundHandlers === "1") return;
   acc.dataset.boundHandlers = "1";
 
-  /* -------------------------------------------------------
-     ✅ 0) 아코디언 헤더 내부 버튼 클릭 시 토글 방지
-     - 확인서 확인 / 다운로드 / 삭제 버튼 클릭 시
-       accordion-button까지 이벤트가 올라가면서 토글되는 문제 방지
-     - "캡처링 단계(true)"에서 먼저 막는 게 가장 안정적
-  -------------------------------------------------------- */
+  // ✅ 헤더 내부 버튼 클릭은 토글 방지(캡처링)
   acc.addEventListener(
     "click",
     (e) => {
       const btn = e.target.closest(".js-confirm-view, .js-confirm-download, .js-confirm-delete");
       if (!btn) return;
-      e.stopPropagation(); // ✅ 토글 방지
+      e.stopPropagation();
     },
     true
   );
 
-  /* -------------------------------------------------------
-     ✅ 1) click: delete-row / delete-group (data-action)
-  -------------------------------------------------------- */
+  // ✅ delete-row / delete-group
   acc.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
 
     const action = str(btn.dataset.action);
 
-    // ✅ 행 삭제
+    // 행 삭제
     if (action === "delete-row") {
       const url = getDeleteRowUrl();
-      if (!url) return alertBox("행삭제 URL이 없습니다. (data-data-delete-row-url 확인)");
+      if (!url) return alertBox("행삭제 URL이 없습니다. (data-delete-row-url 확인)");
 
       const rowId = str(btn.dataset.rowId);
       if (!rowId) return alertBox("row_id가 없습니다.");
-
       if (!confirm("해당 행을 삭제할까요?")) return;
 
       showLoading("행 삭제 중...");
@@ -431,12 +390,12 @@ function bindHandlersOnce() {
       return;
     }
 
-    // ✅ 그룹 삭제
+    // 그룹 삭제 (sub_admin 금지)
     if (action === "delete-group") {
       if (isSubAdmin()) return;
 
       const url = getDeleteGroupUrl();
-      if (!url) return alertBox("그룹삭제 URL이 없습니다. (data-data-delete-group-url 확인)");
+      if (!url) return alertBox("그룹삭제 URL이 없습니다. (data-delete-group-url 확인)");
 
       const groupId = str(btn.dataset.groupId);
       if (!groupId) return alertBox("group_id가 없습니다.");
@@ -472,9 +431,7 @@ function bindHandlersOnce() {
     }
   });
 
-  /* -------------------------------------------------------
-     ✅ 2) change: process_date update (admin only)
-  -------------------------------------------------------- */
+  // ✅ process_date update (admin only)
   acc.addEventListener("change", async (e) => {
     const input = e.target;
     if (!input?.classList?.contains("js-process-date")) return;
@@ -486,7 +443,7 @@ function bindHandlersOnce() {
     const rowId = str(input.dataset.rowId);
     if (!rowId) return alertBox("row_id가 없습니다.");
 
-    const process_date = str(input.value); // ""이면 NULL 처리
+    const process_date = str(input.value);
     const prev = str(input.dataset.prevValue);
 
     input.disabled = true;
@@ -498,11 +455,7 @@ function bindHandlersOnce() {
           "X-CSRFToken": getCSRFToken(),
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({
-          id: rowId,
-          process_date,
-          kind: "efficiency",
-        }),
+        body: JSON.stringify({ id: rowId, process_date, kind: "efficiency" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -514,27 +467,22 @@ function bindHandlersOnce() {
     } catch (err) {
       console.error("❌ update process_date error:", err);
       alertBox(err?.message || "처리일자 저장 중 오류가 발생했습니다.");
-
-      // 실패 시 롤백
-      input.value = prev;
+      input.value = prev; // rollback
     } finally {
       input.disabled = false;
     }
   });
 }
 
-/* =========================
+/* -------------------------
    Render Groups (Accordion)
-========================= */
+-------------------------- */
 function renderGroups(groups, rowsByGroup) {
   const acc = getGroupsContainer();
-  if (!acc) {
-    log("groups container not found -> skip renderGroups");
-    return;
-  }
+  if (!acc) return;
 
-  const canDeleteGroup = canAdminEdit();
   const subAdmin = isSubAdmin();
+  const canDeleteGroup = canAdminEdit() && !subAdmin;
 
   const list = Array.isArray(groups) ? groups.map(normalizeGroup) : [];
   if (!list.length) {
@@ -554,24 +502,25 @@ function renderGroups(groups, rowsByGroup) {
       const headingId = `heading_${escapeAttr(gid)}_${idx}`;
       const collapseId = `collapse_${escapeAttr(gid)}_${idx}`;
 
+      // ✅ 타이틀: (예) 2026-01-06 / 프로사업단총괄 다미본부
       const titleText = normalizeGroupTitle(g.title, g.month, g.branch);
-      const headerTitle = escapeHtml(titleText);
+      const headerMain = escapeHtml(titleText || ""); // 일반 텍스트
 
       const rows = (rowsByGroup?.[gid] || []) || (gidPk ? rowsByGroup?.[gidPk] || [] : []);
-      const rowCount = fmtNumber(g.row_count || rows.length || 0);
-      const totalAmt = fmtNumber(
-        (Number(g.total_amount) || 0) > 0 ? g.total_amount : sumAmount(rows)
-      );
+      const rowCountNum = Number(g.row_count || rows.length || 0);
+      const rowCountText = `${fmtNumber(rowCountNum)}건`;
 
-      const monthText = escapeHtml(str(g.month || ""));
-      const branchText = escapeHtml(str(g.branch || ""));
+      const totalAmtNum =
+        (Number(g.total_amount) || 0) > 0 ? Number(g.total_amount) : Number(sumAmount(rows) || 0);
+      const totalAmtText = `${fmtNumber(totalAmtNum)}원`;
 
-      // ✅ 확인서(대표 첨부) 표시
+      // ✅ 작은 텍스트: (예) 1건 / 666,666원
+      const headerSub = escapeHtml(`${rowCountText} / ${totalAmtText}`);
+
       const { fileName, fileUrl, rawName } = pickPrimaryAttachment(g);
       const fileNameEsc = escapeAttr(fileName);
       const rawNameEsc = escapeAttr(rawName);
 
-      // 다운로드 버튼(파일 없으면 disabled)
       const downloadBtnHtml = fileUrl
         ? `
           <a class="btn btn-outline-success btn-sm js-confirm-download"
@@ -588,7 +537,6 @@ function renderGroups(groups, rowsByGroup) {
           </button>
         `;
 
-      // 그룹 삭제 버튼: sub_admin 숨김
       const deleteGroupBtnHtml = canDeleteGroup
         ? `
           <button type="button"
@@ -645,7 +593,6 @@ function renderGroups(groups, rowsByGroup) {
 
                     const processDateCell = renderProcessDateCell(r);
 
-                    // title에는 escape, 본문은 escapeHtml로 출력(ellipsis + hover 확장 대응)
                     const contentText = str(r.content);
                     const contentTitle = escapeAttr(contentText);
                     const contentBody = escapeHtml(contentText);
@@ -666,9 +613,7 @@ function renderGroups(groups, rowsByGroup) {
 
                         <td class="text-center">${escapeHtml(str(r.request_date))}</td>
 
-                        <td class="text-center">
-                          ${processDateCell}
-                        </td>
+                        <td class="text-center">${processDateCell}</td>
 
                         <td class="text-center">
                           <button type="button"
@@ -694,9 +639,7 @@ function renderGroups(groups, rowsByGroup) {
           </div>
         `;
 
-      // ✅ 그룹 헤더(스크롤 영역 안에 메타 + 확인서 UI 포함)
-      // - 아코디언 토글은 accordion-button 자체 클릭으로만 동작
-      // - 내부 버튼들은 bindHandlersOnce()에서 stopPropagation 처리됨
+      // ✅ 헤더: eff-group-scroll 내부에 "일반 텍스트 타이틀" + "작은 텍스트 서브"
       return `
         <div class="accordion-item">
           <h2 class="accordion-header" id="${headingId}">
@@ -707,12 +650,14 @@ function renderGroups(groups, rowsByGroup) {
                     aria-controls="${collapseId}">
 
               <div class="eff-group-scroll">
+
                 <div class="eff-group-meta">
-                  <span class="badge bg-light text-dark border">월도: ${monthText || "-"}</span>
-                  <span class="badge bg-light text-dark border">소속: ${branchText || "-"}</span>
-                  <span class="badge bg-light text-dark border">건수: ${rowCount}</span>
-                  <span class="badge bg-light text-dark border">합계: ${totalAmt}</span>
-                  <span class="badge bg-white text-dark border">${headerTitle}</span>
+                  <div class="eff-group-title" style="font-weight:700;">
+                    ${headerMain || "-"}
+                  </div>
+                  <div class="eff-group-sub small text-muted">
+                    ${headerSub}
+                  </div>
                 </div>
 
                 <div class="eff-group-confirm">
@@ -734,6 +679,7 @@ function renderGroups(groups, rowsByGroup) {
                   ${downloadBtnHtml}
                   ${deleteGroupBtnHtml}
                 </div>
+
               </div>
 
             </button>
@@ -753,20 +699,18 @@ function renderGroups(groups, rowsByGroup) {
 
   acc.innerHTML = html;
 
-  // ⭐ 렌더 후 컬럼비율 적용 (모든 그룹 테이블)
+  // ✅ 렌더 후 컬럼비율 적용
   const root = getRoot();
-  acc.querySelectorAll("table.main-group-table").forEach((tbl) => {
-    applyMainColWidths(root, tbl);
-  });
+  acc.querySelectorAll("table.main-group-table").forEach((tbl) => applyMainColWidths(root, tbl));
 }
 
-/* =========================
+/* -------------------------
    Public: fetchData
-========================= */
+-------------------------- */
 export async function fetchData(ym, branch) {
   const url = getFetchUrl();
   if (!url) {
-    alertBox("조회 URL이 없습니다. (data-data-fetch-url 확인)");
+    alertBox("조회 URL이 없습니다. (data-fetch-url / data-data-fetch-url 확인)");
     return;
   }
 
@@ -774,17 +718,17 @@ export async function fetchData(ym, branch) {
   const br = str(branch);
   if (!month || !br) return;
 
-  // ✅ 재조회용 캐시
+  // ✅ 재조회 캐시
   window.__lastEfficiencyYM = month;
   window.__lastEfficiencyBranch = br;
 
   showLoading("조회 중...");
-
   try {
     const fullUrl = `${url}?month=${encodeURIComponent(month)}&branch=${encodeURIComponent(
       br
     )}&grouped=1`;
-    log("fetchData ->", fullUrl);
+
+    log("fetch ->", fullUrl);
 
     const res = await fetch(fullUrl, {
       method: "GET",
@@ -797,11 +741,11 @@ export async function fetchData(ym, branch) {
 
     const groups = payload.groups || [];
     const rows = payload.rows || [];
-    const rowsByGroup = buildRowsByGroup(rows);
 
+    const rowsByGroup = buildRowsByGroup(rows);
     renderGroups(groups, rowsByGroup);
 
-    // ✅ 이벤트(삭제/처리일자/토글방지) 1회 바인딩
+    // ✅ 이벤트 1회 바인딩
     bindHandlersOnce();
   } catch (e) {
     console.error("❌ efficiency fetchData error:", e);
