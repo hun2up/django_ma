@@ -1,4 +1,4 @@
-{# django_ma/join/templates/join/manual_list.html #}
+{# django_ma/manual/templates/manual/manual_list.html #}
 {% extends "base.html" %}
 {% block title %}업무매뉴얼{% endblock %}
 
@@ -12,14 +12,14 @@
     </div>
 
     {% if is_admin %}
-      <a class="btn btn-primary" href="{% url 'join:manual_create' %}">+ 새 매뉴얼</a>
+      <a class="btn btn-primary" href="{% url 'manual:manual_create' %}">+ 새 매뉴얼</a>
     {% endif %}
   </div>
 
   <div class="list-group shadow-sm" style="border-radius: 14px; overflow:hidden;">
     {% for m in manuals %}
       <a class="list-group-item list-group-item-action py-3"
-         href="{% url 'join:manual_detail' m.pk %}">
+         href="{% url 'manual:manual_detail' m.pk %}">
         <div class="d-flex justify-content-between gap-3">
           <div class="min-w-0">
             <div class="fw-semibold text-truncate">{{ m.title }}</div>

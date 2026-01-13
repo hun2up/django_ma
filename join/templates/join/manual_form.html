@@ -1,4 +1,4 @@
-{# django_ma/join/templates/join/manual_form.html #}
+{# django_ma/manual/templates/manual/manual_form.html #}
 {% extends "base.html" %}
 {% block title %}업무매뉴얼{% endblock %}
 
@@ -19,12 +19,12 @@
     <div class="d-flex gap-2">
       {% if mode == "edit" %}
         <a class="btn btn-outline-secondary"
-           href="{% url 'join:manual_detail' manual.pk %}">
+           href="{% url 'manual:manual_detail' manual.pk %}">
           돌아가기
         </a>
       {% else %}
         <a class="btn btn-outline-secondary"
-           href="{% url 'join:manual_list' %}">
+           href="{% url 'manual:manual_list' %}">
           목록
         </a>
       {% endif %}
@@ -60,12 +60,12 @@
     <div class="d-flex gap-2 justify-content-end">
       {% if mode == "edit" %}
         <a class="btn btn-secondary"
-           href="{% url 'join:manual_detail' manual.pk %}">
+           href="{% url 'manual:manual_detail' manual.pk %}">
           취소
         </a>
       {% else %}
         <a class="btn btn-secondary"
-           href="{% url 'join:manual_list' %}">
+           href="{% url 'manual:manual_list' %}">
           취소
         </a>
       {% endif %}
