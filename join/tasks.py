@@ -1,4 +1,4 @@
-# join/tasks.py
+# manual/tasks.py
 from celery import shared_task
 from .pdf_utils import fill_pdf
 import time

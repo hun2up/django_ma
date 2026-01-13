@@ -1,4 +1,4 @@
-# django_ma/join/models.py
+# django_ma/manual/models.py
 from django.db import models
 from ckeditor_uploader.fields import RichTextUploadingField
 

@@ -3,244 +3,24 @@
 {% block title %}매뉴얼{% endblock %}
 
 {% block content %}
-<style>
-  /* =========================================================
-   * Layout
-   * ========================================================= */
-  #manual-detail {
-    width: 72vw;
-    max-width: none;
-    margin-left: calc(-36vw + 50%);
-  }
-  #manual-detail .manual-section { width: 100%; position: relative; }
-
-  @media (max-width: 576px) {
-    #manual-detail { width: 100%; margin-left: 0; }
-  }
-
-  /* =========================================================
-   * ✅ Navbar dropdown이 Subnav에 가려지지 않도록(모달 z-index는 유지)
-   * - Bootstrap modal: 1055
-   * - dropdown-menu: 기본 1000 → subnav보다 위로 올림
-   * ========================================================= */
-  .navbar .dropdown-menu{
-    z-index: 1040 !important;
-  }
-
-  /* =========================================================
-   * Section 카드 헤더 액션
-   * ========================================================= */
-  .sec-card-actions{
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    display: flex;
-    gap: 8px;
-    z-index: 2;
-  }
-
-  .sec-title-row{
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-  }
-
-  .sec-title{
-    font-weight: 800;
-    color: #003f7d;
-    margin: 0;
-    font-size: 1.2rem;
-    line-height: 1.2;
-    word-break: break-word;
-  }
-  .sec-title.empty{ color: #6c757d; font-weight: 700; }
-  .sec-title-actions{ display: flex; gap: 6px; flex: 0 0 auto; white-space: nowrap; }
-
-  /* =========================================================
-   * Block (이미지 + 텍스트)
-   * ========================================================= */
-  .manual-block-grid{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    align-items: start;
-  }
-  @media (max-width: 768px){
-    .manual-block-grid{ grid-template-columns: 1fr; }
-  }
-
-  .manual-block-media{
-    width: 100%;
-    border-radius: 12px;
-    border: 1px solid #e9ecef;
-    background: #f8f9fa;
-    overflow: hidden;
-    min-height: 120px;
-    max-height: 320px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .manual-block-thumb{
-    width: 100%;
-    height: auto;
-    display: block;
-    max-height: 320px;
-    object-fit: contain;
-    cursor: zoom-in;
-  }
-
-  .manual-block-text{
-    width: 100%;
-    overflow-wrap: anywhere;
-  }
-
-  .manual-block-actions{
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 10px;
-  }
-
-  /* =========================================================
-   * Floating Actions (FAB)
-   * ========================================================= */
-  .manual-fab{
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 1080;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .manual-fab a,
-  .manual-fab button{
-    width: 64px;
-    height: 64px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-    overflow: hidden;
-    cursor: pointer;
-  }
-
-  .manual-fab img{
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  /* =========================================================
-   * Sub Nav (Manual TOC)
-   * - ✅ 제목 아래로 이동
-   * - ✅ radius/padding으로 자연스럽게
-   * - ✅ z-index를 navbar dropdown보다 낮게(가려짐 방지)
-   * ========================================================= */
-  .manual-subnav{
-    position: sticky;
-    top: 70px;                 /* base.html navbar 높이(대략) */
-    z-index: 1020;             /* dropdown-menu(1040)보다 낮게 */
-    padding: 8px 0 10px;
-    background: transparent;
-  }
-
-  .manual-subnav .subnav-inner{
-    width: 72vw;
-    margin-left: calc(-36vw + 50%);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    /* ✅ 자연스러운 박스 */
-    background: #fff;
-    border: 1px solid #e9ecef;
-    border-radius: 16px;
-    padding: 10px 12px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-  }
-
-  .manual-subnav .subnav-title{
-    font-weight: 800;
-    color: #003f7d;
-    white-space: nowrap;
-    flex: 0 0 auto;
-    padding-left: 4px;
-  }
-
-  .manual-subnav .subnav-links{
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding: 2px 2px 4px;
-    flex: 1 1 auto;
-    scrollbar-width: thin;
-  }
-
-  .manual-subnav .subnav-links::-webkit-scrollbar{ height: 6px; }
-  .manual-subnav .subnav-links::-webkit-scrollbar-thumb{
-    background: #d2ddec;
-    border-radius: 10px;
-  }
-
-  .manual-subnav .subnav-links a{
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 11px;         /* ✅ 살짝 넉넉하게 */
-    border-radius: 999px;
-    border: 1px solid #e9ecef;
-    color: #333;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-    background: #f8f9fa;
-    white-space: nowrap;
-  }
-
-  .manual-subnav .subnav-links a:hover{
-    border-color: #005BAC;
-    color: #005BAC;
-    background: #fff;
-  }
-
-  .manual-subnav .subnav-links a.active{
-    border-color: #005BAC;
-    color: #fff;
-    background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
-  }
-
-  @media (max-width: 576px){
-    .manual-subnav{ top: 70px; }
-    .manual-subnav .subnav-inner{
-      width: 100%;
-      margin-left: 0;
-      padding: 10px 12px;
-      border-radius: 14px;
-    }
-  }
-</style>
-
 <div class="container-fluid my-5">
   <div id="manual-detail">
     <div id="manualDetailTop">
 
-      <!-- ✅ 제목(상단) -->
+      <!------------------------------------------------------------
+         Header: Title + badges
+         ---------------------------------------------------------->
       <div class="d-flex justify-content-center align-items-center mb-2 gap-2">
-        <h3 class="fw-bold mb-0 text-center" style="color:#003f7d;">{{ m.title }}</h3>
+        <h3 class="fw-bold mb-0 text-center manual-detail-title">{{ m.title }}</h3>
         {% if m.admin_only %}<span class="badge manual-badge-admin">관리자 전용</span>{% endif %}
         {% if not m.is_published %}<span class="badge manual-badge-staff">직원 전용</span>{% endif %}
       </div>
 
-      <!-- ✅ 보조 네비게이션 바 (섹션 목차) : 제목 아래로 이동 -->
+      <!------------------------------------------------------------
+         Subnav: Section TOC (sticky)
+         - 링크 클릭 시 “상단바 + subnav 높이”를 고려해 부드럽게 스크롤
+         - 스크롤 위치에 따라 active 자동 반영
+         ---------------------------------------------------------->
       <div class="manual-subnav" id="manualSubnav">
         <div class="subnav-inner">
           <div class="subnav-title">{{ m.title }}</div>
@@ -257,6 +37,10 @@
         </div>
       </div>
 
+      <!------------------------------------------------------------
+         Boot: superuser만 AJAX URL 주입
+         - JS는 이 data-*를 읽어서 요청
+         ---------------------------------------------------------->
       {% if user.is_authenticated and user.grade == "superuser" %}
         <div id="manualDetailBoot"
              data-section-title-update-url="{% url 'manual:manual_section_title_update_ajax' %}"
@@ -271,18 +55,23 @@
         </div>
       {% endif %}
 
+      <!------------------------------------------------------------
+         Sections
+         ---------------------------------------------------------->
       <div id="manualSections" class="mt-3">
         {% for sec in sections %}
           <div class="card p-4 mb-3 manual-section"
                id="sec-{{ sec.id }}"
                data-section-id="{{ sec.id }}">
 
+            {# 카드 삭제 버튼(우상단) #}
             {% if user.is_authenticated and user.grade == "superuser" %}
               <div class="sec-card-actions">
                 <button type="button" class="btn btn-sm btn-danger btnDeleteSection">카드 삭제</button>
               </div>
             {% endif %}
 
+            {# 소제목 + 소제목 수정 버튼 #}
             <div class="sec-title-row">
               <h5 class="sec-title {% if not sec.title %}empty{% endif %}" data-role="secTitleText">
                 {% if sec.title %}{{ sec.title }}{% else %}(소제목 없음){% endif %}
@@ -290,20 +79,28 @@
 
               {% if user.is_authenticated and user.grade == "superuser" %}
                 <div class="sec-title-actions">
-                  <button type="button" class="btn btn-sm btn-outline-secondary btnEditSectionTitle">소제목 수정</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary btnEditSectionTitle">
+                    소제목 수정
+                  </button>
                 </div>
               {% endif %}
             </div>
 
+            <!------------------------------------------------------------
+               Blocks
+               ---------------------------------------------------------->
             <div class="manualBlocks" id="manualBlocks-{{ sec.id }}">
               {% for b in sec.blocks.all %}
                 <div class="border rounded-3 p-3 mb-3 manual-block"
                      data-block-id="{{ b.id }}"
                      data-image-url="{% if b.image %}{{ b.image.url }}{% endif %}">
                   <div class="manual-block-grid">
+
                     <div class="manual-block-media">
                       {% if b.image %}
-                        <img src="{{ b.image.url }}" class="manual-block-thumb jsManualImg" alt="manual image">
+                        <img src="{{ b.image.url }}"
+                             class="manual-block-thumb jsManualImg"
+                             alt="manual image">
                       {% else %}
                         <div class="text-muted small py-4">이미지 없음</div>
                       {% endif %}
@@ -322,13 +119,16 @@
                               data-bs-target="#manualBlockModal">
                         수정
                       </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger btn-delete-block">삭제</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger btn-delete-block">
+                        삭제
+                      </button>
                     </div>
                   {% endif %}
                 </div>
               {% endfor %}
             </div>
 
+            {# 블록 추가 버튼 #}
             {% if user.is_authenticated and user.grade == "superuser" %}
               <div class="d-flex justify-content-end mt-2">
                 <button type="button"
@@ -345,6 +145,7 @@
         {% endfor %}
       </div>
 
+      {# 섹션(구역) 추가 #}
       {% if user.is_authenticated and user.grade == "superuser" %}
         <div class="d-flex justify-content-end mt-2">
           <button type="button"
@@ -361,6 +162,9 @@
   </div>
 </div>
 
+<!------------------------------------------------------------
+   Floating Actions (FAB)
+   ---------------------------------------------------------->
 <div class="manual-fab">
   <a href="{% url 'manual:manual_list' %}" title="매뉴얼 목록으로">
     <img src="{% static 'images/manual/manual_home.png' %}" alt="HOME">
@@ -370,10 +174,13 @@
   </button>
 </div>
 
+<!------------------------------------------------------------
+   Superuser-only: editor + modals + scripts
+   ---------------------------------------------------------->
 {% if user.is_authenticated and user.grade == "superuser" %}
   <form id="manualBlockCsrfForm" class="d-none">{% csrf_token %}</form>
 
-  <!-- ✅ 이미지 원본 팝업 모달 -->
+  {# 이미지 원본 팝업 모달 #}
   <div class="modal fade" id="manualImageViewer" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen">
       <div class="modal-content bg-dark">
@@ -381,16 +188,13 @@
           <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body d-flex align-items-center justify-content-center">
-          <img id="manualViewerImg"
-               src=""
-               alt="full image"
-               style="max-width:95vw; max-height:85vh; object-fit:contain;">
+          <img id="manualViewerImg" src="" alt="full image" class="manual-viewer-img">
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ✅ 블록 add/edit 모달 -->
+  {# 블록 add/edit 모달 #}
   <div class="modal fade"
        id="manualBlockModal"
        tabindex="-1"
@@ -400,25 +204,22 @@
        data-attach-upload-url="{% url 'manual:manual_block_attachment_upload_ajax' %}"
        data-manual-id="{{ m.id }}">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content" style="border-radius:14px;">
+      <div class="modal-content manual-block-modal">
         <div class="modal-header">
-          <h5 class="modal-title fw-bold" style="color:#003f7d;" id="manualBlockModalTitle">내용 추가</h5>
+          <h5 class="modal-title fw-bold manual-block-modal-title" id="manualBlockModalTitle">내용 추가</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
 
         <div class="modal-body">
           <div class="alert alert-danger py-2 d-none" id="manualBlockError"></div>
 
-          <!-- ✅ 이미지 업로드 + 미리보기 -->
+          {# 이미지 업로드 + 미리보기 #}
           <div class="mb-3">
             <label class="form-label fw-bold">이미지</label>
             <input type="file" class="form-control" id="manualBlockImageInput" accept="image/*">
 
-            <div class="mt-2 border rounded-3 p-2 bg-light" id="manualBlockImagePreviewWrap" style="display:none;">
-              <img id="manualBlockImagePreview"
-                   src=""
-                   alt="preview"
-                   style="width:100%; height:auto; object-fit:contain;">
+            <div class="mt-2 border rounded-3 p-2 bg-light d-none" id="manualBlockImagePreviewWrap">
+              <img id="manualBlockImagePreview" src="" alt="preview" class="manual-block-preview-img">
             </div>
 
             <div class="form-check mt-2 d-none" id="manualBlockRemoveImageWrap">
@@ -427,12 +228,12 @@
             </div>
           </div>
 
-          <!-- ✅ Quill 첨부용 hidden input -->
+          {# Quill 첨부용 hidden input #}
           <input type="file" id="manualQuillAttachInput" class="d-none">
 
-          <!-- ✅ 텍스트(Quill) -->
+          {# 텍스트(Quill) #}
           <label class="form-label fw-bold">텍스트</label>
-          <div id="manualQuillEditor" style="height:320px;"></div>
+          <div id="manualQuillEditor" class="manual-quill-editor"></div>
           <div class="form-text mt-2">
             📎 첨부 버튼으로 파일을 업로드하면 본문에 링크가 자동 삽입됩니다.
             (새 블록은 먼저 저장 후 첨부 가능)
@@ -447,68 +248,15 @@
     </div>
   </div>
 
+  {# Quill (외부 CDN) #}
   <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 
+  {# 기존 블록 편집/첨부 로직(이미 분리되어 있음) #}
   <script src="{% static 'js/manual/manual_detail_block.js' %}?v=20260112_attach_01"></script>
 
-  <script>
-    (() => {
-      const subnav = document.getElementById("manualSubnav");
-      if (!subnav) return;
-
-      const links = Array.from(document.querySelectorAll(".jsSubnavLink"));
-      if (!links.length) return;
-
-      function getOffsetTop() {
-        const mainNavH = 70; // base.html padding-top 기준
-        const subNavH = subnav.getBoundingClientRect().height || 0;
-        return mainNavH + subNavH + 10;
-      }
-
-      links.forEach((a) => {
-        a.addEventListener("click", (e) => {
-          const id = a.dataset.target;
-          const target = document.getElementById(id);
-          if (!target) return;
-
-          e.preventDefault();
-          const y = window.scrollY + target.getBoundingClientRect().top - getOffsetTop();
-          window.scrollTo({ top: y, behavior: "smooth" });
-        });
-      });
-
-      const sections = links
-        .map((a) => document.getElementById(a.dataset.target))
-        .filter(Boolean);
-
-      const linkById = new Map(links.map((a) => [a.dataset.target, a]));
-
-      const clearActive = () => links.forEach((a) => a.classList.remove("active"));
-      const setActive = (id) => {
-        clearActive();
-        const a = linkById.get(id);
-        if (a) a.classList.add("active");
-      };
-
-      const io = new IntersectionObserver(
-        (entries) => {
-          const visible = entries
-            .filter((en) => en.isIntersecting)
-            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-
-          if (visible.length) setActive(visible[0].target.id);
-        },
-        {
-          root: null,
-          rootMargin: `-${getOffsetTop()}px 0px -70% 0px`,
-          threshold: [0.1, 0.2, 0.3],
-        }
-      );
-
-      sections.forEach((sec) => io.observe(sec));
-      setActive(sections[0]?.id);
-    })();
-  </script>
 {% endif %}
+
+{# Subnav/GoTop 등 “페이지 공통 동작” 스크립트 분리본 #}
+<script src="{% static 'js/manual/manual_detail_subnav.js' %}?v=20260113_01"></script>
 {% endblock %}

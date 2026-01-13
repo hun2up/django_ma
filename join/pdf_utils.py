@@ -1,4 +1,4 @@
-# join/pdf_utils.py
+# manual/pdf_utils.py
 # -*- coding: utf-8 -*-
 import io
 import os

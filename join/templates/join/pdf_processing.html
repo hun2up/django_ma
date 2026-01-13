@@ -34,10 +34,10 @@
 <script>
   const taskId = "{{ task_id }}";
   const checkStatus = async () => {
-    const res = await fetch(`/join/status/${taskId}/`);
+    const res = await fetch(`/manual/status/${taskId}/`);
     const data = await res.json();
     if (data.status === 'SUCCESS' && data.pdf_ready) {
-      window.location.href = `/join/download/${taskId}/`;
+      window.location.href = `/manual/download/${taskId}/`;
     } else if (data.status === 'FAILURE') {
       alert('PDF 생성에 실패했습니다.');
     } else {
