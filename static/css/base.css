@@ -1556,7 +1556,146 @@ a.manual-item.manual-editing {
 
 
 /* ==========================================================
- 7) PLUGINS / FIXES
+ 7) PAGES / COMMISSION
+========================================================== */
+/* django_ma/static/css/commission/deposit_home.css
+ * Deposit Home (채권현황) 전용 스타일
+ * - 기존 템플릿 inline <style> 제거용
+ * - base.css 공용 스타일은 그대로 두고, 이 파일은 "Deposit 페이지에서만" 필요한 규칙만 포함
+ */
+
+.deposit-maxw { max-width: 1100px; }
+
+.deposit-title { color: #003f7d; }
+.deposit-section-title { color: #000000; }
+
+/* info-table 공통 */
+.info-table thead th {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #5b6b7a;
+  background: #f6f8fb;
+  border-bottom: 1px solid #e6edf5;
+  padding: 10px 12px;
+}
+
+.info-table tbody td {
+  font-size: 1rem;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+/* ===============================
+ * 채권현황(Deposit) - 테이블 스크롤/컬럼 정책
+ * - 테이블 폭이 화면보다 크면 table-responsive에서 가로 스크롤
+ * - 대부분 컬럼: 줄바꿈/말줄임 없음 + min-width로 폭 유지(내용 길면 테이블이 커짐)
+ * - 증권번호/비고: 고정폭 + 줄바꿈 없음 + 말줄임 + 클릭(전체보기)
+ * =============================== */
+
+/* 공통: 테이블을 내용 기준(max-content)으로 유지 → 화면이 좁으면 가로스크롤 */
+#suretyTable,
+#otherTable {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+/* 공통: 기본은 줄바꿈 금지 */
+#suretyTable th, #suretyTable td,
+#otherTable th,  #otherTable td {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: middle;
+}
+
+/* ---------- 보증보험(surety) 컬럼 폭 ---------- */
+/* 1) 상품명 */
+#suretyTable th:nth-child(1),
+#suretyTable td:nth-child(1) { min-width: 110px; }
+
+/* 2) 증권번호: 고정폭 + 말줄임 */
+#suretyTable th:nth-child(2),
+#suretyTable td:nth-child(2) {
+  width: 100px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* 3) 가입금액 */
+#suretyTable th:nth-child(3),
+#suretyTable td:nth-child(3) {
+  width: 100px;
+  min-width: 100px;
+  text-align: right;
+}
+
+/* 4) 상태 */
+#suretyTable th:nth-child(4),
+#suretyTable td:nth-child(4) { min-width: 80px; }
+
+/* 5) 보험가입일 */
+#suretyTable th:nth-child(5),
+#suretyTable td:nth-child(5) { min-width: 110px; }
+
+/* 6) 보험종료일 */
+#suretyTable th:nth-child(6),
+#suretyTable td:nth-child(6) { min-width: 110px; }
+
+/* ---------- 기타채권(other) 컬럼 폭 ---------- */
+/* 1) 상품명 */
+#otherTable th:nth-child(1),
+#otherTable td:nth-child(1) { min-width: 110px; }
+
+/* 2) 보증내용 */
+#otherTable th:nth-child(2),
+#otherTable td:nth-child(2) { min-width: 110px; }
+
+/* 3) 가입금액 */
+#otherTable th:nth-child(3),
+#otherTable td:nth-child(3) {
+  width: 100px;
+  min-width: 100px;
+  text-align: right;
+}
+
+/* 4) 상태 */
+#otherTable th:nth-child(4),
+#otherTable td:nth-child(4) { min-width: 80px; }
+
+/* 5) 채권번호 */
+#otherTable th:nth-child(5),
+#otherTable td:nth-child(5) { min-width: 110px; }
+
+/* 6) 가입일 */
+#otherTable th:nth-child(6),
+#otherTable td:nth-child(6) { min-width: 95px; }
+
+/* 7) 비고: 고정폭 + 말줄임 + 클릭(전체보기) */
+#otherTable th:nth-child(7),
+#otherTable td:nth-child(7) {
+  width: 200px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* ✅ 말줄임 셀 내부 span: 클릭/탭 영역 안정화 */
+.ellipsis-cell {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================
+ 8) PLUGINS / FIXES
 ========================================================== */
 #mainSheet { min-width: 0; }
 

@@ -1171,28 +1171,387 @@ a.manual-item.manual-editing {
   background: #fbfdff;
 }
 
-/* ==========================================================
- 6) PAGES / MANUAL
-========================================================== */
+/* -----------------------------------------
+ 6-A) Manual List (manual_list.html)
+ - Title(좌) + Chips(우) 완전 분리 레이아웃
+ - 칩이 줄바꿈되더라도 "칩 영역 내부"에서만 wrap
+--------------------------------------------*/
 
-/* ✅ manual_detail 페이지를 partner(지점효율)처럼 wide layout 적용 */
-#manual-detail{
-  width: 86vw;
-  max-width: none;
-  margin-left: calc(-43vw + 50%);
+/* page container width */
+.manual-list-container{
+  max-width: 800px;
 }
 
-/* 섹션 카드가 부모 폭을 100% 사용하도록 */
+/* page title */
+.manual-list-title{
+  color:#003f7d;
+}
+
+/* list group styling */
+.manual-list-group{
+  border-radius:14px;
+  overflow:hidden;
+}
+
+/* left block min-width safety */
+.manual-item-left{
+  min-width:0;
+}
+
+/* ✅ Title(좌) + Chips(우) grid */
+.manual-title-row{
+  display: grid;
+  grid-template-columns: max-content 1fr; /* 좌: 타이틀(내용폭), 우: 칩영역 */
+  column-gap: 32px;   /* ✅ 타이틀/칩 영역 사이 공백(원하면 여기 조절) */
+  row-gap: 8px;
+  align-items: start;
+  width: 100%;
+  min-width: 0; /* grid overflow 방지 */
+}
+
+/* left title area */
+.manual-title-col{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;          /* 타이틀 영역은 한 줄 유지 */
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* drag handle */
+.manual-drag-handle{
+  cursor: grab;
+  user-select:none;
+}
+
+/* title text (긴 경우 말줄임) */
+.manual-title-text{
+  /* ✅ 타이틀 컬러를 파란색으로 쓰고 싶으면 아래 주석 해제 */
+  /* color: #005BAC; */
+
+  font-weight: 700;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* edit mode title input */
+.manual-title-input{
+  min-width: 260px;
+  max-width: 520px;
+}
+
+/* access select width helper */
+.manual-access-select-w{
+  width: 140px;
+}
+
+/* ✅ Chips area: right column only wraps */
+.manual-section-chips{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;                 /* 타이틀 아래로 내리던 margin 제거 */
+  min-width: 0;
+  align-content: flex-start;
+}
+
+/* chip style (bold 해제: font-weight 400) */
+.manual-section-chip{
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e9ecef;
+  background: #f8f9fa;
+  color: #333;
+  font-size: 0.85rem;
+  font-weight: 400;  /* ✅ bold 해제 */
+  line-height: 1;
+  max-width: 100%;
+}
+
+/* 우측 액션(삭제 버튼) 영역: 절대 줄바꿈/수축 금지 */
+.manual-item-actions{
+  flex: 0 0 auto;         /* ✅ 수축 금지 */
+  white-space: nowrap;    /* ✅ 내부 줄바꿈 금지 */
+  align-self: flex-start; /* 기존 align-items-start와 자연스럽게 */
+}
+
+/* 삭제 버튼 자체도 줄바꿈 방지 + 최소 폭 확보 */
+.btn-manual-delete{
+  white-space: nowrap;
+  min-width: 56px;        /* 필요하면 60~70으로 조절 */
+}
+
+/* responsive: small screen stacked */
+@media (max-width: 576px){
+  .manual-title-row{
+    grid-template-columns: 1fr;  /* 한 컬럼 */
+    row-gap: 10px;
+  }
+  .manual-title-col{
+    white-space: normal;
+  }
+  .manual-title-text{
+    max-width: 100%;
+  }
+  .manual-title-input{
+    max-width: 100%;
+  }
+  .btn-manual-delete{
+    min-width: 64px;
+  }
+}
+
+/* -------------------------------------------
+ 6-B) Manual Detail (manual_detail.html)
+   - Navbar dropdown이 Subnav에 가려지지 않도록
+   - modal z-index(1055)는 건드리지 않고
+   - dropdown-menu를 subnav보다 위로 
+   -------------------------------------------*/
+.navbar .dropdown-menu{
+  z-index: 1040 !important;
+}
+
+/* ---------- Wide layout (manual_detail) ---------- */
+#manual-detail{
+  width: 72vw;                 /* 기존 값 유지 */
+  max-width: none;
+  margin-left: calc(-36vw + 50%);
+}
 #manual-detail .manual-section{
   width: 100%;
+  position: relative;
 }
 
-/* (선택) 모바일에서는 그냥 100%로 복귀 */
 @media (max-width: 576px){
   #manual-detail{
     width: 100%;
     margin-left: 0;
   }
+}
+
+/* ---------- Title ---------- */
+.manual-detail-title{
+  color: #003f7d;
+}
+
+/* ---------- Section header actions ---------- */
+.sec-card-actions{
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.sec-title-row{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.sec-title{
+  font-weight: 800;
+  color: #003f7d;
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  word-break: break-word;
+}
+.sec-title.empty{
+  color: #6c757d;
+  font-weight: 700;
+}
+.sec-title-actions{
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ---------- Block grid ---------- */
+.manual-block-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 768px){
+  .manual-block-grid{ grid-template-columns: 1fr; }
+}
+
+.manual-block-media{
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  background: #f8f9fa;
+  overflow: hidden;
+  min-height: 120px;
+  max-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manual-block-thumb{
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 320px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.manual-block-text{
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.manual-block-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ---------- Floating Actions (FAB) ---------- */
+.manual-fab{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.manual-fab a,
+.manual-fab button{
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  cursor: pointer;
+}
+.manual-fab img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- Sub Nav (Manual TOC) ---------- */
+.manual-subnav{
+  position: sticky;
+  top: 70px;       /* base.html navbar 높이(대략) */
+  z-index: 1020;   /* dropdown-menu(1040)보다 낮게 */
+  padding: 8px 0 10px;
+  background: transparent;
+}
+
+.manual-subnav .subnav-inner{
+  width: 72vw;
+  margin-left: calc(-36vw + 50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+
+.manual-subnav .subnav-title{
+  font-weight: 800;
+  color: #003f7d;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  padding-left: 4px;
+}
+
+.manual-subnav .subnav-links{
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  flex: 1 1 auto;
+  scrollbar-width: thin;
+}
+
+.manual-subnav .subnav-links::-webkit-scrollbar{ height: 6px; }
+.manual-subnav .subnav-links::-webkit-scrollbar-thumb{
+  background: #d2ddec;
+  border-radius: 10px;
+}
+
+.manual-subnav .subnav-links a{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid #e9ecef;
+  color: #333;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: #f8f9fa;
+  white-space: nowrap;
+}
+.manual-subnav .subnav-links a:hover{
+  border-color: #005BAC;
+  color: #005BAC;
+  background: #fff;
+}
+.manual-subnav .subnav-links a.active{
+  border-color: #005BAC;
+  color: #fff;
+  background: linear-gradient(135deg, #005BAC 0%, #0074D9 100%);
+}
+
+@media (max-width: 576px){
+  .manual-subnav{ top: 70px; }
+  .manual-subnav .subnav-inner{
+    width: 100%;
+    margin-left: 0;
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+}
+
+/* ---------- Modal helper classes ---------- */
+.manual-viewer-img{
+  max-width: 95vw;
+  max-height: 85vh;
+  object-fit: contain;
+}
+
+.manual-block-modal{
+  border-radius: 14px;
+}
+.manual-block-modal-title{
+  color: #003f7d;
+}
+.manual-block-preview-img{
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.manual-quill-editor{
+  height: 320px;
 }
 
 
