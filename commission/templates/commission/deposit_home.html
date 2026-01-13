@@ -7,11 +7,15 @@
 {% block title %}채권관리{% endblock %}
 
 {% block content %}
+<!-- ✅ Deposit Home 전용 CSS (기존 inline <style> 제거) -->
+<link rel="stylesheet" href="{% static 'css/commission/deposit_home.css' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}">
+
 <div class="container mt-5">
-  <div class="mx-auto" style="max-width: 1100px;">
+  <div class="mx-auto deposit-maxw">
     <div
       id="deposit-home"
       class="card shadow p-4 border-0 rounded-4"
+      {# ✅ JS에서 사용하는 dataset URL (기존 그대로 유지) #}
       data-user-detail-url="/commission/api/user-detail/"
       data-deposit-summary-url="/commission/api/deposit-summary/"
       data-deposit-surety-url="{% url 'commission:api_deposit_surety_list' %}"
@@ -19,8 +23,11 @@
       data-reset-url="/commission/deposit/"
       data-support-pdf-url="{% url 'commission:api_support_pdf' %}"
     >
+      <!-----------------------------------------------------------
+         1) 상단 액션바 (대상자검색 / 초기화 / 지원신청서)
+         ----------------------------------------------------------->
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0" style="color:#003f7d;">채권현황</h5>
+        <h5 class="fw-bold mb-0 deposit-title">채권현황</h5>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#searchUserModal">대상자검색</button>
           <button type="button" id="resetUserBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
@@ -28,11 +35,14 @@
         </div>
       </div>
 
-      <!-- ✅ 인적사항 -->
+      <!-----------------------------------------------------------
+         2) 인적사항
+         - data-bind, id 그대로 유지 (JS가 자동 바인딩)
+         ----------------------------------------------------------->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">인적사항</div>
+            <div class="fw-bold deposit-section-title">인적사항</div>
           </div>
 
           <div class="table-responsive">
@@ -49,12 +59,24 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="text-nowrap"><span id="target_emp_id" data-bind="target.id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap fw-semibold"><span id="target_name" data-bind="target.name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_part" data-bind="target.part">{% if target %}{{ target.part|default:"-" }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_branch" data-bind="target.branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_join_date" data-bind="target.join_date_display">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span></td>
-                  <td class="text-nowrap"><span id="target_retire_date" data-bind="target.retire_date_display">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span></td>
+                  <td class="text-nowrap">
+                    <span id="target_emp_id" data-bind="target.id">{% if target %}{{ target.id }}{% else %}-{% endif %}</span>
+                  </td>
+                  <td class="text-nowrap fw-semibold">
+                    <span id="target_name" data-bind="target.name">{% if target %}{{ target.name }}{% else %}-{% endif %}</span>
+                  </td>
+                  <td class="text-nowrap">
+                    <span id="target_part" data-bind="target.part">{% if target %}{{ target.part|default:"-" }}{% else %}-{% endif %}</span>
+                  </td>
+                  <td class="text-nowrap">
+                    <span id="target_branch" data-bind="target.branch">{% if target %}{{ target.branch|default:"-" }}{% else %}-{% endif %}</span>
+                  </td>
+                  <td class="text-nowrap">
+                    <span id="target_join_date" data-bind="target.join_date_display">{% if target %}{{ target.join_date_display }}{% else %}-{% endif %}</span>
+                  </td>
+                  <td class="text-nowrap">
+                    <span id="target_retire_date" data-bind="target.retire_date_display">{% if target %}{{ target.retire_date_display }}{% else %}-{% endif %}</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -62,22 +84,24 @@
         </div>
       </div>
 
-      <!-- ✅ 주요지표 -->
+      <!-----------------------------------------------------------
+         3) 주요지표
+         ----------------------------------------------------------->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">주요지표</div>
+            <div class="fw-bold deposit-section-title">주요지표</div>
           </div>
 
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">최종지급액</th>
-                  <th scope="col" class="text-nowrap">장기총실적</th>
-                  <th scope="col" class="text-nowrap">환수예상</th>
-                  <th scope="col" class="text-nowrap">지급예상</th>
-                  <th scope="col" class="text-nowrap">손생합산통산</th>
+                  <th class="text-nowrap">최종지급액</th>
+                  <th class="text-nowrap">장기총실적</th>
+                  <th class="text-nowrap">환수예상</th>
+                  <th class="text-nowrap">지급예상</th>
+                  <th class="text-nowrap">손생합산통산</th>
                 </tr>
               </thead>
               <tbody>
@@ -96,11 +120,11 @@
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">채권합계</th>
-                  <th scope="col" class="text-nowrap">보증합계</th>
-                  <th scope="col" class="text-nowrap">기타합계</th>
-                  <th scope="col" class="text-nowrap">필요채권</th>
-                  <th scope="col" class="text-nowrap">최종초과금액</th>
+                  <th class="text-nowrap">채권합계</th>
+                  <th class="text-nowrap">보증합계</th>
+                  <th class="text-nowrap">기타합계</th>
+                  <th class="text-nowrap">필요채권</th>
+                  <th class="text-nowrap">최종초과금액</th>
                 </tr>
               </thead>
               <tbody>
@@ -119,11 +143,11 @@
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">1개월전분급</th>
-                  <th scope="col" class="text-nowrap">2개월전분급</th>
-                  <th scope="col" class="text-nowrap">3개월전분급</th>
-                  <th scope="col" class="text-nowrap">당월인정계속분</th>
-                  <th scope="col" class="text-nowrap">전월인정계속분</th>
+                  <th class="text-nowrap">1개월전분급</th>
+                  <th class="text-nowrap">2개월전분급</th>
+                  <th class="text-nowrap">3개월전분급</th>
+                  <th class="text-nowrap">당월인정계속분</th>
+                  <th class="text-nowrap">전월인정계속분</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,21 +164,23 @@
         </div>
       </div>
 
-      {# ✅ 수수료현황 #}
+      <!-----------------------------------------------------------
+         4) 수수료현황
+         ----------------------------------------------------------->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">수수료현황</div>
+            <div class="fw-bold deposit-section-title">수수료현황</div>
           </div>
 
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">환수손보</th>
-                  <th scope="col" class="text-nowrap">환수생보</th>
-                  <th scope="col" class="text-nowrap">지급손보</th>
-                  <th scope="col" class="text-nowrap">지급생보</th>
+                  <th class="text-nowrap">환수손보</th>
+                  <th class="text-nowrap">환수생보</th>
+                  <th class="text-nowrap">지급손보</th>
+                  <th class="text-nowrap">지급생보</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,6 +194,7 @@
             </table>
           </div>
 
+          {# 보증(O/X) 환수/지급 4개 테이블 (기존 id/data-bind 유지) #}
           <div class="row g-3 mb-3">
             <div class="col-12 col-lg-6">
               <div class="table-responsive">
@@ -189,7 +216,7 @@
                 </table>
               </div>
             </div>
-            
+
             <div class="col-12 col-lg-6">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0 info-table">
@@ -258,10 +285,10 @@
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">3개월총수수료</th>
-                  <th scope="col" class="text-nowrap">6개월총수수료</th>
-                  <th scope="col" class="text-nowrap">9개월총수수료</th>
-                  <th scope="col" class="text-nowrap">12개월총수수료</th>
+                  <th class="text-nowrap">3개월총수수료</th>
+                  <th class="text-nowrap">6개월총수수료</th>
+                  <th class="text-nowrap">9개월총수수료</th>
+                  <th class="text-nowrap">12개월총수수료</th>
                 </tr>
               </thead>
               <tbody>
@@ -278,22 +305,23 @@
         </div>
       </div>
 
-      <!-- ✅ 유지율/수금율 -->
+      <!-----------------------------------------------------------
+         5) 유지율/수금율
+         ----------------------------------------------------------->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">유지율/수금율</div>
+            <div class="fw-bold deposit-section-title">유지율/수금율</div>
           </div>
 
-          <!-- ✅ 회차유지율 -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">13회손보회차</th>
-                  <th scope="col" class="text-nowrap">18회손보회차</th>
-                  <th scope="col" class="text-nowrap">13회생보회차</th>
-                  <th scope="col" class="text-nowrap">18회생보회차</th>
+                  <th class="text-nowrap">13회손보회차</th>
+                  <th class="text-nowrap">18회손보회차</th>
+                  <th class="text-nowrap">13회생보회차</th>
+                  <th class="text-nowrap">18회생보회차</th>
                 </tr>
               </thead>
               <tbody>
@@ -307,15 +335,14 @@
             </table>
           </div>
 
-          <!-- ✅ 통산유지율 -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">18회손보통산</th>
-                  <th scope="col" class="text-nowrap">25회손보통산</th>
-                  <th scope="col" class="text-nowrap">18회생보통산</th>
-                  <th scope="col" class="text-nowrap">25회생보통산</th>
+                  <th class="text-nowrap">18회손보통산</th>
+                  <th class="text-nowrap">25회손보통산</th>
+                  <th class="text-nowrap">18회생보통산</th>
+                  <th class="text-nowrap">25회생보통산</th>
                 </tr>
               </thead>
               <tbody>
@@ -329,15 +356,14 @@
             </table>
           </div>
 
-          <!-- ✅ 응당수금율 -->
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">2-6회손보응당</th>
-                  <th scope="col" class="text-nowrap">2-13회손보응당</th>
-                  <th scope="col" class="text-nowrap">2-6회생보응당</th>
-                  <th scope="col" class="text-nowrap">2-13회생보응당</th>
+                  <th class="text-nowrap">2-6회손보응당</th>
+                  <th class="text-nowrap">2-13회손보응당</th>
+                  <th class="text-nowrap">2-6회생보응당</th>
+                  <th class="text-nowrap">2-13회생보응당</th>
                 </tr>
               </thead>
               <tbody>
@@ -354,58 +380,56 @@
         </div>
       </div>
 
-      <!-- ✅ 채권현황 -->
+      <!-----------------------------------------------------------
+         6) 채권현황 상세(보증보험 / 기타채권)
+         - tbody id 유지: suretyTableBody / otherTableBody
+         ----------------------------------------------------------->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">보증보험</div>
+            <div class="fw-bold deposit-section-title">보증보험</div>
           </div>
 
           <div class="table-responsive mb-3">
             <table id="suretyTable" class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">상품명</th>
-                  <th scope="col" class="text-nowrap">증권번호</th>
-                  <th scope="col" class="text-nowrap">가입금액</th>
-                  <th scope="col" class="text-nowrap">상태</th>
-                  <th scope="col" class="text-nowrap">보험가입일</th>
-                  <th scope="col" class="text-nowrap">보험종료일</th>
+                  <th class="text-nowrap">상품명</th>
+                  <th class="text-nowrap">증권번호</th>
+                  <th class="text-nowrap">가입금액</th>
+                  <th class="text-nowrap">상태</th>
+                  <th class="text-nowrap">보험가입일</th>
+                  <th class="text-nowrap">보험종료일</th>
                 </tr>
               </thead>
-
-              {# ✅ JS가 렌더링하는 영역 #}
               <tbody id="suretyTableBody">
                 <tr>
                   <td class="text-nowrap text-center" colspan="5">대상자를 선택하면 보증보험 내역이 표시됩니다.</td>
                 </tr>
               </tbody>
-
             </table>
           </div>
 
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-bold" style="color:#000000;">기타채권</div>
+            <div class="fw-bold deposit-section-title">기타채권</div>
           </div>
 
           <div class="table-responsive">
             <table id="otherTable" class="table table-sm align-middle mb-0 info-table">
               <thead>
                 <tr>
-                  <th scope="col" class="text-nowrap">상품명</th>
-                  <th scope="col" class="text-nowrap">보증내용</th>
-                  <th scope="col" class="text-nowrap">가입금액</th>
-                  <th scope="col" class="text-nowrap">상태</th>
-                  <th scope="col" class="text-nowrap">채권번호</th>
-                  <th scope="col" class="text-nowrap">가입일</th>
-                  <th scope="col" class="text-nowrap">비고</th>
+                  <th class="text-nowrap">상품명</th>
+                  <th class="text-nowrap">보증내용</th>
+                  <th class="text-nowrap">가입금액</th>
+                  <th class="text-nowrap">상태</th>
+                  <th class="text-nowrap">채권번호</th>
+                  <th class="text-nowrap">가입일</th>
+                  <th class="text-nowrap">비고</th>
                 </tr>
               </thead>
               <tbody id="otherTableBody">
                 <tr>
-                  <td class="text-center text-nowrap" colspan="7">
-                    대상자를 선택하면 기타채권 내역이 표시됩니다.
-                  </td>
+                  <td class="text-center text-nowrap" colspan="7">대상자를 선택하면 기타채권 내역이 표시됩니다.</td>
                 </tr>
               </tbody>
             </table>
@@ -413,17 +437,20 @@
 
         </div>
       </div>
+
       {{ block.super }}
     </div>
   </div>
 </div>
 
-<!-- 데이터업로드 카드 -->
+<!-----------------------------------------------------------
+   7) 데이터 업데이트 카드 (엑셀 업로드)
+   ----------------------------------------------------------->
 <div class="container mt-5">
-  <div class="mx-auto" style="max-width: 1100px;">
+  <div class="mx-auto deposit-maxw">
     <div class="card shadow p-4 border-0 rounded-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0" style="color:#003f7d;">데이터 업데이트</h5>
+        <h5 class="fw-bold mb-0 deposit-title">데이터 업데이트</h5>
         <div class="d-flex gap-2 align-items-center">
           <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#excelUploadModal">
             엑셀업로드
@@ -441,16 +468,16 @@
               {% endfor %}
             </tr>
           </thead>
-
           <tbody>
             {% for c in categories %}
               <tr>
                 <td class="text-nowrap fw-semibold">{{ c }}</td>
-
                 {% for p in parts %}
                   <td class="text-nowrap text-center">
                     {% if supported_upload_types and c in supported_upload_types %}
-                      <span class="upload-date" data-upload-date data-upload-type="{{ c }}" data-part="{{ p }}">{{ upload_dates|get_item:c|get_item:p|default:"-" }}</span>
+                      <span class="upload-date" data-upload-date data-upload-type="{{ c }}" data-part="{{ p }}">
+                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
+                      </span>
                     {% else %}
                       <span data-key="{{ c }}" data-part="{{ p }}">
                         {{ upload_dates|get_item:c|get_item:p|default:"-" }}
@@ -458,7 +485,6 @@
                     {% endif %}
                   </td>
                 {% endfor %}
-
               </tr>
             {% endfor %}
           </tbody>
@@ -469,7 +495,9 @@
   </div>
 </div>
 
-<!-- ✅ 엑셀 업로드 모달 -->
+<!-----------------------------------------------------------
+   8) 엑셀 업로드 모달 / 토스트 (기존 그대로)
+   ----------------------------------------------------------->
 <div class="modal fade" id="excelUploadModal" tabindex="-1" aria-labelledby="excelUploadModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4 border-0 shadow">
@@ -525,7 +553,6 @@
   </div>
 </div>
 
-<!-- ✅ 업로드 완료 토스트 -->
 <div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
   <div id="uploadToast" class="toast align-items-center text-bg-success border-0" role="alert">
     <div class="d-flex">
@@ -535,144 +562,9 @@
   </div>
 </div>
 
-<style>
-  .info-table thead th{
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #5b6b7a;
-    background: #f6f8fb;
-    border-bottom: 1px solid #e6edf5;
-    padding: 10px 12px;
-  }
-  .info-table tbody td{
-    font-size: 1rem;
-    padding: 10px 12px;
-    border-bottom: 1px solid #eef2f7;
-  }
-
-  /* ===============================
-  * 채권현황(Deposit) - 테이블 스크롤/컬럼 정책
-  * - 테이블 폭이 화면보다 크면 table-responsive에서 가로 스크롤
-  * - 대부분 컬럼: 줄바꿈/말줄임 없음 + min-width로 폭 유지(내용 길면 테이블이 커짐)
-  * - 증권번호/비고: 고정폭 + 줄바꿈 없음 + 말줄임 + title 툴팁
-  * =============================== */
-
-  /* 공통: 테이블을 내용 기준(max-content)으로 유지 → 화면이 좁으면 가로스크롤 */
-  #suretyTable,
-  #otherTable {
-    width: max-content;
-    min-width: 100%;
-    table-layout: auto; /* 내용 길면 테이블이 커지도록 */
-  }
-
-  /* 공통: 기본은 줄바꿈 금지(말줄임도 기본은 없음) */
-  #suretyTable th, #suretyTable td,
-  #otherTable th,  #otherTable td {
-    white-space: nowrap;
-    word-break: keep-all;
-    overflow: visible;
-    text-overflow: clip;
-    vertical-align: middle;
-  }
-
-  /* ---------- 보증보험(surety) 컬럼 폭 ---------- */
-  /* 1) 상품명 */
-  #suretyTable th:nth-child(1),
-  #suretyTable td:nth-child(1) { min-width: 110px; }
-
-  /* 2) 증권번호: 가입금액과 동일 폭(100px) + 말줄임 + 툴팁용 */
-  #suretyTable th:nth-child(2),
-  #suretyTable td:nth-child(2) {
-    width: 100px;
-    max-width: 100px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* 3) 가입금액 */
-  #suretyTable th:nth-child(3),
-  #suretyTable td:nth-child(3) {
-    width: 100px;
-    min-width: 100px;
-    text-align: right;
-  }
-
-  /* 4) 상태 */
-  #suretyTable th:nth-child(4),
-  #suretyTable td:nth-child(4) { min-width: 80px; }
-
-  /* 5) 보험가입일 */
-  #suretyTable th:nth-child(5),
-  #suretyTable td:nth-child(5) { min-width: 110px; }
-
-  /* 6) 보험종료일 */
-  #suretyTable th:nth-child(6),
-  #suretyTable td:nth-child(6) { min-width: 110px; }
-
-  /* 증권번호 셀 UX(툴팁이 있음을 암시) */
-  #suretyTable td:nth-child(2) {
-    cursor: help;
-  }
-
-  /* ---------- 기타채권(other) 컬럼 폭 ---------- */
-  /* 1) 상품명 */
-  #otherTable th:nth-child(1),
-  #otherTable td:nth-child(1) { min-width: 110px; }
-
-  /* 2) 보증내용 */
-  #otherTable th:nth-child(2),
-  #otherTable td:nth-child(2) { min-width: 110px; }
-
-  /* 3) 가입금액 */
-  #otherTable th:nth-child(3),
-  #otherTable td:nth-child(3) {
-    width: 100px;
-    min-width: 100px;
-    text-align: right;
-  }
-
-  /* 4) 상태 */
-  #otherTable th:nth-child(4),
-  #otherTable td:nth-child(4) { min-width: 80px; }
-
-  /* 5) 채권번호 */
-  #otherTable th:nth-child(5),
-  #otherTable td:nth-child(5) { min-width: 110px; }
-
-  /* 6) 가입일 */
-  #otherTable th:nth-child(6),
-  #otherTable td:nth-child(6) { min-width: 95px; }
-
-  /* 7) 비고: 가입금액의 2배 정도(200px) + 말줄임 + 툴팁 */
-  #otherTable th:nth-child(7),
-  #otherTable td:nth-child(7) {
-    width: 200px;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  #otherTable td:nth-child(7) {
-    cursor: help;
-  }
-
-  /* ✅ 말줄임 셀 내부 span: 툴팁 타겟(클릭/탭 영역 안정화) */
-  .ellipsis-cell {
-    display: block;
-    width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* 툴팁 표시가 가능한 셀임을 UX로 암시 */
-  #suretyTable td:nth-child(2),
-  #otherTable td:nth-child(7) {
-    cursor: pointer; /* help 보다 모바일에서 자연스러움 */
-  }
-</style>
-
+{# ✅ 공용 대상자 검색 모달 #}
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
 
+{# ✅ Deposit Home 전용 JS (기존 파일 유지, 내부만 리팩토링) #}
 <script type="module" src="{% static 'js/commission/deposit_home.js' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"></script>
 {% endblock %}
-
