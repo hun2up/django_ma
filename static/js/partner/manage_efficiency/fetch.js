@@ -1,20 +1,11 @@
 // django_ma/static/js/partner/manage_efficiency/fetch.js
 // =========================================================
-// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL (REFAC)
+// ✅ Efficiency fetch + render (Accordion groups + rows) FINAL
 // - grouped=1 응답(groups + rows 플랫) 지원
 // - group_key(문자열) / group_pk(숫자) 모두 매칭
-// - sub_admin: 그룹삭제 버튼 숨김 + 행삭제 disabled
-// - 그룹삭제/행삭제 이벤트 + 서버 POST + 재조회
+// - sub_admin: 그룹삭제 버튼 숨김 + 행삭제 disabled (UI 레벨)
 // - superuser/main_admin: 각 행 처리일자(date) 수정 가능(즉시 저장)
-// - 아코디언 헤더 내부 버튼 클릭 시 토글 방지(stopPropagation)
-// - ✅ 그룹 헤더 타이틀 리뉴얼:
-//   · "월도/소속 badge" 제거
-//   · 일반 텍스트로 "요청일자 / 소속" 표기 (예: 2026-01-06 / 프로사업단총괄 다미본부)
-//   · 작은 텍스트로 "건수 / 합계금액" 표기 (예: 1건 / 666,666원)
-// - ✅ 헤더 UI 리팩토링:
-//   · 토글 아이콘(▼) 좌측 고정 (CSS에서 ::after left)
-//   · 헤더 스크롤 인디케이터 방지: 버튼 자체 overflow hidden, 내부만 scroll
-//   · 좌(토글) + 우(확인서박스) 2컬럼
+// - ❗삭제 로직은 delete.js로 완전 분리(중복/충돌 방지)
 // =========================================================
 
 import { els } from "./dom_refs.js";
@@ -75,7 +66,7 @@ function isSubAdmin() {
 }
 
 /**
- * ✅ dataset key들은 “여러 후보를 OR”로 흡수
+ * dataset key들은 여러 후보를 OR로 흡수
  */
 function dsPick(root, keys) {
   for (const k of keys) {
@@ -88,14 +79,6 @@ function dsPick(root, keys) {
 function getFetchUrl() {
   const root = getRoot();
   return dsPick(root, ["fetchUrl", "dataFetchUrl", "dataFetch", "dataDataFetchUrl"]);
-}
-function getDeleteRowUrl() {
-  const root = getRoot();
-  return dsPick(root, ["deleteRowUrl", "dataDeleteRowUrl", "dataDeleteRow", "dataDataDeleteRowUrl"]);
-}
-function getDeleteGroupUrl() {
-  const root = getRoot();
-  return dsPick(root, ["deleteGroupUrl", "dataDeleteGroupUrl", "dataDeleteGroup", "dataDataDeleteGroupUrl"]);
 }
 function getUpdateProcessDateUrl() {
   const root = getRoot();
@@ -180,7 +163,7 @@ function applyMainColWidths(root, table) {
 function normalizeGroupTitle(rawTitle, fallbackMonth, fallbackBranch) {
   const title = str(rawTitle);
 
-  // 기존: ".... - ...." 형식이면 마지막 토큰만 사용
+  // ".... - ...." 형식이면 마지막 토큰만 사용
   if (title && title.includes(" - ")) {
     const parts = title
       .split(" - ")
@@ -328,7 +311,7 @@ function renderProcessDateCell(r) {
 }
 
 /* -------------------------
-   Events (delegation) bind once
+   Events (process_date only) bind once
 -------------------------- */
 function bindHandlersOnce() {
   const acc = getGroupsContainer();
@@ -336,103 +319,6 @@ function bindHandlersOnce() {
 
   if (acc.dataset.boundHandlers === "1") return;
   acc.dataset.boundHandlers = "1";
-
-  // ✅ 헤더 내부 버튼 클릭은 토글 방지(캡처링)
-  acc.addEventListener(
-    "click",
-    (e) => {
-      const btn = e.target.closest(".js-confirm-view, .js-confirm-download, .js-confirm-delete");
-      if (!btn) return;
-      e.stopPropagation();
-    },
-    true
-  );
-
-  // ✅ delete-row / delete-group
-  acc.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-action]");
-    if (!btn) return;
-
-    const action = str(btn.dataset.action);
-
-    // 행 삭제
-    if (action === "delete-row") {
-      const url = getDeleteRowUrl();
-      if (!url) return alertBox("행삭제 URL이 없습니다. (data-delete-row-url 확인)");
-
-      const rowId = str(btn.dataset.rowId);
-      if (!rowId) return alertBox("row_id가 없습니다.");
-      if (!confirm("해당 행을 삭제할까요?")) return;
-
-      showLoading("행 삭제 중...");
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCSRFToken(),
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: JSON.stringify({ id: rowId }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.status !== "success") {
-          throw new Error(data.message || `삭제 실패(${res.status})`);
-        }
-
-        if (window.__lastEfficiencyYM && window.__lastEfficiencyBranch) {
-          await fetchData(window.__lastEfficiencyYM, window.__lastEfficiencyBranch);
-        }
-      } catch (err) {
-        console.error("❌ delete-row error:", err);
-        alertBox(err?.message || "행 삭제 중 오류가 발생했습니다.");
-      } finally {
-        hideLoading();
-      }
-      return;
-    }
-
-    // 그룹 삭제 (sub_admin 금지)
-    if (action === "delete-group") {
-      if (isSubAdmin()) return;
-
-      const url = getDeleteGroupUrl();
-      if (!url) return alertBox("그룹삭제 URL이 없습니다. (data-delete-group-url 확인)");
-
-      const groupId = str(btn.dataset.groupId);
-      if (!groupId) return alertBox("group_id가 없습니다.");
-
-      if (!confirm("해당 그룹을 삭제할까요?\n(그룹 내 저장된 행 + 확인서도 함께 삭제됩니다)")) return;
-
-      showLoading("그룹 삭제 중...");
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCSRFToken(),
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: JSON.stringify({ group_id: groupId }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.status !== "success") {
-          throw new Error(data.message || `삭제 실패(${res.status})`);
-        }
-
-        if (window.__lastEfficiencyYM && window.__lastEfficiencyBranch) {
-          await fetchData(window.__lastEfficiencyYM, window.__lastEfficiencyBranch);
-        }
-      } catch (err) {
-        console.error("❌ delete-group error:", err);
-        alertBox(err?.message || "그룹 삭제 중 오류가 발생했습니다.");
-      } finally {
-        hideLoading();
-      }
-    }
-  });
 
   // ✅ process_date update (admin only)
   acc.addEventListener("change", async (e) => {
@@ -548,6 +434,7 @@ function renderGroups(groups, rowsByGroup) {
           </button>
         `;
 
+      // ✅ 삭제버튼은 delete.js가 처리 (여기서는 UI만 렌더)
       const deleteGroupBtnHtml = canDeleteGroup
         ? `
           <button type="button"
@@ -648,7 +535,7 @@ function renderGroups(groups, rowsByGroup) {
           </div>
         `;
 
-      // ✅ 핵심: 헤더 구조 리팩토링 (좌 토글 / 우 확인서)
+      // ✅ 헤더 구조 (좌 토글 / 우 확인서)
       return `
         <div class="accordion-item">
           <h2 class="accordion-header" id="${headingId}">
@@ -661,7 +548,6 @@ function renderGroups(groups, rowsByGroup) {
                       aria-expanded="false"
                       aria-controls="${collapseId}">
 
-                <!-- 헤더 텍스트는 여기에서만 scroll (스크롤바 숨김은 CSS) -->
                 <div class="eff-group-scroll">
                   <div class="eff-group-meta">
                     <span class="eff-group-title">${headerMain}</span>
@@ -717,16 +603,13 @@ export async function fetchData(ym, branch) {
   const br = str(branch);
   if (!month || !br) return;
 
-  // ✅ 재조회 캐시
+  // ✅ 재조회 캐시(삭제 후 refresh에서도 사용)
   window.__lastEfficiencyYM = month;
   window.__lastEfficiencyBranch = br;
 
   showLoading("조회 중...");
   try {
-    const fullUrl = `${url}?month=${encodeURIComponent(month)}&branch=${encodeURIComponent(
-      br
-    )}&grouped=1`;
-
+    const fullUrl = `${url}?month=${encodeURIComponent(month)}&branch=${encodeURIComponent(br)}&grouped=1`;
     log("fetch ->", fullUrl);
 
     const res = await fetch(fullUrl, {
@@ -744,7 +627,7 @@ export async function fetchData(ym, branch) {
     const rowsByGroup = buildRowsByGroup(rows);
     renderGroups(groups, rowsByGroup);
 
-    // ✅ 이벤트 1회 바인딩
+    // ✅ 이벤트 1회 바인딩(process_date)
     bindHandlersOnce();
   } catch (e) {
     console.error("❌ efficiency fetchData error:", e);

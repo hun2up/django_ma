@@ -18,13 +18,17 @@ Including another URLconf
 # django_ma > web_ma > urls.py
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path, include
+from django.contrib.auth.decorators import login_required
+from django.urls import path, include, re_path
+from django.views.static import serve
 from accounts.custom_admin import custom_admin_site
 from home import views as home_views  # 메인 페이지 뷰
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from accounts.views import SessionCloseLoginView
+
+
 
 def home_redirect(request):
     """홈(/) 접속 시 게시판으로 리다이렉트"""
@@ -47,6 +51,9 @@ urlpatterns = [
     # path("ckeditor/", include("ckeditor_uploader.urls")),
 ]
 
-# 개발 모드(DEBUG=True)에서만 업로드 파일 서빙
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# 운영에서도 서빙
+urlpatterns += [
+    re_path(r"^media/(?P<path>.*)$",
+            login_required(serve),
+            {"document_root": settings.MEDIA_ROOT}),
+]

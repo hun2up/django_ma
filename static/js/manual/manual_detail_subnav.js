@@ -1,9 +1,11 @@
-/**
- * manual_detail_subnav.js
- * - 섹션 목차(Subnav) 클릭 시 “헤더 + subnav 높이”를 고려한 부드러운 스크롤
- * - 스크롤 위치에 따라 활성 링크(active) 자동 처리
- * - (옵션) TOP 버튼 동작(있으면)
- */
+// django_ma/static/js/manual/manual_detail_subnav.js
+// -----------------------------------------------------------------------------
+// Manual Detail Subnav (FINAL - Refactor)
+// - subnav 클릭 시 헤더+subnav 높이를 고려한 부드러운 스크롤
+// - IntersectionObserver로 active 링크 자동 처리
+// - (옵션) TOP 버튼이 있으면 동작
+// -----------------------------------------------------------------------------
+
 (() => {
   const subnav = document.getElementById("manualSubnav");
   if (!subnav) return;
@@ -14,10 +16,10 @@
   // base.html navbar 높이(대략). 프로젝트에서 값이 달라지면 여기만 수정하면 됨.
   const MAIN_NAV_H = 70;
 
-  const getOffsetTop = () => {
+  function getOffsetTop() {
     const subNavH = subnav.getBoundingClientRect().height || 0;
     return MAIN_NAV_H + subNavH + 10;
-  };
+  }
 
   // ---------- smooth scroll on click ----------
   links.forEach((a) => {
@@ -33,9 +35,8 @@
   });
 
   // ---------- active link by intersection observer ----------
-  const sections = links
-    .map((a) => document.getElementById(a.dataset.target))
-    .filter(Boolean);
+  const sections = links.map((a) => document.getElementById(a.dataset.target)).filter(Boolean);
+  if (!sections.length) return;
 
   const linkById = new Map(links.map((a) => [a.dataset.target, a]));
 

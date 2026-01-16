@@ -1,9 +1,8 @@
 // django_ma/static/js/manual/manual_list_boot.js
-// --------------------------------------------------
-// Manual List Boot Loader
-// - 템플릿에서 내려준 dataset(URL) → window.ManualListBoot로 매핑
-// - inline script 제거 목적
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
+// Manual List Boot Loader (FINAL)
+// - 템플릿 dataset(URL) -> window.ManualListBoot로 매핑
+// -----------------------------------------------------------------------------
 
 (() => {
   const el = document.getElementById("manualListBoot");

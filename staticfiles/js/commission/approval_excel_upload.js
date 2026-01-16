@@ -1,96 +1,136 @@
 // django_ma/static/js/commission/approval_excel_upload.js
 (() => {
+  "use strict";
+
   const form = document.getElementById("approvalExcelUploadForm");
+  if (!form) return;
+
   const resultEl = document.getElementById("approvalUploadResult");
   const toastEl = document.getElementById("approvalUploadToast");
   const modalEl = document.getElementById("approvalExcelUploadModal");
 
-  if (!form || !resultEl) return;
-  if (form.dataset.bound === "1") return;
-  form.dataset.bound = "1";
-
-  const submitBtn = form.querySelector('button[type="submit"]');
+  // ===== utils =====
+  const $ = (sel, root = document) => root.querySelector(sel);
 
   const getCSRFToken = () => {
     const inp = form.querySelector('input[name="csrfmiddlewaretoken"]');
     return inp ? inp.value : "";
   };
 
-  const setResult = (msg, kind = "muted") => {
-    resultEl.textContent = msg || "";
-    resultEl.className = `mt-3 small text-center text-${kind}`;
-  };
-
   const setSubmitting = (on) => {
     form.dataset.submitting = on ? "1" : "0";
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = on;
+  };
 
-    // form 내 모든 input/select/file disable
-    const fields = form.querySelectorAll("input, select, button");
-    fields.forEach((el) => {
-      // 취소 버튼은 막지 않아도 되지만, 업로드 중 모달 닫기 방지 원하면 disable 유지 가능
-      if (el === submitBtn) return;
-      el.disabled = !!on;
-    });
-
-    if (submitBtn) {
-      submitBtn.disabled = !!on;
-      submitBtn.textContent = on ? "업로드 중..." : "업로드";
-    }
+  const showResult = (msg, type = "muted") => {
+    if (!resultEl) return;
+    resultEl.textContent = msg;
+    resultEl.className = `mt-3 small text-center text-${type}`;
   };
 
   const showToast = () => {
     if (!toastEl || !window.bootstrap) return;
-    try {
-      const toast = new bootstrap.Toast(toastEl, { delay: 1800 });
-      toast.show();
-    } catch (_) {}
+    const toast = new bootstrap.Toast(toastEl, { delay: 1800 });
+    toast.show();
   };
 
   const closeModal = () => {
     if (!modalEl || !window.bootstrap) return;
-    try {
-      const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-      inst.hide();
-    } catch (_) {}
+    const inst =
+      bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    inst.hide();
   };
 
-  const safeJson = async (res) => {
-    try {
-      return await res.json();
-    } catch (_) {
-      return null;
+  const readSelectValue = (selectorList) => {
+    for (const sel of selectorList) {
+      const el = $(sel, form) || $(sel);
+      if (!el) continue;
+      const v = (el.value ?? "").toString().trim();
+      if (v) return v;
     }
+    return "";
   };
 
-  const formatServerError = (data) => {
-    if (!data) return "업로드 실패";
-
-    let msg = data.message || "업로드 실패";
-
-    // 컬럼 진단(views.py에서 detected_columns 내려주는 케이스)
-    if (Array.isArray(data.detected_columns) && data.detected_columns.length) {
-      const cols = data.detected_columns.slice(0, 25).join(", ");
-      msg += `\n(감지된 컬럼 일부: ${cols}${data.detected_columns.length > 25 ? "..." : ""})`;
+  const readFileInput = (selectorList) => {
+    for (const sel of selectorList) {
+      const el = $(sel, form) || $(sel);
+      if (!el) continue;
+      if (el.files && el.files.length > 0) return el;
     }
-
-    // 미매칭 샘플
-    if (Array.isArray(data.missing_sample) && data.missing_sample.length) {
-      msg += `\n(미매칭 사번 예시: ${data.missing_sample.slice(0, 10).join(", ")}${
-        data.missing_sample.length > 10 ? "..." : ""
-      })`;
-    }
-
-    return msg;
+    return null;
   };
 
+  const validate = ({ year, month, kind, fileEl }) => {
+    if (!year) return { ok: false, msg: "연도를 선택해주세요." };
+    if (!month) return { ok: false, msg: "월도를 선택해주세요." };
+    // ✅ part는 '전체' 업로드도 가능하므로 필수 체크 제거
+    if (!kind) return { ok: false, msg: "구분을 선택해주세요." };
+    if (!fileEl) return { ok: false, msg: "엑셀 파일을 선택해주세요." };
+
+    const file = fileEl.files[0];
+    const name = (file?.name || "").toLowerCase();
+
+    const okExt = name.endsWith(".xlsx") || name.endsWith(".xls");
+    if (!okExt) {
+      return { ok: false, msg: "엑셀 파일(.xlsx / .xls)만 업로드할 수 있습니다." };
+    }
+    return { ok: true, msg: "" };
+  };
+
+
+  const buildSuccessMessage = (data) => {
+    const ym = data?.ym ? String(data.ym) : "-";
+    const kind = data?.kind ? String(data.kind) : "-";
+    const rowCount = typeof data?.row_count === "number" ? data.row_count : null;
+    const inserted = typeof data?.inserted === "number" ? data.inserted : null;
+
+    const parts = [`✅ 완료 (${ym} / ${kind})`];
+    if (rowCount !== null) parts.push(`rows: ${rowCount}`);
+    if (inserted !== null) parts.push(`반영: ${inserted}`);
+    return parts.join(" · ");
+  };
+
+  // ===== main submit handler =====
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (form.dataset.submitting === "1") return;
 
-    setSubmitting(true);
-    setResult("업로드 중...", "muted");
+    // (중요) 템플릿 id/name이 바뀌어도 최대한 살아남게 selector 여러 개 지원
+    const year = readSelectValue(['select[name="year"]', "#year", "#approvalYear"]);
+    const month = readSelectValue(['select[name="month"]', "#month", "#approvalMonth"]);
+    const part = readSelectValue(['select[name="part"]', "#part", "#approvalPart"]);
+    const kind = readSelectValue(['select[name="kind"]', "#kind", "#approvalKind"]);
 
+    const fileEl = readFileInput([
+      'input[type="file"][name="excel_file"]',
+      'input[type="file"][name="file"]',
+      'input[type="file"]#excel_file',
+      'input[type="file"]#approvalExcelFile',
+      'input[type="file"]',
+    ]);
+
+    const v = validate({ year, month, part, kind, fileEl });
+    if (!v.ok) {
+      showResult(v.msg, "danger");
+      return;
+    }
+
+    setSubmitting(true);
+    showResult("업로드 중...", "muted");
+
+    // ✅ FormData 구성 + 값 강제 set (name 누락/폼 밖 배치/브라우저 이슈 대비)
     const fd = new FormData(form);
+    fd.set("year", year);
+    fd.set("month", month);
+    fd.set("part", part);
+    fd.set("kind", kind);
+
+    // 파일 name이 다른 경우도 대비해서 excel_file 키로 통일(서버가 excel_file 기대 시)
+    // 이미 excel_file로 들어있다면 그대로고, 아니면 강제로 추가
+    if (!fd.get("excel_file") && fileEl?.files?.[0]) {
+      fd.set("excel_file", fileEl.files[0]);
+    }
 
     try {
       const res = await fetch(form.action, {
@@ -99,34 +139,26 @@
         body: fd,
       });
 
-      const data = await safeJson(res);
+      const data = await res.json().catch(() => null);
 
       if (!res.ok || !data || data.ok !== true) {
-        const msg = formatServerError(data);
-        // 줄바꿈 표현을 위해 textContent 사용(HTML X)
-        setResult(msg, "danger");
+        const msg =
+          (data && data.message) ? data.message : `업로드 실패 (HTTP ${res.status})`;
+        showResult(msg, "danger");
         return;
       }
 
-      // ✅ 성공 메시지 표준화
-      const ym = data.ym || "-";
-      const kind = data.kind || "-";
-      const rows = typeof data.row_count === "number" ? data.row_count : (data.uploaded ?? "-");
-      const info = `✅ 완료 (${ym} / ${kind}) · 반영: ${rows}건`;
-
-      setResult(info, "success");
+      showResult(buildSuccessMessage(data), "success");
       showToast();
 
-      // ✅ 모달 닫기 + 페이지 갱신(성공한 데이터 표시)
-      //  - 지연을 주는 이유: 토스트/메시지를 잠깐 보여주기 위함
+      // ✅ 모달 닫고, 쿼리스트링 유지한 채 새로고침
       setTimeout(() => {
         closeModal();
-        // 필요한 경우: 업로드 결과 테이블 즉시 갱신
         window.location.reload();
-      }, 500);
+      }, 600);
 
     } catch (err) {
-      setResult("⚠️ 네트워크 오류로 업로드에 실패했습니다.", "danger");
+      showResult("⚠️ 네트워크 오류로 업로드에 실패했습니다.", "danger");
     } finally {
       setSubmitting(false);
     }

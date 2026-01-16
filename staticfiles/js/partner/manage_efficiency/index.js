@@ -15,6 +15,7 @@ import { initInputRowEvents } from "./input_rows.js";
 import { fetchData } from "./fetch.js";
 import { initManageBoot } from "../../common/manage_boot.js";
 import { initConfirmUploadHandlers } from "./confirm_upload.js";
+import { attachEfficiencyDeleteHandlers } from "./delete.js";
 
 // ---------------------------------------------------------
 // Debug
@@ -135,6 +136,8 @@ onReady(() => {
     return;
   }
   if (!ensureInitedOnce(root)) return;
+
+  attachEfficiencyDeleteHandlers();
 
   // 1) ManageBoot 연동(실패해도 동작)
   let ctx = {};
