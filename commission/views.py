@@ -6,23 +6,27 @@ import re
 import datetime
 import pandas as pd
 
+from openpyxl import Workbook
+from openpyxl.styles import numbers
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html.parser import HTMLParser
 from xml.sax.saxutils import escape
+from urllib.parse import quote
 
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 from django.db import transaction
-from django.db.models import Q, Sum, Min, Max
+from django.db.models import Q, Sum, Min, Max, Case, When, Value, IntegerField
 from django.core.files.storage import FileSystemStorage
 from django.utils import timezone
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepInFrame
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepInFrame, Preformatted
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -30,7 +34,8 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 
-from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOther, ApprovalExcelUploadLog, CommissionApprovalPending, ApprovalPending
+from .models import DepositSummary, DepositUploadLog, DepositSurety, DepositOther, ApprovalExcelUploadLog, ApprovalPending, EfficiencyPayExcess
+
 
 
 # =========================================================
@@ -44,6 +49,7 @@ SUPPORTED_UPLOAD_TYPES = {"최종지급액", "환수지급예상", "보증증액
 # 통산손보(소수) 저장 시 기본 소수자리 (프론트 toFixed(2) 기준)
 DEC2 = Decimal("0.00")
 
+EXCESS_THRESHOLD = 10_000_000
 
 # =========================================================
 # JSON helpers
@@ -64,6 +70,21 @@ def _json_ok(message=None, **extra):
         payload["message"] = message
     payload.update(extra)
     return JsonResponse(payload)
+
+
+def _set_attachment_filename(resp: HttpResponse, filename: str):
+    """
+    한글 파일명도 안정적으로 저장되도록
+    filename + filename* (RFC5987) 동시 세팅
+    """
+    # Windows/구형 클라이언트 대비 ASCII fallback
+    ascii_fallback = re.sub(r"[^\x20-\x7E]", "_", filename)  # 비-ASCII는 _
+    quoted = quote(filename)
+
+    resp["Content-Disposition"] = (
+        f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{quoted}'
+    )
+    return resp
 
 
 # =========================================================
@@ -1886,93 +1907,101 @@ def api_support_pdf(request):
     # =========================
     # 세부내용(표 우측셀에 들어갈 "문장들" 묶음) — 표 추가 금지!
     # =========================
-    detail_flow = []
+    NBSP = "\u00A0"  # non-breaking space
+    IND1 = NBSP * 0  # 들여쓰기 정도는 취향대로 조절
+    IND2 = NBSP * 3
+    IND3 = NBSP * 6
 
-    detail_flow.append(Paragraph("- 아     래 -", base))
-    detail_flow.append(Spacer(1, 6))
+    lines = []
+    lines.append(f"{IND3}{IND3}{IND3}- 아     래 -")
+    lines.append("")  # 빈 줄
 
-    if retire_disp:  # ✅ 퇴사자
-        detail_flow.append(
-            Paragraph(
-                f"가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} ~ {retire_disp})",
-                ind1
-            )
-        )
-    else:  # ✅ 재직자
-        detail_flow.append(
-            Paragraph(
-                f"가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} 입사)",
-                ind1
-            )
-        )
-    detail_flow.append(Spacer(1, 6))
+    # 가. 대상
+    if retire_disp:
+        lines.append(f"{IND1}가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} ~ {retire_disp})")
+    else:
+        lines.append(f"{IND1}가. 대상: {part} {branch} {state} {name} ({user_id}, {join_disp} 입사)")
+    lines.append("")
 
-    detail_flow.append(Paragraph(request_text, ind1))
-    detail_flow.append(Spacer(1, 6))
+    # 나. 요청사항
+    # request_text는 Paragraph용 마크업(<font ...>)이 섞여 있으니
+    # Preformatted용 “순수 텍스트” 버전을 하나 더 만드는 게 좋습니다.
+    req_plain = f"{IND1}나. 요청사항 : "  # Preformatted용 텍스트(태그X)
 
-    # 다. 채권현황 (표 없이 텍스트만)
-    detail_flow.append(Paragraph("다. 채권현황", ind1))
+    lines.append(req_plain)   # ✅ append는 1개만
+    lines.append("") 
 
-    # 1) 보증보험: 합계 + (기간) + 리스트(유지건)
+    # 다. 채권현황
+    lines.append(f"{IND1}다. 채권현황")
+
+    # 1. 보증보험
     if surety_obj:
-        detail_flow.append(
-            Paragraph(
-                f"1. 보증보험: {_fmt_money(surety_total)}원 ({surety_period_text})",
-                ind2
-            )
-        )
+        lines.append(f"{IND2}1. 보증보험: {_fmt_money(surety_total)}원 ({surety_period_text})")
     else:
-        detail_flow.append(Paragraph("1. 보증보험: 해당없음", ind2))
+        lines.append(f"{IND2}1. 보증보험: 해당없음")
 
-    # 2) 기타채권: 합계 + 리스트(유지건)
+    # 2. 기타채권
     if others.exists():
-        detail_flow.append(Paragraph(f"2. 기타채권 : {_fmt_money(other_total)}원", ind2))
+        lines.append(f"{IND2}2. 기타채권 : {_fmt_money(other_total)}원")
         for o in others:
-            # 양식: {상품명}({채권번호}) : {가입금액}원
-            bond_no_clean = (o.bond_no or "").replace(",", "")  # ✅ 콤마 제거
-            bond = f"{o.product_name or ''}({bond_no_clean})"
-            detail_flow.append(Paragraph(f"• {bond} : {_fmt_money(o.amount)}원", ind2))
+            # 예시 포맷(원하는 대로)
+            lines.append(f"{IND3}- {o.product_name}({o.bond_no}) : {_fmt_money(o.amount)}원")
     else:
-        detail_flow.append(Paragraph("2. 기타채권 : 해당없음", ind2))
+        lines.append(f"{IND2}2. 기타채권 : 해당없음")
 
-    detail_flow.append(Spacer(1, 6))
+    lines.append("")
+    
+    # 라. 수수료현황
+    lines.append(f"{IND1}라. 수수료현황")
 
-    # 라. 수수료현황 (표 없이 텍스트만)
-    detail_flow.append(Paragraph("라. 수수료현황", ind1))
-    detail_flow.append(Paragraph(f"1. 최종지급액: {_fmt_money(gi('final_payment', 0))}원", ind2))
-    detail_flow.append(Paragraph("2. 환수지급예상수수료", ind2))
-    detail_flow.append(Paragraph(f"- 환수예상수수료: {_fmt_money(gi('refund_expected', 0))}원", ind2))
-    detail_flow.append(Paragraph(f"- 지급예상수수료: {_fmt_money(gi('pay_expected', 0))}원", ind2))
-    detail_flow.append(Paragraph(f"3. 직전3개월장기총수수료: {_fmt_money(gi('comm_3m', 0))}원", ind2))
+    # 1. 최종지급액
+    lines.append(f"{IND2}1. 최종지급액: {_fmt_money(gi('final_payment', 0))}원")
+    
+    # 2. 환수지급예상수수료
+    lines.append(f"{IND2}2. 환수지급예상수수료")
+    lines.append(f"{IND3}- 환수예상수수료: {_fmt_money(gi('refund_expected', 0))}원")
+    lines.append(f"{IND3}- 지급예상수수료: {_fmt_money(gi('pay_expected', 0))}원")
+    
+    # 3. 직전3개월장기총수수료
+    lines.append(f"{IND2}3. 직전3개월장기총수수료: {_fmt_money(gi('comm_3m', 0))}원")
 
-    detail_flow.append(Spacer(1, 6))
+    lines.append("")
 
-    # 마. 유지율/수금율현황 (표 없이 텍스트만)
-    detail_flow.append(Paragraph("마. 유지율/수금율현황", ind1))
-    detail_flow.append(Paragraph("1. 통산유지율 (25회통산)", ind2))
-    detail_flow.append(Paragraph(f"- 생보: {gd('ls_25_total', '0.00')}%", ind2))
-    detail_flow.append(Paragraph(f"- 손보: {gd('ns_25_total', '0.00')}%", ind2))
-    detail_flow.append(Paragraph("2. 응당수금율 (2-13회)", ind2))
-    detail_flow.append(Paragraph(f"- 생보: {gd('ls_2_13_due', '0.00')}%", ind2))
-    detail_flow.append(Paragraph(f"- 손보: {gd('ns_2_13_due', '0.00')}%", ind2))
+    # 마 . 유지율/수금율현황
+    lines.append(f"{IND1}라. 유지율/수금율현황")
 
-    detail_flow.append(Spacer(1, 6))
+    # 1. 통산유지율 (25회통산)
+    lines.append(f"{IND2}1. 통산유지율 (25회통산)")
+    lines.append(f"{IND3}- 생보: {gd('ls_25_total', '0.00')}%")
+    lines.append(f"{IND3}- 손보: {gd('ns_25_total', '0.00')}%")
 
-    # 바. 첨부 (텍스트만)
-    detail_flow.append(Paragraph("바. 첨부", ind1))
-    detail_flow.append(Paragraph(f"• {branch} 업무요청서 1부.", ind2))
-    detail_flow.append(Paragraph(f"• {name} FA 지표현황 1부.", ind2))
+    # 2. 응당수금율 (2-13회)
+    lines.append(f"{IND2}2. 응당수금율 (2-13회)")
+    lines.append(f"{IND3}- 생보: {gd('ls_2_13_due', '0.00')}%")
+    lines.append(f"{IND3}- 손보: {gd('ns_2_13_due', '0.00')}%")
 
-    detail_flow.append(Spacer(1, 6))
-    detail_flow.append(Paragraph("끝.", base))
+    lines.append("")
+
+    # 바. 첨부
+    lines.append(f"{IND1}바. 첨부")
+    lines.append(f"{IND2}- {branch} 업무요청서 1부.")
+    lines.append(f"{IND2}- {name} FA 지표현황 1부.")
+
+    lines.append("")
+    lines.append("")
+    
+    lines.append(f"{IND2}끝.")
+
+    detail_text = "\n".join(lines)
+    detail_block = Preformatted(detail_text, base)
 
     # 테이블 셀에 넣을 때 넘침 방지 (A4 안에서 최대한 맞추기)
-    detail_cell = KeepInFrame(155 * mm, 240 * mm, detail_flow, mode="shrink")
+    detail_cell = KeepInFrame(155 * mm, 240 * mm, [detail_block], mode="shrink")
 
     # =========================
     # 0) 상단 요약 테이블(제목 + 주요내용)
     # =========================
-    summary_rows = [
+    summary_rows = [    
         [Paragraph("제목", base), Paragraph(title_one_line, base)],
         [Paragraph("주요내용", base), Paragraph(main_text, base)],
         [Paragraph("지원기간", base), Paragraph(f"{current_month_disp} 자금지급일", base)],
@@ -2091,13 +2120,55 @@ def approval_home(request):
 
     ym = f"{selected_year}-{_pad2(selected_month)}"
 
-    pending_qs = ApprovalPending.objects.select_related("user").filter(ym=ym)
+    # ✅ 최신 업로드 일시(각 테이블 좌측 상단 표시용)
+    def _latest_upload(kind: str):
+        qs = ApprovalExcelUploadLog.objects.filter(ym=ym, kind=kind)
 
-    # 부서 필터(“전체”면 패스)
+        # ✅ 부서를 선택했으면 그 부서 업로드 기준으로 표시
+        # (부서 미선택이면 전체 중 최신)
+        if selected_part:
+            qs = qs.filter(part=selected_part)
+
+        # 최신 업로드시각 + 파일명까지 같이 뽑기
+        last = qs.order_by("-uploaded_at").values("uploaded_at", "file_name").first()
+        if not last or not last.get("uploaded_at"):
+            return {"dt": "-", "file": ""}
+
+        dt = timezone.localtime(last["uploaded_at"]).strftime("%Y-%m-%d %H:%M:%S")
+        return {"dt": dt, "file": last.get("file_name") or ""}
+
+    latest_approval = _latest_upload("approval")
+    latest_efficiency = _latest_upload("efficiency")
+
+    # ✅ 수수료 미결현황 (기존)
+    pending_qs = ApprovalPending.objects.select_related("user").filter(ym=ym)
     if selected_part:
         pending_qs = pending_qs.filter(user__part=selected_part)
-
+    pending_qs = pending_qs.filter(user__regist__in=["생보등록", "손보등록", "손생등록"])
+    pending_qs = pending_qs.annotate(
+        _status_order=Case(
+            When(user__status="재직", then=Value(0)),
+            When(user__status="퇴사", then=Value(1)),
+            default=Value(9),
+            output_field=IntegerField(),
+        )
+    ).order_by("_status_order", "user__branch")
     pending_rows = list(pending_qs)
+
+    # ✅ 지점효율지급 초과현황 (추가)
+    eff_qs = EfficiencyPayExcess.objects.select_related("user").filter(ym=ym, pay_amount_sum__gt=EXCESS_THRESHOLD)
+    if selected_part:
+        eff_qs = eff_qs.filter(user__part=selected_part)
+    eff_qs = eff_qs.filter(user__regist__in=["생보등록", "손보등록", "손생등록"])
+    eff_qs = eff_qs.annotate(
+        _status_order=Case(
+            When(user__status="재직", then=Value(0)),
+            When(user__status="퇴사", then=Value(1)),
+            default=Value(9),
+            output_field=IntegerField(),
+        )
+    ).order_by("user__branch", "-pay_amount_sum")
+    efficiency_rows = list(eff_qs)
 
     ctx = {
         "current_year": current_year,
@@ -2109,6 +2180,9 @@ def approval_home(request):
         "years": years,
         "ym": ym,
         "pending_rows": pending_rows,
+        "efficiency_rows": efficiency_rows,
+        "latest_approval_upload": latest_approval,
+        "latest_efficiency_upload": latest_efficiency,
     }
     return render(request, "commission/approval_home.html", ctx)
 
@@ -2122,10 +2196,10 @@ def approval_upload_excel(request):
     if request.method != "POST":
         return _json_error("잘못된 요청 방식입니다.", status=405)
 
-    # month/year (월도)
-    year = (request.POST.get("year") or "").strip()
-    month = (request.POST.get("month") or "").strip()
-    kind = (request.POST.get("kind") or "").strip()  # efficiency / approval
+    year = (request.POST.get("year") or request.GET.get("year") or "").strip()
+    month = (request.POST.get("month") or request.GET.get("month") or "").strip()
+    part = (request.POST.get("part") or request.GET.get("part") or "").strip()
+    kind = (request.POST.get("kind") or request.GET.get("kind") or "").strip()
     excel_file = request.FILES.get("excel_file")
 
     if not year.isdigit():
@@ -2152,22 +2226,56 @@ def approval_upload_excel(request):
 
     try:
         with transaction.atomic():
-            df = _read_excel_safely(file_path, original_name=excel_file.name)
-            row_count = int(len(df.index)) if df is not None else 0
+            df_raw = _read_excel_raw_matrix(
+                file_path=file_path,
+                original_name=excel_file.name,
+                skiprows=0,
+                header_none=True,
+            )
+            row_count = int(len(df_raw.index)) if df_raw is not None else 0
 
+
+            # =====================================================
+            # ✅ (1) 기존 데이터 DROP: ym + part + kind
+            #     part가 ""(전체)이면 해당 ym/kind 전체 삭제
+            # =====================================================
             if kind == "approval":
+                del_qs = ApprovalPending.objects.filter(ym=ym)
+                if part:
+                    del_qs = del_qs.filter(user__part=part)
+                del_qs.delete()
+
+                # ✅ (2) 새 업로드
                 result = _handle_upload_commission_approval(
                     file_path=file_path,
                     original_name=excel_file.name,
                     ym=ym,
+                    part=part,  # ✅ 전달
                 )
                 inserted = result["inserted_or_updated"]
-            else:
-                # (추후 efficiency도 동일 패턴으로 구현)
-                inserted = 0
 
+            else:
+                # =====================================================
+                # ✅ (efficiency) 기존 데이터 DROP: ym + (선택) part
+                # =====================================================
+                del_qs = EfficiencyPayExcess.objects.filter(ym=ym)
+                if part:
+                    del_qs = del_qs.filter(user__part=part)
+                del_qs.delete()
+
+                # ✅ 새 업로드
+                result = _handle_upload_efficiency_pay_excess(
+                    file_path=file_path,
+                    original_name=excel_file.name,
+                    ym=ym,
+                    part=part,
+                )
+                inserted = result["inserted_or_updated"]
+
+            # ✅ 업로드 로그(ym+part+kind)
             ApprovalExcelUploadLog.objects.update_or_create(
                 ym=ym,
+                part=part,
                 kind=kind,
                 defaults={
                     "uploaded_by": request.user,
@@ -2180,17 +2288,16 @@ def approval_upload_excel(request):
         return _json_ok(
             "✅ 업로드가 완료되었습니다.",
             ym=ym,
+            part=part,
             kind=kind,
             row_count=row_count,
             file_name=excel_file.name,
             inserted=inserted,
-            missing_users=(result.get("missing_users", 0) if kind == "approval" else 0),
-            missing_sample=(result.get("missing_sample", []) if kind == "approval" else []),
+            missing_users=result.get("missing_users", 0),
+            missing_sample=result.get("missing_sample", []),
         )
 
-
     except ValueError as ve:
-        # 컬럼 진단 용도
         detected_columns = []
         try:
             detected_columns = [str(c) for c in df.columns]  # noqa: F821
@@ -2309,46 +2416,64 @@ def _handle_upload_commission_approval_pending(file_path: str, original_name: st
     }
 
 
-def _handle_upload_commission_approval(file_path: str, original_name: str, ym: str):
+def _handle_upload_commission_approval(file_path: str, original_name: str, ym: str, part: str = ""):
     """
     ✅ 수수료결재(kind=approval) 업로드
-    - B열(1): 사원명
-    - C열(2): 사번(매칭키)
-    - N열(13): 실지급액
-    - O열(14): 결재
+    조건:
+      - N열(14번째) 실지급액 > 0
+      - O열(15번째) 결재값 == 'N'
+    + part가 있으면 해당 part 사용자만 저장(안전)
     """
     df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=0, header_none=True)
 
     IDX_EMP_NAME = 1   # B
     IDX_USER_ID  = 2   # C
-    IDX_PAY      = 13  # N
-    IDX_APPR     = 14  # O
+    IDX_PAY      = 13  # N (14th)
+    IDX_APPR     = 14  # O (15th)
 
-    rows = []
-    user_ids = []
+    bucket = {}   # uid -> {"emp_name":..., "paid_sum":..., "approval":"N"}
 
     for _, row in df.iterrows():
         uid = _norm_emp_id(row[IDX_USER_ID] if len(row) > IDX_USER_ID else "")
-        if not uid:
+        if not uid or not uid.isdigit():
             continue
 
-        emp_name = str(row[IDX_EMP_NAME]).strip() if len(row) > IDX_EMP_NAME and row[IDX_EMP_NAME] is not None else ""
         pay = _to_int(row[IDX_PAY] if len(row) > IDX_PAY else 0)
-        appr = str(row[IDX_APPR]).strip() if len(row) > IDX_APPR and row[IDX_APPR] is not None else ""
+        appr = ("" if len(row) <= IDX_APPR or row[IDX_APPR] is None else str(row[IDX_APPR])).strip()
+        appr_u = appr.upper()
 
-        user_ids.append(uid)
-        rows.append((uid, emp_name, pay, appr))
+        # ✅ 조건 필터
+        if pay <= 0:
+            continue
+        if appr_u != "N":
+            continue
 
-    if not rows:
+        emp_name = ("" if len(row) <= IDX_EMP_NAME or row[IDX_EMP_NAME] is None else str(row[IDX_EMP_NAME])).strip()
+        if emp_name.lower() in ("nan", "none"):
+            emp_name = ""
+
+        rec = bucket.get(uid)
+        if not rec:
+            bucket[uid] = {"emp_name": emp_name, "paid_sum": pay, "approval": "N"}
+        else:
+            if emp_name and not rec["emp_name"]:
+                rec["emp_name"] = emp_name
+            rec["paid_sum"] += pay
+
+    if not bucket:
         return {"inserted_or_updated": 0, "missing_users": 0, "missing_sample": []}
 
-    # 존재 유저만 반영
-    user_map = CustomUser.objects.in_bulk(set(user_ids))  # {pk: user}
-    missing = [uid for uid in set(user_ids) if uid not in user_map]
+    # ✅ 유저 존재 + (선택) 부서 일치 필터
+    qs = CustomUser.objects.filter(pk__in=bucket.keys())
+    if part:
+        qs = qs.filter(part=part)
+    user_map = qs.in_bulk()  # {pk: user}
+
+    missing = [uid for uid in bucket.keys() if uid not in user_map]
     missing_sample = missing[:10]
 
     objs = []
-    for uid, emp_name, pay, appr in rows:
+    for uid, rec in bucket.items():
         u = user_map.get(uid)
         if not u:
             continue
@@ -2356,13 +2481,12 @@ def _handle_upload_commission_approval(file_path: str, original_name: str, ym: s
             ApprovalPending(
                 ym=ym,
                 user=u,
-                emp_name=emp_name,
-                actual_pay=int(pay or 0),
-                approval_flag=appr or "",
+                emp_name=rec["emp_name"] or "",
+                actual_pay=int(rec["paid_sum"] or 0),
+                approval_flag="N",
             )
         )
 
-    # ym+user 충돌 시 업데이트 (Django 5.x + PostgreSQL에서 사용 가능)
     ApprovalPending.objects.bulk_create(
         objs,
         batch_size=1000,
@@ -2376,3 +2500,311 @@ def _handle_upload_commission_approval(file_path: str, original_name: str, ym: s
         "missing_users": len(missing),
         "missing_sample": missing_sample,
     }
+
+
+def _find_header_row_and_col_indices(df_raw: pd.DataFrame):
+    """
+    raw matrix(df_raw, header=None)에서
+    - 헤더 행(구분/금액/사원번호 등 키워드 포함)을 찾아
+    - 구분열/금액열 index를 리턴
+    """
+    def _norm(x):
+        s = "" if x is None else str(x).strip()
+        s = s.replace(" ", "")
+        return s
+
+    # 보통 상단 0~5행 안에 헤더가 있음
+    for r in range(min(6, len(df_raw.index))):
+        row = df_raw.iloc[r].tolist()
+        normed = [_norm(c) for c in row]
+
+        # 구분/금액을 동시에 찾는 행을 헤더로 간주
+        has_div = any("구분" in c for c in normed)
+        has_amt = any(("금액" in c) or ("지급액" in c) for c in normed)
+        if not (has_div and has_amt):
+            continue
+
+        div_idx = None
+        amt_idx = None
+
+        for i, c in enumerate(normed):
+            if div_idx is None and "구분" in c:
+                div_idx = i
+            if amt_idx is None and (("금액" in c) or ("지급액" in c)):
+                amt_idx = i
+
+        if div_idx is not None and amt_idx is not None:
+            return r, div_idx, amt_idx
+
+    return None, None, None
+
+
+def _handle_upload_efficiency_pay_excess(file_path: str, original_name: str, ym: str, part: str = ""):
+    """
+    ✅ 지점효율(kind=efficiency) 업로드
+    규칙:
+      - 사번: 사원번호(E열) → CustomUser.id 매칭
+      - 지급금액합계: 해당 사번의 데이터 중 구분 == '지급' 인 금액 합계
+      - 저장: EfficiencyPayExcess(ym+user unique)
+      - part가 있으면 해당 part 사용자만 저장(안전)
+    """
+    df = _read_excel_raw_matrix(file_path, original_name=original_name, skiprows=0, header_none=True)
+
+    IDX_E = 4  # ✅ 사원번호(E열)
+
+    header_row, div_idx, amt_idx = _find_header_row_and_col_indices(df)
+
+    # 헤더를 못 찾으면, 최소한의 안전장치로 에러 처리
+    if header_row is None:
+        raise ValueError("엑셀에서 '구분'/'금액' 헤더를 찾지 못했습니다. (지점효율 파일 형식을 확인해주세요)")
+
+    bucket = {}  # uid -> sum_amount
+
+    for r in range(header_row + 1, len(df.index)):
+        row = df.iloc[r]
+
+        # 길이 방어
+        if len(row) <= max(IDX_E, div_idx, amt_idx):
+            continue
+
+        uid = _norm_emp_id(row[IDX_E])
+        if not uid or not uid.isdigit():
+            continue
+
+        div_val = ("" if row[div_idx] is None else str(row[div_idx])).strip()
+        if div_val.lower() in ("nan", "none"):
+            div_val = ""
+
+        # ✅ 구분 == '지급'
+        if div_val != "지급":
+            continue
+
+        amt = _to_int(row[amt_idx], default=0)
+        if amt == 0:
+            continue
+
+        bucket[uid] = bucket.get(uid, 0) + amt
+
+    if not bucket:
+        return {"inserted_or_updated": 0, "missing_users": 0, "missing_sample": []}
+
+    # ✅ 유저 존재 + (선택) part 필터
+    qs = CustomUser.objects.filter(pk__in=bucket.keys())
+    if part:
+        qs = qs.filter(part=part)
+    user_map = qs.in_bulk()  # {pk: user}
+
+    missing = [uid for uid in bucket.keys() if uid not in user_map]
+    missing_sample = missing[:10]
+
+    objs = []
+    for uid, s in bucket.items():
+        u = user_map.get(uid)
+        if not u:
+            continue
+        objs.append(
+            EfficiencyPayExcess(
+                ym=ym,
+                user=u,
+                pay_amount_sum=int(s or 0),
+            )
+        )
+
+    EfficiencyPayExcess.objects.bulk_create(
+        objs,
+        batch_size=1000,
+        update_conflicts=True,
+        unique_fields=["ym", "user"],
+        update_fields=["pay_amount_sum", "updated_at"],
+    )
+
+    return {
+        "inserted_or_updated": len(objs),
+        "missing_users": len(missing),
+        "missing_sample": missing_sample,
+    }
+
+
+@require_GET
+@grade_required(["superuser"])
+def download_approval_pending_excel(request):
+    year = (request.GET.get("year") or "").strip()
+    month = (request.GET.get("month") or "").strip()
+    part = (request.GET.get("part") or "").strip()
+
+    if not (year.isdigit() and month.isdigit()):
+        return _json_error("year/month 파라미터가 필요합니다.", status=400)
+
+    y = int(year)
+    m = int(month)
+    if m < 1 or m > 12:
+        return _json_error("month는 1~12 범위여야 합니다.", status=400)
+
+    # ✅ approval_home / 업로드와 동일한 ym 포맷("YYYY-MM")으로 통일
+    ym = f"{y}-{_pad2(m)}"
+
+    qs = (
+        ApprovalPending.objects
+        .select_related("user")
+        .filter(ym=ym)
+    )
+
+    if part:
+        qs = qs.filter(user__part=part)
+
+    qs = qs.annotate(
+        _status_order=Case(
+            When(user__status="재직", then=Value(0)),
+            When(user__status="퇴사", then=Value(1)),
+            default=Value(9),
+            output_field=IntegerField(),
+        )
+    ).order_by("_status_order", "user__branch")
+
+    # ===============================
+    # Excel 생성
+    # ===============================
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "수수료 미결현황"
+
+    ws.append([
+        "부서",
+        "영업가족명",
+        "사원명",
+        "성명",
+        "사번",
+        "상태",
+        "유자격(사용인)",
+        "실지급액",
+        "결재",
+    ])
+
+    for r in qs:
+        ws.append([
+            r.user.part,
+            r.user.branch,
+            r.emp_name,
+            r.user.name,
+            r.user.id,
+            r.user.status,
+            r.user.regist,
+            r.actual_pay,
+            r.approval_flag,
+        ])
+
+        # ✅ 금액 컬럼 통화 형식 (#,##0)
+        ws.cell(row=ws.max_row, column=8).number_format = "#,##0"
+
+    from io import BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    ts = timezone.localtime(timezone.now()).strftime("%Y%m%d%H%M")
+    part_name = part if part else "전체"
+    safe_part = re.sub(r'[\\/:*?"<>|]', "_", part_name).strip()
+
+    filename = f"{ts}_수수료미결현황_{safe_part}.xlsx"
+
+    resp = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    _set_attachment_filename(resp, filename)
+    return resp
+
+
+@require_GET
+@grade_required(["superuser"])
+def download_efficiency_excess_excel(request):
+    """
+    지점효율지급 초과현황 엑셀 다운로드
+    - approval_home과 동일한 필터(ym, part) 적용
+    - 금액 내림차순(pay_amount_sum DESC) 유지
+    """
+    year = (request.GET.get("year") or "").strip()
+    month = (request.GET.get("month") or "").strip()
+    part = (request.GET.get("part") or "").strip()
+
+    if not (year.isdigit() and month.isdigit()):
+        return _json_error("year/month 파라미터가 필요합니다.", status=400)
+
+    y = int(year)
+    m = int(month)
+    if m < 1 or m > 12:
+        return _json_error("month는 1~12 범위여야 합니다.", status=400)
+
+    ym = f"{y}-{_pad2(m)}"
+
+    qs = (
+        EfficiencyPayExcess.objects
+        .select_related("user")
+        .filter(ym=ym, pay_amount_sum__gt=EXCESS_THRESHOLD)
+    )
+
+    if part:
+        qs = qs.filter(user__part=part)
+
+    qs = qs.filter(user__regist__in=["생보등록", "손보등록", "손생등록"]).annotate(
+        _status_order=Case(
+            When(user__status="재직", then=Value(0)),
+            When(user__status="퇴사", then=Value(1)),
+            default=Value(9),
+            output_field=IntegerField(),
+        )
+    ).order_by("user__branch", "-pay_amount_sum", "user__name")
+
+    rows = []
+    for x in qs:
+        rows.append({
+            "부서": x.user.part or "",
+            "지점": x.user.branch or "",
+            "재직상태": x.user.status or "",
+            "성명": x.user.name or "",
+            "사번": str(x.user_id),
+            "지급금액합계": int(x.pay_amount_sum or 0),
+            "업데이트": timezone.localtime(x.updated_at).strftime("%Y-%m-%d %H:%M:%S") if getattr(x, "updated_at", None) else "",
+        })
+
+    df = pd.DataFrame(rows)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="지점효율지급초과현황")
+        ws = writer.sheets["지점효율지급초과현황"]
+
+        # ✅ (1) "지급금액합계" 컬럼 통화 형식(#,##0) 적용
+        money_header = "지급금액합계"
+        headers = [c.value for c in ws[1]]
+        if money_header in headers:
+            col_idx = headers.index(money_header) + 1
+            for r in range(2, ws.max_row + 1):
+                cell = ws.cell(row=r, column=col_idx)
+                cell.number_format = "#,##0"
+
+        # (선택) 열너비 자동
+        for col_cells in ws.columns:
+            max_len = 0
+            col_letter = col_cells[0].column_letter
+            for c in col_cells:
+                v = "" if c.value is None else str(c.value)
+                max_len = max(max_len, len(v))
+            ws.column_dimensions[col_letter].width = min(max_len + 2, 40)
+
+    output.seek(0)
+
+    # ✅ (2) 파일명 커스터마이징: 일시_지점효율지급초과현황_부서
+    ts = timezone.localtime(timezone.now()).strftime("%Y%m%d%H%M")
+    part_name = part if part else "전체"
+    safe_part = re.sub(r'[\\/:*?"<>|]', "_", part_name).strip()
+    fname = f"{ts}_지점효율지급초과현황_{safe_part}.xlsx"
+
+    resp = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    _set_attachment_filename(resp, fname)
+    return resp

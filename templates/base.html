@@ -147,7 +147,7 @@
 
           {% if user.grade == 'superuser' %}
             <li class="nav-item">
-              <a class="nav-link {% if '/admin' in request.path %}active{% else %}inactive{% endif %}"
+              <a class="nav-link text-nowrap {% if '/admin' in request.path %}active{% else %}inactive{% endif %}"
                  href="/admin/">관리자</a>
             </li>
           {% endif %}
@@ -265,7 +265,6 @@
             <div id="mCommission" class="accordion-collapse collapse" aria-labelledby="mCommissionHead" data-bs-parent="#mobileMenuAccordion">
               <div class="accordion-body pt-0">
                 <a class="d-block py-2" href="{% url 'commission:deposit_home' %}">채권관리</a>
-                <a class="d-block py-2" href="{% url 'commission:support_home' %}">지원신청서</a>
                 <a class="d-block py-2" href="{% url 'commission:approval_home' %}">수수료결재</a>
               </div>
             </div>
@@ -284,14 +283,7 @@
             </h2>
             <div id="mManual" class="accordion-collapse collapse" aria-labelledby="mManualHead" data-bs-parent="#mobileMenuAccordion">
               <div class="accordion-body pt-0">
-                <a class="d-block py-2" href="{% url 'join:manual_basic' %}">업무매뉴얼</a>
-                {% if user.grade in 'superuser main_admin' %}
-                  <a class="d-block py-2" href="{% url 'join:manual_head' %}">업무매뉴얼(관리자)</a>
-                {% endif %}
-                <a class="d-block py-2" href="{% url 'join:rules_basic' %}">영업기준안</a>
-                {% if user.grade in 'superuser main_admin' %}
-                  <a class="d-block py-2" href="{% url 'join:rules_head' %}">영업기준안(관리자)</a>
-                {% endif %}
+                <a class="d-block py-2" href="{% url 'manual:manual_list' %}">업무매뉴얼</a>
               </div>
             </div>
           </div>

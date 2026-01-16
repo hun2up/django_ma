@@ -1,3 +1,5 @@
+# django_ma/manual/urls.py
+
 from django.urls import path
 from . import views
 
@@ -8,8 +10,8 @@ urlpatterns = [
     # Pages
     # =========================================================
     path("", views.manual_list, name="manual_list"),
-    path("<int:pk>/", views.manual_detail, name="manual_detail"),
     path("new/", views.manual_create, name="manual_create"),
+    path("<int:pk>/", views.manual_detail, name="manual_detail"),
     path("<int:pk>/edit/", views.manual_edit, name="manual_edit"),
 
     # =========================================================
@@ -38,7 +40,7 @@ urlpatterns = [
     path("ajax/block-reorder/", views.manual_block_reorder_ajax, name="manual_block_reorder_ajax"),
 
     # =========================================================
-    # Block Attachments (AJAX)  ✅ NEW
+    # Block Attachments (AJAX)
     # =========================================================
     path("ajax/block-attachment/upload/", views.manual_block_attachment_upload_ajax, name="manual_block_attachment_upload_ajax"),
     path("ajax/block-attachment/delete/", views.manual_block_attachment_delete_ajax, name="manual_block_attachment_delete_ajax"),

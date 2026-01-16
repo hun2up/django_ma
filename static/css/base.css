@@ -92,6 +92,17 @@ body {
   box-shadow: 0 0 0 0.2rem rgba(0, 91, 172, 0.25);
 }
 
+/* ✅ Navbar menu: 줄바꿈 방지(관리자만 내려가는 현상 해결) */
+.navbar .navbar-nav {
+  flex-wrap: nowrap;           /* 메뉴 자체가 다음 줄로 넘어가지 않게 */
+}
+
+.navbar .navbar-nav .nav-link {
+  white-space: nowrap;         /* 글자(한글) 단위 줄바꿈 금지 */
+  word-break: keep-all;        /* 한글 글자 단위 break 방지(브라우저별 방어) */
+}
+
+
 /* 모바일: 로고/토글 버튼 축소 */
 @media (max-width: 576px) {
   .navbar {
@@ -342,6 +353,51 @@ input[name^="premium_"],
   border-color: #dee2e6 !important;
 }
 
+/* ==========================================================
+ 3-6) Employment Status Badge (재직/퇴사)
+========================================================== */
+.emp-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* 재직(초록) */
+.emp-badge--active{
+  color: #0f5132;
+  background: #d1e7dd;
+  border-color: #badbcc;
+}
+
+/* 퇴사(회색) */
+.emp-badge--inactive{
+  color: #1b1f23;
+  background: #e2e3e5;
+  border-color: #d3d6d8;
+}
+
+/* (선택) 기타 상태가 있을 경우 대비 */
+.emp-badge--warning{
+  color: #856404;
+  background: #fff3cd;
+  border-color: #ffeeba;
+}
+
+/* ==========================================================
+ 3-7) Money / Numeric alignment
+========================================================== */
+.money-cell{
+  text-align: right !important;
+  font-variant-numeric: tabular-nums; /* 숫자 폭 고정(정렬 더 예쁨) */
+  white-space: nowrap;
+}
 
 /* ==========================================================
  4) PAGES: BOARD
@@ -871,14 +927,17 @@ textarea[name="content"] {
 
 /* accordion body가 가로 스크롤 컨테이너 */
 #manage-efficiency #confirmGroupsAccordion .accordion-body {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  /* 기존 스크롤 정책 유지 */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 /* 그룹 테이블: “줄지 말고 스크롤” */
 #manage-efficiency #confirmGroupsAccordion .main-group-table {
-  width: max-content;
-  min-width: var(--eff-header-minw);
+  width: max-content;  /* 컬럼이 많으면 그대로 늘어나게(스크롤 유지) */
+  min-width: 100%;     /* ✅ 내용이 적어도 헤드 폭만큼은 꽉 차게 */
   table-layout: fixed;
 }
 
@@ -1040,8 +1099,6 @@ textarea[name="content"] {
 
   padding: 8px 10px;
   background: #fff;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
 }
 
 /* 확인서 파일명 말줄임 */
@@ -1691,6 +1748,42 @@ a.manual-item.manual-editing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+
+/* ==========================================================
+ 7-B) COMMISSION / APPROVAL (approval_home.html)
+ - 모바일/좁은 화면에서도 줄바꿈 ❌
+ - table-responsive에서 가로 스크롤 ✅
+========================================================== */
+
+/* 스크롤 컨테이너: iOS 부드러운 스크롤 */
+.commission-table-scroll{
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px; /* 스크롤바 공간 */
+}
+
+/* 테이블: 내용 기준으로 가로로 늘어나게 */
+.commission-nowrap-table{
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+/* 셀: 줄바꿈 금지(한글 글자 단위 줄바꿈 방지) */
+.commission-nowrap-table th,
+.commission-nowrap-table td{
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: middle;
+}
+
+/* 숫자(금액) 셀은 이미 money-cell이 nowrap이지만, 안전하게 유지 */
+.commission-nowrap-table .money-cell{
+  white-space: nowrap !important;
 }
 
 

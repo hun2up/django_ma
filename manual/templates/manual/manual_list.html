@@ -1,29 +1,30 @@
+<!-- django_ma/manual/templates/manual/manual_list.html -->
+
 {% extends "base.html" %}
 {% load static %}
 {% block title %}업무매뉴얼{% endblock %}
 
 {% block content %}
-<!----------------------------------------------------------
-  Manual List Page
-  - superuser: 생성/편집(정렬/삭제/일괄수정) 가능
+<!------------------------------------------------------------------------------
+  Manual List Page (FINAL - Refactor)
+  - superuser: 생성/편집(정렬/삭제/일괄수정)
   - 일반: 목록 클릭 → 상세 이동
-  - CSS/JS는 모두 외부 파일로 분리(base.css + static/js)
------------------------------------------------------------->
+  - 기존 id/class/data-* 유지 (JS 의존성 영향 0)
+-------------------------------------------------------------------------------->
 
 <div class="container manual-list-container">
 
-  <!----------------------------
-    Page Title
-  ----------------------------->
-  <h3 class="text-center fw-bold mb-4 manual-list-title">
-    업무매뉴얼
-  </h3>
+  <!-----------------------------
+    1) Page Title
+  ------------------------------>
+  <h3 class="text-center fw-bold mb-4 manual-list-title">업무매뉴얼</h3>
 
-  <!----------------------------
-    Controls (superuser only)
-  ----------------------------->
+  <!-----------------------------
+    2) Controls (superuser only)
+  ------------------------------>
   <div class="d-flex justify-content-end mb-3 gap-2">
     {% if user.is_authenticated and user.grade == "superuser" %}
+
       <button type="button"
               class="btn btn-primary"
               data-bs-toggle="modal"
@@ -45,13 +46,14 @@
 
       {# CSRF: JS에서 읽어 POST에 사용 (CSRF_COOKIE_HTTPONLY 대응) #}
       <form id="manualEditCsrfForm" class="d-none">{% csrf_token %}</form>
+
     {% endif %}
   </div>
 
-  <!----------------------------
-    Boot Data (urls) → JS에서 dataset으로 읽음
-    ※ 인라인 script 제거 목적
-  ----------------------------->
+  <!-----------------------------
+    3) Boot Data (urls) → dataset
+    - inline script 제거 목적
+  ------------------------------>
   {% if user.is_authenticated and user.grade == "superuser" %}
     <div id="manualListBoot"
          class="d-none"
@@ -61,9 +63,9 @@
     </div>
   {% endif %}
 
-  <!----------------------------
-    Manual List
-  ----------------------------->
+  <!-----------------------------
+    4) Manual List
+  ------------------------------>
   <div class="list-group shadow-sm manual-list-group" id="manualListGroup">
     {% for m in manuals %}
       <a class="list-group-item list-group-item-action py-3 manual-item"
@@ -74,20 +76,18 @@
 
         <div class="d-flex justify-content-between align-items-start gap-2">
 
-          {# Left: title + chips #}
+          {# ----- Left: Title + chips ----- #}
           <div class="flex-grow-1 manual-item-left">
 
-            {# ✅ Title(좌) + Chips(우) 완전 분리 레이아웃 #}
             <div class="manual-title-row">
 
-              {# ---- Title Area (left column) ---- #}
+              {# (A) Title column #}
               <div class="manual-title-col">
-                <span class="manual-drag-handle d-none"
-                      title="드래그로 순서 변경">☰</span>
+                <span class="manual-drag-handle d-none" title="드래그로 순서 변경">☰</span>
 
                 <span class="fw-semibold manual-title-text">{{ m.title }}</span>
 
-                {# Edit mode title input #}
+                {# Edit mode title input (JS 토글) #}
                 <input type="text"
                        class="form-control form-control-sm manual-title-input d-none"
                        value="{{ m.title|escape }}"
@@ -101,7 +101,7 @@
                   <span class="badge manual-badge-staff">직원 전용</span>
                 {% endif %}
 
-                {# Edit mode access select #}
+                {# Edit mode access select (JS 토글) #}
                 <select class="form-select form-select-sm manual-access-select d-none manual-access-select-w">
                   <option value="normal">일반</option>
                   <option value="admin">관리자 전용</option>
@@ -109,10 +109,7 @@
                 </select>
               </div>
 
-              <!----------------------------
-                 - 칩이 많아도 "칩 영역 내부"에서만 줄바꿈
-                 - (소제목 없음)은 아예 렌더링하지 않음
-              ----------------------------->
+              {# (B) Section chips: 칩 영역 내부에서만 줄바꿈, 소제목 없으면 미렌더 #}
               <div class="manual-section-chips" aria-label="섹션 소제목 목록">
                 {% for sec in m.sections.all %}
                   {% if sec.title %}
@@ -124,7 +121,7 @@
             </div>
           </div>
 
-          {# Right: actions #}
+          {# ----- Right: actions (superuser only) ----- #}
           <div class="d-flex align-items-center gap-2 manual-item-actions">
             {% if user.is_authenticated and user.grade == "superuser" %}
               <button type="button"
@@ -140,73 +137,14 @@
       <div class="p-3 text-muted">등록된 매뉴얼이 없습니다.</div>
     {% endfor %}
   </div>
+
 </div>
 
-
-<!----------------------------------------------------------
-  Create Manual Modal (superuser only)
------------------------------------------------------------->
+<!-----------------------------
+  5) Create Manual Modal + Scripts (superuser only)
+------------------------------>
 {% if user.is_authenticated and user.grade == "superuser" %}
-  <div class="modal fade" id="createManualModal" tabindex="-1" aria-hidden="true"
-       data-create-url="{% url 'manual:manual_create_ajax' %}">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content manual-modal">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold manual-modal-title">새 매뉴얼 만들기</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-        </div>
-
-        <div class="modal-body">
-          <form id="createManualForm">
-            {% csrf_token %}
-
-            <label class="form-label fw-semibold">매뉴얼 이름</label>
-            <input type="text" class="form-control" id="manualTitleInput">
-
-            <div class="mt-3">
-              <label class="form-label fw-semibold mb-2">공개 범위</label>
-
-              <div class="d-flex flex-column gap-2">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess"
-                         id="manualAccessNormal" value="normal" checked>
-                  <label class="form-check-label fw-semibold" for="manualAccessNormal">일반</label>
-                </div>
-
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess"
-                         id="manualAccessAdmin" value="admin">
-                  <label class="form-check-label fw-semibold" for="manualAccessAdmin">관리자 전용</label>
-                </div>
-
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="manualAccess"
-                         id="manualAccessStaff" value="staff">
-                  <label class="form-check-label fw-semibold" for="manualAccessStaff">직원 전용</label>
-                </div>
-              </div>
-            </div>
-
-            <div class="alert alert-danger py-2 mt-3 d-none" id="manualCreateError"></div>
-
-            <div class="d-flex gap-2 justify-content-end mt-3">
-              <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
-              <button type="submit" class="btn btn-primary" id="btnCreateManualConfirm">만들기</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# SortableJS (외부 라이브러리) #}
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-
-  {# Boot(dataset) → window.ManualListBoot 세팅 전용 JS #}
-  <script src="{% static 'js/manual/manual_list_boot.js' %}"></script>
-
-  {# Existing page scripts #}
-  <script src="{% static 'js/manual/manual_list_edit.js' %}"></script>
-  <script src="{% static 'js/manual/create_manual_modal.js' %}"></script>
+  {% include "manual/_partials/create_manual_modal.html" %}
+  {% include "manual/_partials/manual_list_scripts.html" %}
 {% endif %}
 {% endblock %}

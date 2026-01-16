@@ -20,6 +20,12 @@ urlpatterns = [
     path("approval/upload-excel/", views.approval_upload_excel, name="approval_upload_excel"),  # 결재/효율 업로드
 
     # =========================================================================
+    # Excel Download
+    # =========================================================================
+    path("approval/excel/pending/", views.download_approval_pending_excel, name="download_approval_pending_excel"),
+    path("approval/excel/efficiency-excess/", views.download_efficiency_excess_excel, name="download_efficiency_excess_excel"),
+
+    # =========================================================================
     # Data APIs (Deposit)
     # =========================================================================
     path("api/user-detail/", views.api_user_detail, name="api_user_detail"),
