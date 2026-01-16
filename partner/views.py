@@ -1815,3 +1815,6 @@ def structure_save(request):
 @transaction.atomic
 def structure_delete(request):
     return ajax_delete(request)
+
+
+def join_form(request): return render(request, "partner/join_form.html")

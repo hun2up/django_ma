@@ -111,6 +111,7 @@
               <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
                  href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
               <ul class="dropdown-menu" aria-labelledby="partnerMenu">
+                <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
@@ -141,6 +142,7 @@
                  href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
               <ul class="dropdown-menu" aria-labelledby="joinMenu">
                 <li><a class="dropdown-item" href="{% url 'manual:manual_list' %}">업무매뉴얼</a></li>
+                <li><a class="dropdown-item" href="{% url 'manual:rules_home' %}">영업기준안</a></li>
               </ul>
             </li>
           {% endif %}
@@ -240,6 +242,7 @@
             </h2>
             <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
               <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'partner:join_form' %}">위촉서류</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_charts' %}">편제변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_rate' %}">요율변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_calculate' %}">지점효율</a>
@@ -284,6 +287,7 @@
             <div id="mManual" class="accordion-collapse collapse" aria-labelledby="mManualHead" data-bs-parent="#mobileMenuAccordion">
               <div class="accordion-body pt-0">
                 <a class="d-block py-2" href="{% url 'manual:manual_list' %}">업무매뉴얼</a>
+                <a class="d-block py-2" href="{% url 'manual:rules_home' %}">영업기준안</a>
               </div>
             </div>
           </div>
