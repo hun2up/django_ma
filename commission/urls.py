@@ -1,3 +1,4 @@
+# django_ma/commission/urls.py
 from django.urls import path
 
 from . import views
@@ -8,16 +9,15 @@ urlpatterns = [
     # =========================================================================
     # Pages (UI)
     # =========================================================================
-    path("", views.redirect_to_deposit, name="commission_home"),      # 기본 접속 → 채권관리로 이동
-    path("deposit/", views.deposit_home, name="deposit_home"),       # 채권관리(채권현황)
-    path("support/", views.support_home, name="support_home"),       # 지원신청서(페이지)
-    path("approval/", views.approval_home, name="approval_home"),    # 수수료결재(페이지)
+    path("", views.redirect_to_deposit, name="commission_home"),
+    path("deposit/", views.deposit_home, name="deposit_home"),
+    path("approval/", views.approval_home, name="approval_home"),
 
     # =========================================================================
     # Upload APIs
     # =========================================================================
-    path("upload-excel/", views.upload_excel, name="upload_excel"),                  # 채권 데이터 업로드
-    path("approval/upload-excel/", views.approval_upload_excel, name="approval_upload_excel"),  # 결재/효율 업로드
+    path("upload-excel/", views.upload_excel, name="upload_excel"),
+    path("approval/upload-excel/", views.approval_upload_excel, name="approval_upload_excel"),
 
     # =========================================================================
     # Excel Download

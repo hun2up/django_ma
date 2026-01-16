@@ -620,3 +620,5 @@ def manual_block_attachment_delete_ajax(request):
     a.delete()
 
     return ok()
+
+def rules_home(request): return render(request, "manual/rules_home.html")

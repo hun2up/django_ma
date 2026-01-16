@@ -8,6 +8,7 @@ app_name = "partner"
 urlpatterns = [
     # Pages
     path("", views.redirect_to_calculate, name="calculate_home"),
+    path("join/", views.join_form, name="join_form"),
     path("calculate/", views.manage_calculate, name="manage_calculate"),
     path("grades/", views.manage_grades, name="manage_grades"),
     path("charts/", views.manage_charts, name="manage_charts"),

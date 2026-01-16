@@ -11,6 +11,7 @@ urlpatterns = [
     # =========================================================
     path("", views.manual_list, name="manual_list"),
     path("new/", views.manual_create, name="manual_create"),
+    path("rules/", views.rules_home, name="rules_home"),
     path("<int:pk>/", views.manual_detail, name="manual_detail"),
     path("<int:pk>/edit/", views.manual_edit, name="manual_edit"),
 

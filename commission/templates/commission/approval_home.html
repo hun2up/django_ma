@@ -6,13 +6,29 @@
 {% block title %}수수료결재{% endblock %}
 
 {% block content %}
+<!---------------------------------------------------------------
+  Approval Home (수수료 결재)
+  - 기존 기능 유지: form name/id, modal id, input name, script 경로
+  - 변경 범위: 정렬/주석/가독성만
+----------------------------------------------------------------->
+
 <div class="container my-4">
 
-  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">수수료 결재 페이지</h3>
+  <!--------------------------
+    Page Title
+  ---------------------------->
+  <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">
+    수수료 결재 페이지
+  </h3>
 
-  <!-- ✅ Top Controls (연/월 + 부서) -->
+  <!---------------------------------------------------------------
+    1) Top Controls (연/월 + 부서)
+    - GET 조회 폼
+  ----------------------------------------------------------------->
   <div class="card shadow p-3 border-0 rounded-4 mb-3" style="max-width:1100px; margin:0 auto;">
     <form id="controlsForm" class="row g-2 align-items-end" method="get">
+
+      {# 연도 #}
       <div class="col-6 col-md-2">
         <label class="form-label mb-1">연도</label>
         <select id="yearSelect" name="year" class="form-select">
@@ -22,6 +38,7 @@
         </select>
       </div>
 
+      {# 월도 #}
       <div class="col-6 col-md-2">
         <label class="form-label mb-1">월도</label>
         <select id="monthSelect" name="month" class="form-select">
@@ -40,6 +57,7 @@
         </select>
       </div>
 
+      {# 부서 #}
       <div class="col-12 col-md-4">
         <label class="form-label mb-1">부서</label>
         <select id="partSelect" name="part" class="form-select">
@@ -50,42 +68,56 @@
         </select>
       </div>
 
+      {# 조회 버튼 #}
       <div class="col-12 col-md-2 d-grid">
         <button type="submit" class="btn btn-primary">조회</button>
       </div>
+
     </form>
   </div>
 
-  <!-- ✅ 기존 내용(제작중 영역) -->
+  <!---------------------------------------------------------------
+    2) Main Content Card
+    - 엑셀 업로드 버튼 + 2개 테이블 (지점효율 초과 / 수수료 미결)
+  ----------------------------------------------------------------->
   <div class="card shadow p-3 border-0 rounded-4" style="max-width:1100px; margin:0 auto;">
-    <!-- 상단 헤더 -->
+
+    {# 상단 헤더: 엑셀 업로드 #}
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <button type="button"
-              class="btn btn-primary btn-sm"
-              data-bs-toggle="modal"
-              data-bs-target="#approvalExcelUploadModal">
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        data-bs-toggle="modal"
+        data-bs-target="#approvalExcelUploadModal"
+      >
         엑셀업로드
       </button>
     </div>
 
-    <!-- ✅ 테이블 소제목 -->
+    <!--------------------------
+      2-1) 지점효율지급 초과현황
+    ---------------------------->
     <div class="text-center fw-bold mb-2" style="font-size:1.05rem; color:#333;">
       지점효율지급 초과현황
     </div>
 
-    <!-- ✅ 업로드 결과 테이블 -->
     <div class="table-responsive commission-table-scroll">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="text-muted" style="font-size: 0.9rem;">
           <strong>최종 업데이트:</strong> {{ latest_efficiency_upload.dt }}
-          {% if latest_efficiency_upload.file %}<span class="ms-2">({{ latest_efficiency_upload.file }})</span>{% endif %}
+          {% if latest_efficiency_upload.file %}
+            <span class="ms-2">({{ latest_efficiency_upload.file }})</span>
+          {% endif %}
         </div>
 
-        <a class="btn btn-sm btn-outline-success"
-          href="{% url 'commission:download_efficiency_excess_excel' %}?year={{ selected_year }}&month={{ selected_month }}&part={{ selected_part|urlencode }}">
+        <a
+          class="btn btn-sm btn-outline-success"
+          href="{% url 'commission:download_efficiency_excess_excel' %}?year={{ selected_year }}&month={{ selected_month }}&part={{ selected_part|urlencode }}"
+        >
           엑셀다운로드
         </a>
       </div>
+
       <table id="efficiencyExcessTable" class="table table-bordered table-sm align-middle text-center mb-0 commission-nowrap-table">
         <thead class="table-light">
           <tr>
@@ -116,24 +148,30 @@
 
     <br>
 
-    <!-- ✅ 테이블 소제목 -->
+    <!--------------------------
+      2-2) 수수료 미결현황
+    ---------------------------->
     <div class="text-center fw-bold mb-2" style="font-size:1.05rem; color:#333;">
       수수료 미결현황
     </div>
 
-    <!-- ✅ 업로드 결과 테이블 -->
     <div class="table-responsive commission-table-scroll">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="text-muted" style="font-size: 0.9rem;">
           <strong>최종 업데이트:</strong> {{ latest_approval_upload.dt }}
-          {% if latest_approval_upload.file %}<span class="ms-2">({{ latest_approval_upload.file }})</span>{% endif %}
+          {% if latest_approval_upload.file %}
+            <span class="ms-2">({{ latest_approval_upload.file }})</span>
+          {% endif %}
         </div>
 
-        <a class="btn btn-sm btn-outline-success"
-          href="{% url 'commission:download_approval_pending_excel' %}?year={{ selected_year }}&month={{ selected_month }}&part={{ selected_part|urlencode }}">
+        <a
+          class="btn btn-sm btn-outline-success"
+          href="{% url 'commission:download_approval_pending_excel' %}?year={{ selected_year }}&month={{ selected_month }}&part={{ selected_part|urlencode }}"
+        >
           엑셀다운로드
         </a>
       </div>
+
       <table id="approvalPendingTable" class="table table-bordered table-sm align-middle mb-0 commission-nowrap-table">
         <thead class="table-light">
           <tr>
@@ -169,25 +207,39 @@
         </tbody>
       </table>
     </div>
+
   </div>
 </div>
 
-<!-- ✅ 엑셀 업로드 모달 (월도+구분+파일) -->
-<div class="modal fade" id="approvalExcelUploadModal" tabindex="-1" aria-labelledby="approvalExcelUploadModalLabel" aria-hidden="true">
+<!---------------------------------------------------------------
+  3) 엑셀 업로드 모달 (월도+구분+파일)
+  - form id=approvalExcelUploadForm → JS에서 사용 (변경 금지)
+----------------------------------------------------------------->
+<div
+  class="modal fade"
+  id="approvalExcelUploadModal"
+  tabindex="-1"
+  aria-labelledby="approvalExcelUploadModalLabel"
+  aria-hidden="true"
+>
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4 border-0 shadow">
+
       <div class="modal-header bg-light">
         <h6 class="modal-title fw-bold" id="approvalExcelUploadModalLabel">엑셀 업로드</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
       </div>
 
       <div class="modal-body">
-        <form id="approvalExcelUploadForm"
-              method="POST"
-              enctype="multipart/form-data"
-              action="{% url 'commission:approval_upload_excel' %}">
+        <form
+          id="approvalExcelUploadForm"
+          method="POST"
+          enctype="multipart/form-data"
+          action="{% url 'commission:approval_upload_excel' %}"
+        >
           {% csrf_token %}
 
+          {# 연/월 #}
           <div class="row g-2">
             <div class="col-6">
               <label class="form-label small fw-bold">연도</label>
@@ -201,9 +253,7 @@
             <div class="col-6">
               <label class="form-label small fw-bold">월도</label>
               <select name="month" class="form-select form-select-sm" required>
-                {% for mm in "123456789101112"|make_list %}
-                  {# make_list는 문자 단위라 여기선 아래처럼 고정 옵션이 더 안전합니다 #}
-                {% endfor %}
+                {# make_list는 문자 단위라 안전하게 고정 옵션 유지 #}
                 <option value="1"  {% if selected_month == 1 %}selected{% endif %}>01</option>
                 <option value="2"  {% if selected_month == 2 %}selected{% endif %}>02</option>
                 <option value="3"  {% if selected_month == 3 %}selected{% endif %}>03</option>
@@ -220,7 +270,7 @@
             </div>
           </div>
 
-          {# ✅ [추가] 월도 ↔ 구분 사이에 부서 선택 #}
+          {# 부서 (전체 가능) #}
           <div class="mt-3">
             <label class="form-label small fw-bold">부서</label>
             <select name="part" class="form-select form-select-sm">
@@ -231,6 +281,7 @@
             </select>
           </div>
 
+          {# 구분(kind) #}
           <div class="mt-3">
             <label class="form-label small fw-bold">구분</label>
             <select name="kind" class="form-select form-select-sm" required>
@@ -240,13 +291,16 @@
             </select>
           </div>
 
+          {# 파일 #}
           <div class="mt-3">
             <label class="form-label small fw-bold">엑셀 파일</label>
-            <input class="form-control form-control-sm"
-                   type="file"
-                   name="excel_file"
-                   accept=".xlsx,.xls"
-                   required>
+            <input
+              class="form-control form-control-sm"
+              type="file"
+              name="excel_file"
+              accept=".xlsx,.xls"
+              required
+            >
           </div>
 
           <div class="text-end mt-4">
@@ -255,13 +309,15 @@
           </div>
         </form>
 
+        {# JS 결과 출력 영역 #}
         <div id="approvalUploadResult" class="mt-3 small text-center"></div>
       </div>
+
     </div>
   </div>
 </div>
 
-<!-- ✅ 업로드 완료 토스트 -->
+{# ✅ 업로드 완료 토스트 (id 유지) #}
 <div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
   <div id="approvalUploadToast" class="toast align-items-center text-bg-success border-0" role="alert">
     <div class="d-flex">
@@ -271,6 +327,6 @@
   </div>
 </div>
 
+{# ✅ 업로드 JS (경로 유지) #}
 <script src="{% static 'js/commission/approval_excel_upload.js' %}"></script>
-
 {% endblock %}
