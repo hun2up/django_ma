@@ -76,7 +76,7 @@
            id="navbarContent" style="width: fit-content;">
         <ul class="navbar-nav mb-2 mb-lg-0">
 
-          {% if user.grade in 'superuser main_admin sub_admin' %}
+          {% if user.grade in 'superuser main_admin' %}
             <!-- ✅ Dashboard -->
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}"
@@ -213,7 +213,7 @@
           </div>
         </div>
 
-        {% if user.grade in 'superuser main_admin sub_admin' %}
+        {% if user.grade in 'superuser main_admin' %}
           <!-- 대시보드 -->
           <div class="accordion-item">
             <h2 class="accordion-header" id="mDashHead">

@@ -618,6 +618,20 @@ textarea[name="content"] {
   margin-left: calc(-43vw + 50%);
 }
 
+/* ---------- Dash wide layout (Sales Dashboard) ---------- */
+#dash-sales {
+  width: 86vw;
+  max-width: none;
+  margin-left: calc(-43vw + 50%);
+}
+
+@media (max-width: 576px) {
+  #dash-sales {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* ---------- Partner tables basic ---------- */
 #manage-structure table,
 #manage-rate table,
