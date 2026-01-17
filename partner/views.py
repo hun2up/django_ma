@@ -352,9 +352,9 @@ def efficiency_confirm_template_download(request):
 # ------------------------------------------------------------
 # Pages
 # ------------------------------------------------------------
-@grade_required(["superuser", "main_admin", "sub_admin"])
-def redirect_to_calculate(request):
-    return redirect("partner:manage_calculate")
+@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
+def redirect_to_join(request):
+    return redirect("partner:join_form")
 
 
 @grade_required(["superuser", "main_admin", "sub_admin"])

@@ -105,24 +105,25 @@
             </ul>
           </li>
 
-          {% if user.grade in 'superuser main_admin sub_admin' %}
-            <!-- ✅ Partner -->
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
-                 href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
-              <ul class="dropdown-menu" aria-labelledby="partnerMenu">
-                <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
+          
+          <!-- ✅ Partner -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
+                href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
+            <ul class="dropdown-menu" aria-labelledby="partnerMenu">
+              <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
+              {% if user.grade in 'superuser main_admin sub_admin' %}
                 <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
-                {% if user.grade in 'superuser main_admin' %}
-                  <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
-                  <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
-                {% endif %}
-              </ul>
-            </li>
-          {% endif %}
-
+              {% endif %}
+              {% if user.grade in 'superuser main_admin' %}
+                <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+                <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
+              {% endif %}
+            </ul>
+          </li>
+          
           {% if user.grade == 'superuser' %}
             <!-- ✅ Commission -->
             <li class="nav-item dropdown">
@@ -230,31 +231,33 @@
               </div>
             </div>
           </div>
+        {% endif %}
 
-          <!-- 조직관리 -->
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="mPartnerHead">
-              <button class="accordion-button collapsed" type="button"
-                      data-bs-toggle="collapse" data-bs-target="#mPartner"
-                      aria-expanded="false" aria-controls="mPartner">
-                조직관리
-              </button>
-            </h2>
-            <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
-              <div class="accordion-body pt-0">
-                <a class="d-block py-2" href="{% url 'partner:join_form' %}">위촉서류</a>
+        <!-- 조직관리 -->
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="mPartnerHead">
+            <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#mPartner"
+                    aria-expanded="false" aria-controls="mPartner">
+              조직관리
+            </button>
+          </h2>
+          <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
+            <div class="accordion-body pt-0">
+              <a class="d-block py-2" href="{% url 'partner:join_form' %}">위촉서류</a>
+              {% if user.grade in 'superuser main_admin sub_admin' %}
                 <a class="d-block py-2" href="{% url 'partner:manage_charts' %}">편제변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_rate' %}">요율변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_calculate' %}">지점효율</a>
-                {% if user.grade in 'superuser main_admin' %}
-                  <a class="d-block py-2" href="{% url 'partner:manage_grades' %}">권한관리</a>
-                  <a class="d-block py-2" href="{% url 'partner:manage_tables' %}">테이블관리</a>
-                {% endif %}
-              </div>
+              {% endif %}
+              {% if user.grade in 'superuser main_admin' %}
+                <a class="d-block py-2" href="{% url 'partner:manage_grades' %}">권한관리</a>
+                <a class="d-block py-2" href="{% url 'partner:manage_tables' %}">테이블관리</a>
+              {% endif %}
             </div>
           </div>
-        {% endif %}
-
+        </div>
+        
         {% if user.grade == 'superuser' %}
           <!-- 수수료 -->
           <div class="accordion-item">

@@ -38,6 +38,11 @@ from .utils import (
 )
 
 
+@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
+def redirect_to_manual(request):
+    return redirect("manual:manual_list")
+
+
 # =============================================================================
 # Pages
 # =============================================================================
