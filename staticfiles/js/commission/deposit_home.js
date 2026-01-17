@@ -7,8 +7,12 @@
  * - data-bind 기반 자동 바인딩(템플릿 legacy 키 ↔ API 키 mismatch는 alias로 흡수)
  * - surety/other 테이블 렌더 + 말줄임(.ellipsis-cell) 클릭 시 전체보기 모달
  * - 지원신청서 버튼: user 선택 시 활성화 → support-pdf URL로 이동
+ *
+ * ✅ 리팩토링 목표(기능 변화 없음)
+ * - 공통 유틸(텍스트/포맷/escape/fetch/unwrap) 모듈화(로컬)
+ * - 기능 단위로 섹션 재정렬 + 주석 보강
+ * - 전역 플래그/이벤트 중복 바인딩 방지 유지
  */
-
 (() => {
   "use strict";
 
@@ -24,7 +28,7 @@
   const ds = root.dataset || {};
 
   /* ==========================================================
-   * 1) URL 설정 (dataset 우선, 없으면 기본값)
+   * 1) URL config (dataset 우선, 없으면 기본값) - 기존 유지
    * ========================================================== */
   const URLS = {
     page: ds.resetUrl || "/commission/deposit/",
@@ -48,76 +52,79 @@
   };
 
   /* ==========================================================
-   * 3) Small Utils
+   * 3) Common Utils (local-module style)
    * ========================================================== */
-  const toText = (v) => (v === null || v === undefined ? "" : String(v));
+  const U = (() => {
+    const toText = (v) => (v === null || v === undefined ? "" : String(v));
 
-  const readTextOrValue = (el) => {
-    if (!el) return "";
-    if ("value" in el) {
-      const v = String(el.value || "").trim();
-      if (v) return v;
-    }
-    return String(el.textContent || "").trim();
-  };
+    const safeSetText = (node, text) => {
+      if (!node) return;
+      node.textContent =
+        text === null || text === undefined || text === "" ? "-" : String(text);
+    };
 
-  const qsUser = () => new URL(window.location.href).searchParams.get("user") || "";
+    const readTextOrValue = (el) => {
+      if (!el) return "";
+      if ("value" in el) {
+        const v = String(el.value || "").trim();
+        if (v) return v;
+      }
+      return String(el.textContent || "").trim();
+    };
 
-  const safeSetText = (node, text) => {
-    if (!node) return;
-    node.textContent = text === null || text === undefined || text === "" ? "-" : String(text);
-  };
+    const qsUser = () => new URL(window.location.href).searchParams.get("user") || "";
 
-  const setSupportEnabled = (userId) => {
-    if (!els.supportPdfBtn) return;
-    els.supportPdfBtn.disabled = !String(userId || "").trim();
-  };
+    /* money/percent 안전 포맷 (문자열은 그대로 통과) */
+    const comma = (v) => {
+      const s = toText(v).trim();
+      if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
 
-  /* money/percent 안전 포맷 (문자열은 그대로 통과) */
-  const comma = (v) => {
-    const s = toText(v).trim();
-    if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
+      const cleaned = s.replace(/,/g, "");
+      const num = Number(cleaned);
+      if (!Number.isFinite(num)) return s; // "정상/분급" 같은 문자열 방어
+      return Math.trunc(num).toLocaleString("ko-KR");
+    };
 
-    const cleaned = s.replace(/,/g, "");
-    const num = Number(cleaned);
-    if (!Number.isFinite(num)) return s; // "정상/분급" 같은 문자열 방어
-    return Math.trunc(num).toLocaleString("ko-KR");
-  };
+    const percent = (v) => {
+      const s = toText(v).trim();
+      if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
 
-  const percent = (v) => {
-    const s = toText(v).trim();
-    if (!s || s === "-" || s.toLowerCase() === "nan") return "-";
+      const cleaned = s.replace(/,/g, "");
+      const num = Number(cleaned);
+      if (!Number.isFinite(num)) return s;
+      return `${num.toFixed(2)}%`;
+    };
 
-    const cleaned = s.replace(/,/g, "");
-    const num = Number(cleaned);
-    if (!Number.isFinite(num)) return s;
-    return `${num.toFixed(2)}%`;
-  };
+    /* HTML escape */
+    const escapeHtml = (str) =>
+      String(str ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 
-  /* HTML escape */
-  const escapeHtml = (str) =>
-    String(str ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
+    return {
+      toText,
+      safeSetText,
+      readTextOrValue,
+      qsUser,
+      comma,
+      percent,
+      escapeHtml,
+    };
+  })();
 
   /* ==========================================================
-   * 4) Modal: ellipsis-cell 전체보기
+   * 4) Modal: ellipsis-cell 전체보기 (기존 UX 유지)
    * ========================================================== */
-  function openTextViewer(title, text) {
-    const safeTitle = title || "전체 내용";
-    const safeText = (text || "").toString();
+  const TextViewer = (() => {
+    const hasBootstrapModal = () => !!(window.bootstrap && window.bootstrap.Modal);
 
-    // Bootstrap 모달 없으면 alert fallback
-    if (!window.bootstrap || !window.bootstrap.Modal) {
-      alert(`${safeTitle}\n\n${safeText || "-"}`);
-      return;
-    }
+    function ensureModal() {
+      let modal = document.getElementById("textViewerModal");
+      if (modal) return modal;
 
-    let modal = document.getElementById("textViewerModal");
-    if (!modal) {
       modal = document.createElement("div");
       modal.id = "textViewerModal";
       modal.className = "modal fade";
@@ -135,239 +142,272 @@
           </div>
         </div>`;
       document.body.appendChild(modal);
+      return modal;
     }
 
-    modal.querySelector(".modal-title").textContent = safeTitle;
-    modal.querySelector("pre").textContent = safeText || "-";
-    new bootstrap.Modal(modal).show();
-  }
+    function open(title, text) {
+      const safeTitle = title || "전체 내용";
+      const safeText = (text || "").toString();
 
-  function bindEllipsisClickOnce() {
-    if (window.__depositEllipsisBound) return;
-    window.__depositEllipsisBound = true;
+      // Bootstrap 모달 없으면 alert fallback - 기존 유지
+      if (!hasBootstrapModal()) {
+        alert(`${safeTitle}\n\n${safeText || "-"}`);
+        return;
+      }
 
-    document.addEventListener("click", (e) => {
-      const cell = e.target.closest(".ellipsis-cell");
-      if (!cell) return;
-      const full = String(cell.dataset.fullText || "").trim();
-      const fallback = String(cell.textContent || "").trim();
-      openTextViewer("전체 내용", full || fallback || "-");
-    });
-  }
+      const modal = ensureModal();
+      modal.querySelector(".modal-title").textContent = safeTitle;
+      modal.querySelector("pre").textContent = safeText || "-";
+      new bootstrap.Modal(modal).show();
+    }
+
+    function bindEllipsisClickOnce() {
+      // 기존: 전역 플래그로 중복 바인딩 방지
+      if (window.__depositEllipsisBound) return;
+      window.__depositEllipsisBound = true;
+
+      document.addEventListener("click", (e) => {
+        const cell = e.target.closest(".ellipsis-cell");
+        if (!cell) return;
+
+        const full = String(cell.dataset.fullText || "").trim();
+        const fallback = String(cell.textContent || "").trim();
+        open("전체 내용", full || fallback || "-");
+      });
+    }
+
+    return { open, bindEllipsisClickOnce };
+  })();
 
   /* ==========================================================
-   * 5) Fetch helpers
-   * - 응답 구조가 달라도 최대한 흡수(unwrap)
+   * 5) Fetch / unwrap helpers (응답 구조 변화 흡수) - 기존 로직 유지
    * ========================================================== */
-  async function fetchJSON(url) {
-    const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+  const Net = (() => {
+    async function fetchJSON(url) {
+      const res = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
 
-    let data = null;
-    try {
-      data = await res.json();
-    } catch {
-      data = null;
-    }
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
 
-    if (!res.ok) {
-      const msg = data?.message || `요청 실패 (${res.status})`;
-      throw new Error(msg);
-    }
-    if (data && data.ok === false) {
-      throw new Error(data.message || "요청 실패");
-    }
-    return data;
-  }
-
-  function unwrapFirstObject(data, candidates = []) {
-    if (!data || typeof data !== "object") return null;
-
-    for (const k of candidates) {
-      const v = data?.[k];
-      if (v && typeof v === "object") return v;
+      if (!res.ok) {
+        const msg = data?.message || `요청 실패 (${res.status})`;
+        throw new Error(msg);
+      }
+      if (data && data.ok === false) {
+        throw new Error(data.message || "요청 실패");
+      }
+      return data;
     }
 
-    for (const k of ["user", "summary", "data", "result", "payload", "item"]) {
-      const v = data?.[k];
-      if (v && typeof v === "object") return v;
-    }
-    return null;
-  }
+    function unwrapFirstObject(data, candidates = []) {
+      if (!data || typeof data !== "object") return null;
 
-  function unwrapFirstArray(data, candidates = []) {
-    if (!data || typeof data !== "object") return [];
-    for (const k of candidates) {
-      const v = data?.[k];
-      if (Array.isArray(v)) return v;
+      for (const k of candidates) {
+        const v = data?.[k];
+        if (v && typeof v === "object") return v;
+      }
+      for (const k of ["user", "summary", "data", "result", "payload", "item"]) {
+        const v = data?.[k];
+        if (v && typeof v === "object") return v;
+      }
+      return null;
     }
-    for (const k of ["items", "results", "data", "list", "rows"]) {
-      const v = data?.[k];
-      if (Array.isArray(v)) return v;
+
+    function unwrapFirstArray(data, candidates = []) {
+      if (!data || typeof data !== "object") return [];
+      for (const k of candidates) {
+        const v = data?.[k];
+        if (Array.isArray(v)) return v;
+      }
+      for (const k of ["items", "results", "data", "list", "rows"]) {
+        const v = data?.[k];
+        if (Array.isArray(v)) return v;
+      }
+      return [];
     }
-    return [];
-  }
+
+    return { fetchJSON, unwrapFirstObject, unwrapFirstArray };
+  })();
 
   const api = {
     async userDetail(userId) {
       const url = `${URLS.userDetail}?user=${encodeURIComponent(userId)}`;
-      const data = await fetchJSON(url);
-      return unwrapFirstObject(data, ["user", "data", "result", "item"]);
+      const data = await Net.fetchJSON(url);
+      return Net.unwrapFirstObject(data, ["user", "data", "result", "item"]);
     },
     async summary(userId) {
       const url = `${URLS.summary}?user=${encodeURIComponent(userId)}`;
-      const data = await fetchJSON(url);
-      return unwrapFirstObject(data, ["summary", "data", "result", "item"]);
+      const data = await Net.fetchJSON(url);
+      return Net.unwrapFirstObject(data, ["summary", "data", "result", "item"]);
     },
     async surety(userId) {
       const url = `${URLS.surety}?user=${encodeURIComponent(userId)}`;
-      const data = await fetchJSON(url);
-      return unwrapFirstArray(data, ["items", "results", "data", "list"]);
+      const data = await Net.fetchJSON(url);
+      return Net.unwrapFirstArray(data, ["items", "results", "data", "list"]);
     },
     async other(userId) {
       const url = `${URLS.other}?user=${encodeURIComponent(userId)}`;
-      const data = await fetchJSON(url);
-      return unwrapFirstArray(data, ["items", "results", "data", "list"]);
+      const data = await Net.fetchJSON(url);
+      return Net.unwrapFirstArray(data, ["items", "results", "data", "list"]);
     },
   };
 
   /* ==========================================================
-   * 6) data-bind 렌더 (legacy alias 흡수)
+   * 6) data-bind 렌더 (legacy alias 흡수) - 기존 유지
    * ========================================================== */
-  const BIND_ALIAS = {
-    // target.*
-    "target.emp_id": "target.id",
-    "target.join_date": "target.join_date_display",
-    "target.leave_date": "target.retire_date_display",
+  const Binder = (() => {
+    const BIND_ALIAS = {
+      // target.*
+      "target.emp_id": "target.id",
+      "target.join_date": "target.join_date_display",
+      "target.leave_date": "target.retire_date_display",
 
-    // summary.* legacy
-    "summary.final_pay": "summary.final_payment",
-    "summary.long_term": "summary.sales_total",
-    "summary.loss_asset": "summary.maint_total",
-    "summary.deposit_total": "summary.debt_total",
-    "summary.etc_total": "summary.other_total",
-    "summary.need_deposit": "summary.required_debt",
-    "summary.final_extra_pay": "summary.final_excess_amount",
-    "summary.month1": "summary.div_1m",
-    "summary.month2": "summary.div_2m",
-    "summary.month3": "summary.div_3m",
-  };
+      // summary.* legacy
+      "summary.final_pay": "summary.final_payment",
+      "summary.long_term": "summary.sales_total",
+      "summary.loss_asset": "summary.maint_total",
+      "summary.deposit_total": "summary.debt_total",
+      "summary.etc_total": "summary.other_total",
+      "summary.need_deposit": "summary.required_debt",
+      "summary.final_extra_pay": "summary.final_excess_amount",
+      "summary.month1": "summary.div_1m",
+      "summary.month2": "summary.div_2m",
+      "summary.month3": "summary.div_3m",
+    };
 
-  function resolveBindKey(key) {
-    return BIND_ALIAS[key] || key;
-  }
+    const resolveBindKey = (key) => BIND_ALIAS[key] || key;
 
-  function getByPath(obj, path) {
-    const parts = String(path || "").split(".");
-    let cur = obj;
-    for (const p of parts) {
-      if (!cur) return undefined;
-      cur = cur[p];
+    const getByPath = (obj, path) => {
+      const parts = String(path || "").split(".");
+      let cur = obj;
+      for (const p of parts) {
+        if (!cur) return undefined;
+        cur = cur[p];
+      }
+      return cur;
+    };
+
+    function setSupportEnabled(userId) {
+      if (!els.supportPdfBtn) return;
+      els.supportPdfBtn.disabled = !String(userId || "").trim();
     }
-    return cur;
-  }
 
-  function renderBinds({ target, summary }) {
-    const ctx = { target: target || {}, summary: summary || {} };
+    function renderBinds({ target, summary }) {
+      const ctx = { target: target || {}, summary: summary || {} };
 
-    root.querySelectorAll("[data-bind]").forEach((node) => {
-      const rawKey = node.getAttribute("data-bind");
-      const key = resolveBindKey(rawKey);
-      const type = (node.getAttribute("data-type") || "").trim(); // money/percent/plain
-      const v = getByPath(ctx, key);
+      root.querySelectorAll("[data-bind]").forEach((node) => {
+        const rawKey = node.getAttribute("data-bind");
+        const key = resolveBindKey(rawKey);
+        const type = (node.getAttribute("data-type") || "").trim(); // money/percent/plain
+        const v = getByPath(ctx, key);
 
-      if (type === "percent") safeSetText(node, percent(v));
-      else if (type === "money") safeSetText(node, comma(v));
-      else safeSetText(node, toText(v).trim() || "-");
-    });
+        if (type === "percent") U.safeSetText(node, U.percent(v));
+        else if (type === "money") U.safeSetText(node, U.comma(v));
+        else U.safeSetText(node, U.toText(v).trim() || "-");
+      });
 
-    const uid = String(target?.id || "").trim();
-    setSupportEnabled(uid);
-  }
+      const uid = String(target?.id || "").trim();
+      setSupportEnabled(uid);
+    }
+
+    return { renderBinds, setSupportEnabled };
+  })();
 
   /* ==========================================================
-   * 7) 테이블 렌더 (surety / other)
+   * 7) Table renderers (surety / other) - 기존 유지
    * ========================================================== */
-  function renderSurety(items) {
-    if (!els.suretyTbody) return;
+  const Tables = (() => {
+    function renderSurety(items) {
+      if (!els.suretyTbody) return;
 
-    if (!items || items.length === 0) {
-      els.suretyTbody.innerHTML = `
-        <tr><td class="text-nowrap text-center" colspan="6">표시할 보증보험 내역이 없습니다.</td></tr>
-      `;
-      return;
-    }
-
-    els.suretyTbody.innerHTML = items
-      .map((x) => {
-        const policy = toText(x.policy_no || "").trim();
-        const policyCell = policy
-          ? `<span class="ellipsis-cell" data-full-text="${escapeHtml(policy)}">${escapeHtml(policy)}</span>`
-          : "-";
-
-        return `
-          <tr>
-            <td class="text-nowrap">${escapeHtml(x.product_name || "")}</td>
-            <td class="text-nowrap">${policyCell}</td>
-            <td class="text-nowrap text-end">${comma(x.amount)}</td>
-            <td class="text-nowrap">${escapeHtml(x.status || "")}</td>
-            <td class="text-nowrap">${escapeHtml(x.start_date || "-")}</td>
-            <td class="text-nowrap">${escapeHtml(x.end_date || "-")}</td>
-          </tr>
+      if (!items || items.length === 0) {
+        els.suretyTbody.innerHTML = `
+          <tr><td class="text-nowrap text-center" colspan="6">표시할 보증보험 내역이 없습니다.</td></tr>
         `;
-      })
-      .join("");
-  }
+        return;
+      }
 
-  function renderOther(items) {
-    if (!els.otherTbody) return;
+      els.suretyTbody.innerHTML = items
+        .map((x) => {
+          const policy = U.toText(x.policy_no || "").trim();
+          const policyCell = policy
+            ? `<span class="ellipsis-cell" data-full-text="${U.escapeHtml(policy)}">${U.escapeHtml(policy)}</span>`
+            : "-";
 
-    if (!items || items.length === 0) {
-      els.otherTbody.innerHTML = `
-        <tr><td class="text-nowrap text-center" colspan="7">표시할 기타채권 내역이 없습니다.</td></tr>
-      `;
-      return;
+          return `
+            <tr>
+              <td class="text-nowrap">${U.escapeHtml(x.product_name || "")}</td>
+              <td class="text-nowrap">${policyCell}</td>
+              <td class="text-nowrap text-end">${U.comma(x.amount)}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.status || "")}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.start_date || "-")}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.end_date || "-")}</td>
+            </tr>
+          `;
+        })
+        .join("");
     }
 
-    els.otherTbody.innerHTML = items
-      .map((x) => {
-        const memo = toText(x.memo || "").trim();
-        const memoCell = memo
-          ? `<span class="ellipsis-cell" data-full-text="${escapeHtml(memo)}">${escapeHtml(memo)}</span>`
-          : "-";
+    function renderOther(items) {
+      if (!els.otherTbody) return;
 
-        return `
-          <tr>
-            <td class="text-nowrap">${escapeHtml(x.product_name || "")}</td>
-            <td class="text-nowrap">${escapeHtml(x.product_type || "")}</td>
-            <td class="text-nowrap text-end">${comma(x.amount)}</td>
-            <td class="text-nowrap">${escapeHtml(x.status || "")}</td>
-            <td class="text-nowrap">${escapeHtml(x.bond_no || "")}</td>
-            <td class="text-nowrap">${escapeHtml(x.start_date || "-")}</td>
-            <td class="text-nowrap">${memoCell}</td>
-          </tr>
+      if (!items || items.length === 0) {
+        els.otherTbody.innerHTML = `
+          <tr><td class="text-nowrap text-center" colspan="7">표시할 기타채권 내역이 없습니다.</td></tr>
         `;
-      })
-      .join("");
-  }
+        return;
+      }
 
-  function clearUI() {
-    root.querySelectorAll("[data-bind]").forEach((n) => (n.textContent = "-"));
+      els.otherTbody.innerHTML = items
+        .map((x) => {
+          const memo = U.toText(x.memo || "").trim();
+          const memoCell = memo
+            ? `<span class="ellipsis-cell" data-full-text="${U.escapeHtml(memo)}">${U.escapeHtml(memo)}</span>`
+            : "-";
 
-    if (els.suretyTbody) {
-      els.suretyTbody.innerHTML = `
-        <tr><td class="text-nowrap text-center" colspan="6">대상자를 선택하면 보증보험 내역이 표시됩니다.</td></tr>
-      `;
+          return `
+            <tr>
+              <td class="text-nowrap">${U.escapeHtml(x.product_name || "")}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.product_type || "")}</td>
+              <td class="text-nowrap text-end">${U.comma(x.amount)}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.status || "")}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.bond_no || "")}</td>
+              <td class="text-nowrap">${U.escapeHtml(x.start_date || "-")}</td>
+              <td class="text-nowrap">${memoCell}</td>
+            </tr>
+          `;
+        })
+        .join("");
     }
-    if (els.otherTbody) {
-      els.otherTbody.innerHTML = `
-        <tr><td class="text-nowrap text-center" colspan="7">대상자를 선택하면 기타채권 내역이 표시됩니다.</td></tr>
-      `;
+
+    function clearUI() {
+      root.querySelectorAll("[data-bind]").forEach((n) => (n.textContent = "-"));
+
+      if (els.suretyTbody) {
+        els.suretyTbody.innerHTML = `
+          <tr><td class="text-nowrap text-center" colspan="6">대상자를 선택하면 보증보험 내역이 표시됩니다.</td></tr>
+        `;
+      }
+      if (els.otherTbody) {
+        els.otherTbody.innerHTML = `
+          <tr><td class="text-nowrap text-center" colspan="7">대상자를 선택하면 기타채권 내역이 표시됩니다.</td></tr>
+        `;
+      }
+
+      Binder.setSupportEnabled("");
     }
-    setSupportEnabled("");
-  }
+
+    return { renderSurety, renderOther, clearUI };
+  })();
 
   /* ==========================================================
-   * 8) Main flow: load → render
+   * 8) Main flow: load → render (기존 동작 유지)
    * ========================================================== */
   let currentUserId = "";
 
@@ -375,12 +415,12 @@
     const uid = String(userId || "").trim();
     if (!uid) {
       currentUserId = "";
-      clearUI();
+      Tables.clearUI();
       return;
     }
 
     currentUserId = uid;
-    setSupportEnabled(uid);
+    Binder.setSupportEnabled(uid);
 
     try {
       const [user, summary, surety, other] = await Promise.all([
@@ -390,9 +430,9 @@
         api.other(uid),
       ]);
 
-      renderBinds({ target: user, summary });
-      renderSurety(surety);
-      renderOther(other);
+      Binder.renderBinds({ target: user, summary });
+      Tables.renderSurety(surety);
+      Tables.renderOther(other);
 
       log("render ok", { uid, suretyCount: surety.length, otherCount: other.length });
     } catch (err) {
@@ -411,11 +451,20 @@
   }
 
   /* ==========================================================
-   * 9) Events
+   * 9) Events (기존 동작 유지)
    * ========================================================== */
   function getSelectedUserIdFromEvent(e) {
     const d = e?.detail || {};
-    return d.id || d.user_id || d.userId || d.user || d.empId || d.emp_id || d.employee_id || "";
+    return (
+      d.id ||
+      d.user_id ||
+      d.userId ||
+      d.user ||
+      d.empId ||
+      d.emp_id ||
+      d.employee_id ||
+      ""
+    );
   }
 
   function bindUserSelected() {
@@ -427,6 +476,7 @@
       loadAndRender(userId);
     };
 
+    // 기존 유지: window + document 둘 다 수신
     window.addEventListener("userSelected", handler);
     document.addEventListener("userSelected", handler);
   }
@@ -444,9 +494,7 @@
 
     els.supportPdfBtn.addEventListener("click", () => {
       const uid =
-        String(currentUserId || "").trim() ||
-        qsUser() ||
-        readTextOrValue(els.empIdSpan);
+        String(currentUserId || "").trim() || U.qsUser() || U.readTextOrValue(els.empIdSpan);
 
       if (!uid || uid === "-") {
         alert("대상자를 먼저 선택해주세요.");
@@ -457,22 +505,23 @@
     });
   }
 
+  // 뒤로가기 지원 - 기존 유지
   window.addEventListener("popstate", () => {
-    loadAndRender(qsUser());
+    loadAndRender(U.qsUser());
   });
 
   /* ==========================================================
    * 10) Init
    * ========================================================== */
   function init() {
-    bindEllipsisClickOnce();
+    TextViewer.bindEllipsisClickOnce();
     bindUserSelected();
     bindReset();
     bindSupportPdf();
 
-    const initial = qsUser();
+    const initial = U.qsUser();
     if (initial) loadAndRender(initial);
-    else clearUI();
+    else Tables.clearUI();
 
     log("init", { URLS, initial });
   }
