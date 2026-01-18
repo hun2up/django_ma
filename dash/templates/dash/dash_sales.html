@@ -5,10 +5,16 @@
 {% block title %}매출대시보드{% endblock %}
 
 {% block content %}
+{# ✅ 캐시버스터/디버그용 버전(필요할 때 이 문자열만 바꾸면 됨) #}
+{% with STATIC_VER="20260118-01" %}
+
 <div class="container-fluid mt-4" id="dash-sales"
      data-upload-url="{% url 'dash_sales_upload' %}"
      data-initial-part="{{ filter_part|default:''|escapejs }}"
-     data-initial-branch="{{ filter_branch|default:''|escapejs }}">
+     data-initial-branch="{{ filter_branch|default:''|escapejs }}"
+     data-initial-life-nl="{{ filter_life_nl|default:''|escapejs }}"
+     data-initial-insurer="{{ filter_insurer|default:''|escapejs }}"
+     data-static-version="{{ STATIC_VER }}">
 
   <!-- =========================
        Header
@@ -34,9 +40,9 @@
   <div class="card mb-3">
     <div class="card-body">
 
-      {# ✅ JSON 내려주기: form 바깥에 두는 게 깔끔/안전 #}
       {{ part_branch_map|json_script:"part-branch-map" }}
       {{ branch_options_all|json_script:"branch-options-all" }}
+      {{ life_nl_insurer_map|json_script:"life-nl-insurer-map" }}
 
       <form method="get" class="d-flex flex-wrap gap-2 align-items-end" id="filterForm">
 
@@ -70,7 +76,6 @@
 
         <div style="width:170px;">
           <label class="form-label fw-semibold mb-1">지점</label>
-          {# ✅ 서버 for-loop 제거: JS가 항상 옵션 생성 #}
           <select name="branch" id="branchSelect" class="form-select">
             <option value="" {% if not filter_branch %}selected{% endif %}>전체</option>
           </select>
@@ -78,7 +83,7 @@
 
         <div style="width:110px;">
           <label class="form-label fw-semibold mb-1">손생</label>
-          <select name="life_nl" class="form-select">
+          <select name="life_nl" id="lifeNlSelect" class="form-select">
             <option value="" {% if not filter_life_nl %}selected{% endif %}>전체</option>
             <option value="손보" {% if filter_life_nl == "손보" %}selected{% endif %}>손보</option>
             <option value="생보" {% if filter_life_nl == "생보" %}selected{% endif %}>생보</option>
@@ -88,7 +93,7 @@
 
         <div style="width:190px;">
           <label class="form-label fw-semibold mb-1">보험사</label>
-          <select name="insurer" class="form-select">
+          <select name="insurer" id="insurerSelect" class="form-select">
             <option value="" {% if not filter_insurer %}selected{% endif %}>전체</option>
             {% for ins in insurer_options %}
               <option value="{{ ins }}" {% if filter_insurer == ins %}selected{% endif %}>{{ ins }}</option>
@@ -114,64 +119,68 @@
   </div>
 
   <!-- =========================
-       Chart Card
+       Chart Card (4 charts)
   ========================== -->
   <div class="card mb-3">
     <div class="card-body">
 
+      {{ chart_day_labels|json_script:"chart-day-labels" }}
+      {{ nl_l_y_step|json_script:"nl-l-y-step" }}
+      {{ nl_l_y_max|json_script:"nl-l-y-max" }}
+
+      {{ chart_cumsum|json_script:"chart-cumsum" }}
+      {{ car_chart_cumsum|json_script:"car-chart-cumsum" }}
+      {{ nonlife_chart_cumsum|json_script:"nonlife-chart-cumsum" }}
+      {{ life_chart_cumsum|json_script:"life-chart-cumsum" }}
+
       <div class="row g-3">
-        <!-- (좌) 손생 장기매출 -->
         <div class="col-12 col-lg-6">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="fw-bold">손생 장기매출</div>
-            <div class="text-muted small">
-              기준 월도: <b>{{ filter_ym }}</b>
-            </div>
+            <div class="text-muted small">기준 월도: <b>{{ filter_ym }}</b></div>
           </div>
-
-          {{ chart_labels|json_script:"chart-labels" }}
-          {{ chart_cumsum|json_script:"chart-cumsum" }}
-
           <div class="mt-3" style="height:260px;">
             <canvas id="dailyCumsumChart"></canvas>
           </div>
           <div id="chartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
-
-          {% if not chart_labels %}
-            <div class="text-muted text-center mt-2">
-              표시할 데이터가 없습니다.
-            </div>
-          {% endif %}
         </div>
 
-        <!-- (우) 자동차 매출 -->
         <div class="col-12 col-lg-6">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="fw-bold">자동차 매출</div>
-            <div class="text-muted small">
-              기준 월도: <b>{{ filter_ym }}</b>
-            </div>
+            <div class="text-muted small">기준 월도: <b>{{ filter_ym }}</b></div>
           </div>
-
-          {{ car_chart_labels|json_script:"car-chart-labels" }}
-          {{ car_chart_cumsum|json_script:"car-chart-cumsum" }}
-
           <div class="mt-3" style="height:260px;">
             <canvas id="carDailyCumsumChart"></canvas>
           </div>
           <div id="carChartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
+        </div>
 
-          {% if not car_chart_labels %}
-            <div class="text-muted text-center mt-2">
-              표시할 데이터가 없습니다.
-            </div>
-          {% endif %}
+        <div class="col-12 col-lg-6">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="fw-bold">손보 장기매출</div>
+            <div class="text-muted small">기준 월도: <b>{{ filter_ym }}</b></div>
+          </div>
+          <div class="mt-3" style="height:260px;">
+            <canvas id="nonlifeDailyCumsumChart"></canvas>
+          </div>
+          <div id="nonlifeChartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="fw-bold">생보 장기매출</div>
+            <div class="text-muted small">기준 월도: <b>{{ filter_ym }}</b></div>
+          </div>
+          <div class="mt-3" style="height:260px;">
+            <canvas id="lifeDailyCumsumChart"></canvas>
+          </div>
+          <div id="lifeChartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
         </div>
       </div>
 
     </div>
   </div>
-
 
   <!-- =========================
        Table Card
@@ -260,6 +269,7 @@
         </table>
       </div>
 
+      {# pagination은 너의 버전 그대로 유지 #}
       {% if page_obj.paginator.num_pages > 1 %}
         <nav class="mt-3">
           <ul class="pagination justify-content-center mb-0">
@@ -342,15 +352,11 @@
 </div>
 
 <!-- =========================
-     Scripts
+     Scripts (✅ cache buster)
 ========================== -->
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}?v={{ STATIC_VER }}"></script>
+<script src="{% static 'js/dash/dash_sales_page.js' %}?v={{ STATIC_VER }}"></script>
+<script type="module" src="{% static 'js/dash/sales_upload.js' %}?v={{ STATIC_VER }}"></script>
 
-{# ✅ Chart.js: 로컬 static 파일(배포/CSP 안전) #}
-<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
-
-{# ✅ dash_sales 전용 페이지 스크립트(인라인 제거) #}
-<script src="{% static 'js/dash/dash_sales_page.js' %}"></script>
-
-{# ✅ 기존 업로드 모듈 유지 #}
-<script type="module" src="{% static 'js/dash/sales_upload.js' %}"></script>
+{% endwith %}
 {% endblock %}

@@ -1,6 +1,8 @@
 # django_ma/dash/views.py
 from __future__ import annotations
 
+import calendar
+import json
 import logging
 import re
 from datetime import datetime, date
@@ -22,7 +24,6 @@ from .models import SalesRecord
 
 logger = logging.getLogger(__name__)
 
-
 NONLIFE_INSURERS = {
     "현대해상", "DB손보", "KB손보", "메리츠화재", "한화손보", "롯데손보", "흥국화재",
     "삼성화재", "AIG손보", "MG손보", "농협손보", "하나손보", "라이나손보",
@@ -33,15 +34,12 @@ LIFE_INSURERS = {
     "한화생명", "카디프생명", "동양생명", "메트라이프", "흥국생명", "푸본현대생명", "교보생명",
 }
 
-# ✅ 일반 실적(손보/생보)
 REQUIRED_COLS = [
     "소속", "영업가족", "설계사", "설계사CD",
     "보험사", "증권번호", "계약자", "주피",
     "보험시작", "보험종기", "납입방법", "영수일자", "영수금",
     "보험사 상품코드", "보험사 상품명",
 ]
-
-# ✅ 자동차 실적
 AUTO_REQUIRED_COLS = [
     "소속", "파트너", "담당자코드", "담당자명",
     "보험사", "증권번호", "피보험자명", "차량번호",
@@ -54,10 +52,6 @@ AUTO_REQUIRED_COLS = [
 def redirect_to_sales(request):
     return redirect("dash_sales")
 
-
-# dash/views.py
-from django.db.models import Q
-import json
 
 @grade_required(["superuser", "main_admin"])
 def dash_sales(request):
@@ -93,6 +87,63 @@ def dash_sales(request):
         page_size = 50
 
     # -----------------------------
+    # 공용 유틸
+    # -----------------------------
+    def _clean_list(vals):
+        return sorted({str(v).strip() for v in vals if str(v).strip() and str(v).strip().lower() != "nan"})
+
+    def _month_day_labels(ym_str: str):
+        y_s, m_s = ym_str.split("-")
+        y = int(y_s); m = int(m_s)
+        last_day = calendar.monthrange(y, m)[1]
+        # 공통 라벨은 "YYYY-MM-DD" (JS에서 표시는 1~말일로 바꿔도 됨)
+        return [f"{y:04d}-{m:02d}-{d:02d}" for d in range(1, last_day + 1)]
+
+    def _daily_sum_map(qs):
+        qs = qs.order_by().exclude(receipt_date__isnull=True)
+        rows = (
+            qs.values("receipt_date")
+              .annotate(daily_sum=Sum(Coalesce("receipt_amount", 0)))
+              .order_by("receipt_date")
+        )
+        out = {}
+        for r in rows:
+            d = r["receipt_date"]
+            if not d:
+                continue
+            out[d.strftime("%Y-%m-%d")] = int(r["daily_sum"] or 0)
+        return out
+
+    def _build_cumsum_aligned(qs, labels):
+        daily_map = _daily_sum_map(qs)
+        running = 0
+        cumsum = []
+        for day in labels:
+            running += int(daily_map.get(day, 0))
+            cumsum.append(running)
+        return cumsum
+
+    def _nice_step_and_max(max_value: int):
+        mv = int(max_value or 0)
+        if mv <= 0:
+            return 1000000, 5000000
+
+        target_ticks = 6
+        raw_step = max(1, mv // target_ticks)
+
+        pow10 = 10 ** max(0, len(str(raw_step)) - 1)
+        candidates = [1 * pow10, 2 * pow10, 5 * pow10, 10 * pow10]
+
+        step = candidates[-1]
+        for c in candidates:
+            if raw_step <= c:
+                step = c
+                break
+
+        y_max = ((mv + step - 1) // step) * step
+        return int(step), int(y_max)
+
+    # -----------------------------
     # 3) base QS: 권한 + 월도(ym)
     # -----------------------------
     qs_base = SalesRecord.objects.all()
@@ -109,22 +160,16 @@ def dash_sales(request):
     qs_base = qs_base.filter(ym=ym)
 
     # -----------------------------
-    # 4) 조회용 QS (보험사 제외한 상태: qs_pre_insurer)
-    #    - insurer_options는 이 QS에서 뽑아야 "손생 연동"이 됨
+    # 4) 옵션/조회 공통 스코프(보험사/손생 적용 전)
+    #    - part/branch/q는 반영
     # -----------------------------
-    qs_pre_insurer = qs_base
-
+    qs_scope = qs_base
     if filter_part:
-        qs_pre_insurer = qs_pre_insurer.filter(Q(user__part=filter_part) | Q(part_snapshot=filter_part))
-
+        qs_scope = qs_scope.filter(Q(user__part=filter_part) | Q(part_snapshot=filter_part))
     if filter_branch:
-        qs_pre_insurer = qs_pre_insurer.filter(Q(user__branch=filter_branch) | Q(branch_snapshot=filter_branch))
-
-    if filter_life_nl:
-        qs_pre_insurer = qs_pre_insurer.filter(life_nl=filter_life_nl)
-
+        qs_scope = qs_scope.filter(Q(user__branch=filter_branch) | Q(branch_snapshot=filter_branch))
     if filter_q:
-        qs_pre_insurer = qs_pre_insurer.filter(
+        qs_scope = qs_scope.filter(
             Q(policy_no__icontains=filter_q)
             | Q(contractor__icontains=filter_q)
             | Q(name_snapshot__icontains=filter_q)
@@ -135,16 +180,40 @@ def dash_sales(request):
         )
 
     # -----------------------------
-    # 5) ✅ 보험사 옵션 캐시(손생/부서/지점/월도 기준)
-    #    - q까지 캐시키로 넣으면 캐시 파편화가 심해서 비추
-    #    - q가 있을 때만 옵션을 "현 조회결과 기준"으로 즉시 계산(대개 결과가 작음)
+    # 5) ✅ 손생(life_nl) -> 보험사 맵 (조회 버튼 없이 즉시 연동용)
+    #    - q는 제외한 "대략 정확" 맵(캐시 파편화 방지)
     # -----------------------------
-    def _clean_list(vals):
-        return sorted({str(v).strip() for v in vals if str(v).strip() and str(v).strip().lower() != "nan"})
+    qs_map_scope = qs_base
+    if filter_part:
+        qs_map_scope = qs_map_scope.filter(Q(user__part=filter_part) | Q(part_snapshot=filter_part))
+    if filter_branch:
+        qs_map_scope = qs_map_scope.filter(Q(user__branch=filter_branch) | Q(branch_snapshot=filter_branch))
 
+    map_cache_key = f"dash:lifeinsmap:{ym}:{filter_part or '*'}:{filter_branch or '*'}"
+    life_nl_insurer_map = cache.get(map_cache_key)
+    if life_nl_insurer_map is None:
+        life_nl_insurer_map = {}
+        for ln in ["손보", "생보", "자동차"]:
+            raw = list(
+                qs_map_scope.filter(life_nl=ln)
+                .exclude(insurer__isnull=True).exclude(insurer__exact="")
+                .values_list("insurer", flat=True).distinct()
+            )
+            life_nl_insurer_map[ln] = _clean_list(raw)
+        cache.set(map_cache_key, life_nl_insurer_map, 60 * 30)
+
+    # -----------------------------
+    # 6) 손생 적용 후(보험사 옵션/최종 조회용): qs_pre_insurer
+    # -----------------------------
+    qs_pre_insurer = qs_scope
+    if filter_life_nl:
+        qs_pre_insurer = qs_pre_insurer.filter(life_nl=filter_life_nl)
+
+    # -----------------------------
+    # 7) 보험사 옵션(현재 상태 반영) + 캐시
+    # -----------------------------
     insurer_options = []
     if filter_q:
-        # 검색 중엔 캐시보다 정확성이 중요 + 결과셋이 작으니 즉시 계산
         insurer_options_raw = list(
             qs_pre_insurer.exclude(insurer__isnull=True).exclude(insurer__exact="")
             .values_list("insurer", flat=True).distinct()
@@ -159,67 +228,65 @@ def dash_sales(request):
                 .values_list("insurer", flat=True).distinct()
             )
             insurer_options = _clean_list(insurer_options_raw)
-            cache.set(cache_key, insurer_options, 60 * 30)  # 30분 캐시(원하면 10분/1시간 조절)
+            cache.set(cache_key, insurer_options, 60 * 30)
 
     # -----------------------------
-    # 6) 최종 조회 QS (보험사 필터 적용)
+    # 8) 최종 조회 QS (보험사 필터 적용)
     # -----------------------------
     qs_final = qs_pre_insurer
     if filter_insurer:
         qs_final = qs_final.filter(insurer=filter_insurer)
-
     qs_final = qs_final.select_related("user").order_by("-updated_at")
 
     # -----------------------------
-    # 6.5) ✅ 그래프 데이터(2개):
-    #  (A) 손생 장기매출: 자동차 제외 + 일시납 제외
-    #  (B) 자동차 매출: life_nl='자동차'만 + (일시납 제외는 요구사항에 없음 → 원하면 추가 가능)
+    # 9) ✅ 그래프 데이터(4개) - 공통 라벨(1~말일) 정렬
     # -----------------------------
-    def _build_daily_cumsum(qs):
-        qs = qs.order_by().exclude(receipt_date__isnull=True)
+    chart_day_labels = _month_day_labels(ym)
 
-        daily_rows = (
-            qs.values("receipt_date")
-              .annotate(daily_sum=Sum(Coalesce("receipt_amount", 0)))
-              .order_by("receipt_date")
-        )
-
-        labels, cumsum = [], []
-        running = 0
-        for row in daily_rows:
-            d = row["receipt_date"]
-            s = int(row["daily_sum"] or 0)
-            running += s
-            labels.append(d.strftime("%Y-%m-%d"))
-            cumsum.append(running)
-        return labels, cumsum
-
-    # (A) 손생(자동차 제외) + 일시납 제외
+    # (1) 손생 장기매출: 자동차 제외 + 일시납 제외
     qs_chart_long = (
         qs_final
         .exclude(life_nl="자동차")
         .exclude(pay_method__icontains="일시납")
     )
-    chart_labels, chart_cumsum = _build_daily_cumsum(qs_chart_long)
+    chart_cumsum = _build_cumsum_aligned(qs_chart_long, chart_day_labels)
 
-    # (B) 자동차만 (요구사항: life_nl='자동차'만)
+    # (2) 자동차 매출
     qs_chart_car = qs_final.filter(life_nl="자동차")
-    car_chart_labels, car_chart_cumsum = _build_daily_cumsum(qs_chart_car)
+    car_chart_cumsum = _build_cumsum_aligned(qs_chart_car, chart_day_labels)
+
+    # (3) 손보 장기매출: life_nl='손보' + 일시납 제외
+    qs_chart_nonlife = (
+        qs_final
+        .filter(life_nl="손보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    nonlife_chart_cumsum = _build_cumsum_aligned(qs_chart_nonlife, chart_day_labels)
+
+    # (4) 생보 장기매출: life_nl='생보' + 일시납 제외
+    qs_chart_life = (
+        qs_final
+        .filter(life_nl="생보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    life_chart_cumsum = _build_cumsum_aligned(qs_chart_life, chart_day_labels)
+
+    # ✅ 손보/생보 2개만 y축 눈금 통일
+    y_max_value_nl_l = max(
+        max(nonlife_chart_cumsum or [0]),
+        max(life_chart_cumsum or [0]),
+    )
+    nl_l_y_step, nl_l_y_max = _nice_step_and_max(y_max_value_nl_l)
 
     # -----------------------------
-    # 7) ✅ 부서/지점 옵션: CustomUser + SalesRecord(snapshot + user 필드) "합집합"
-    #    - 월도(ym) 기준으로 SalesRecord에서 snapshot도 같이 가져오면,
-    #      업로드만 되었고 유저 매핑이 없는 행도 옵션에 자연스럽게 섞임
+    # 10) 부서/지점 옵션: CustomUser + SalesRecord snapshot/user "합집합"
     # -----------------------------
-    # 권한 적용된 월도 기준 SalesRecord subset
-    sr_scope = qs_base  # already includes ym + main_admin branch restriction
+    sr_scope = qs_base  # ym + 권한(main_admin) 적용된 scope
 
-    # (A) 부서 옵션: CustomUser.part + SalesRecord.part_snapshot + SalesRecord.user.part
     user_part_vals = list(
         CustomUser.objects.exclude(part__isnull=True).exclude(part__exact="")
         .values_list("part", flat=True).distinct()
     )
-    # main_admin이면 지점 제한된 사용자만(현실적으로 일치)
     if request.user.grade == "main_admin":
         my_branch = (request.user.branch or "").strip()
         if my_branch:
@@ -237,10 +304,8 @@ def dash_sales(request):
         sr_scope.exclude(user__part__isnull=True).exclude(user__part__exact="")
         .values_list("user__part", flat=True).distinct()
     )
-
     part_options = _clean_list(user_part_vals + sr_part_snapshot_vals + sr_user_part_vals)
 
-    # (B) 전체 지점 옵션: CustomUser.branch + SalesRecord.branch_snapshot + SalesRecord.user.branch
     user_branch_vals = list(
         CustomUser.objects.exclude(branch__isnull=True).exclude(branch__exact="")
         .values_list("branch", flat=True).distinct()
@@ -257,40 +322,33 @@ def dash_sales(request):
         sr_scope.exclude(user__branch__isnull=True).exclude(user__branch__exact="")
         .values_list("user__branch", flat=True).distinct()
     )
-
     branch_options_all = _clean_list(user_branch_vals + sr_branch_snapshot_vals + sr_user_branch_vals)
 
-    # (C) part -> branches map (CustomUser + SalesRecord)
     part_branch_map = {}
     for p in part_options:
-        # CustomUser 기반
         u_br = list(
             CustomUser.objects.filter(part=p)
             .exclude(branch__isnull=True).exclude(branch__exact="")
             .values_list("branch", flat=True).distinct()
         )
-        # main_admin이면 지점 1개로 귀결
         if request.user.grade == "main_admin":
             my_branch = (request.user.branch or "").strip()
             u_br = [my_branch] if my_branch else []
 
-        # SalesRecord snapshot 기반
         sr_br_snap = list(
             sr_scope.filter(part_snapshot=p)
             .exclude(branch_snapshot__isnull=True).exclude(branch_snapshot__exact="")
             .values_list("branch_snapshot", flat=True).distinct()
         )
-        # SalesRecord user 기반
         sr_br_user = list(
             sr_scope.filter(user__part=p)
             .exclude(user__branch__isnull=True).exclude(user__branch__exact="")
             .values_list("user__branch", flat=True).distinct()
         )
-
         part_branch_map[p] = _clean_list(u_br + sr_br_snap + sr_br_user)
 
     # -----------------------------
-    # 8) pagination
+    # 11) pagination
     # -----------------------------
     paginator = Paginator(qs_final, page_size)
     page_obj = paginator.get_page(page)
@@ -302,7 +360,7 @@ def dash_sales(request):
     end_page = min(start_page + block_size - 1, total_pages)
 
     # -----------------------------
-    # 9) context
+    # 12) context
     # -----------------------------
     context = {
         "filter_year": year,
@@ -318,12 +376,13 @@ def dash_sales(request):
         "year_options": year_options,
         "month_options": month_options,
 
-        # dropdown sources
         "part_options": part_options,
         "branch_options_all": branch_options_all,
         "part_branch_map": part_branch_map,
 
-        # insurer dropdown (손생 연동 + 캐시)
+        # 손생 변경 즉시 보험사 연동용 맵
+        "life_nl_insurer_map": life_nl_insurer_map,
+        # 서버 렌더 보험사 옵션(현재 상태 반영)
         "insurer_options": insurer_options,
 
         "page_size": page_size,
@@ -333,11 +392,18 @@ def dash_sales(request):
         "end_page": end_page,
         "total_pages": total_pages,
 
-        "chart_labels": chart_labels,
-        "chart_cumsum": chart_cumsum,
+        # ✅ 공통 라벨(1~말일 정렬용: YYYY-MM-DD 배열)
+        "chart_day_labels": chart_day_labels,
 
-        "car_chart_labels": car_chart_labels,
-        "car_chart_cumsum": car_chart_cumsum,
+        # ✅ 4개 시리즈 (라벨은 공통)
+        "chart_cumsum": chart_cumsum,                 # 손생 장기(자동차 제외)
+        "car_chart_cumsum": car_chart_cumsum,         # 자동차
+        "nonlife_chart_cumsum": nonlife_chart_cumsum, # 손보
+        "life_chart_cumsum": life_chart_cumsum,       # 생보
+
+        # ✅ 손보/생보만 y축 눈금 통일
+        "nl_l_y_step": nl_l_y_step,
+        "nl_l_y_max": nl_l_y_max,
     }
     return render(request, "dash/dash_sales.html", context)
 
