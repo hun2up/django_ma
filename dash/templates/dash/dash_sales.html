@@ -6,65 +6,194 @@
 
 {% block content %}
 <div class="container-fluid mt-4" id="dash-sales"
-     data-upload-url="{% url 'dash_sales_upload' %}">
+     data-upload-url="{% url 'dash_sales_upload' %}"
+     data-initial-part="{{ filter_part|default:''|escapejs }}"
+     data-initial-branch="{{ filter_branch|default:''|escapejs }}">
 
+  <!-- =========================
+       Header
+  ========================== -->
   <div class="d-flex align-items-center justify-content-between mb-3">
     <div class="text-center flex-grow-1" style="min-width:0;">
       <h2 class="fw-bold mb-0" style="color:#003f7d;">매출현황 대시보드</h2>
     </div>
 
     <div class="ms-3 flex-shrink-0">
-      <button type="button" class="btn btn-primary text-nowrap"
-              data-bs-toggle="modal" data-bs-target="#salesUploadModal">
-        엑셀 업로드
-      </button>
+      {% if user.grade == 'superuser' %}
+        <button type="button" class="btn btn-primary text-nowrap"
+                data-bs-toggle="modal" data-bs-target="#salesUploadModal">
+          엑셀 업로드
+        </button>
+      {% endif %}
     </div>
   </div>
 
-  <!-- ✅ 필터/검색 바 -->
+  <!-- =========================
+       Filter Card
+  ========================== -->
   <div class="card mb-3">
     <div class="card-body">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-12 col-md-2">
-          <label class="form-label fw-semibold mb-1">월도(YYYY-MM)</label>
-          <input type="text" name="ym" class="form-control" placeholder="2026-01" value="{{ filter_ym }}">
+
+      {# ✅ JSON 내려주기: form 바깥에 두는 게 깔끔/안전 #}
+      {{ part_branch_map|json_script:"part-branch-map" }}
+      {{ branch_options_all|json_script:"branch-options-all" }}
+
+      <form method="get" class="d-flex flex-wrap gap-2 align-items-end" id="filterForm">
+
+        <div style="width:110px;">
+          <label class="form-label fw-semibold mb-1">연도</label>
+          <select name="year" class="form-select">
+            {% for y in year_options %}
+              <option value="{{ y }}" {% if filter_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-12 col-md-2">
+        <div style="width:90px;">
+          <label class="form-label fw-semibold mb-1">월</label>
+          <select name="month" class="form-select">
+            {% for m in month_options %}
+              <option value="{{ m }}" {% if filter_month == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="width:150px;">
+          <label class="form-label fw-semibold mb-1">부서</label>
+          <select name="part" id="partSelect" class="form-select">
+            <option value="" {% if not filter_part %}selected{% endif %}>전체</option>
+            {% for p in part_options %}
+              <option value="{{ p }}" {% if filter_part == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="width:170px;">
+          <label class="form-label fw-semibold mb-1">지점</label>
+          {# ✅ 서버 for-loop 제거: JS가 항상 옵션 생성 #}
+          <select name="branch" id="branchSelect" class="form-select">
+            <option value="" {% if not filter_branch %}selected{% endif %}>전체</option>
+          </select>
+        </div>
+
+        <div style="width:110px;">
           <label class="form-label fw-semibold mb-1">손생</label>
           <select name="life_nl" class="form-select">
             <option value="" {% if not filter_life_nl %}selected{% endif %}>전체</option>
             <option value="손보" {% if filter_life_nl == "손보" %}selected{% endif %}>손보</option>
             <option value="생보" {% if filter_life_nl == "생보" %}selected{% endif %}>생보</option>
-            <option value="기타" {% if filter_life_nl == "기타" %}selected{% endif %}>기타</option>
+            <option value="자동차" {% if filter_life_nl == "자동차" %}selected{% endif %}>자동차</option>
           </select>
         </div>
 
-        <div class="col-12 col-md-3">
-          <label class="form-label fw-semibold mb-1">보험사(정확히 일치)</label>
-          <input type="text" name="insurer" class="form-control" placeholder="예: 현대해상" value="{{ filter_insurer }}">
+        <div style="width:190px;">
+          <label class="form-label fw-semibold mb-1">보험사</label>
+          <select name="insurer" class="form-select">
+            <option value="" {% if not filter_insurer %}selected{% endif %}>전체</option>
+            {% for ins in insurer_options %}
+              <option value="{{ ins }}" {% if filter_insurer == ins %}selected{% endif %}>{{ ins }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-12 col-md-3">
+        <div style="width:260px; min-width:220px; flex:1;">
           <label class="form-label fw-semibold mb-1">검색</label>
-          <input type="text" name="q" class="form-control" placeholder="증권번호/계약자/성명/사번" value="{{ filter_q }}">
+          <input type="text" name="q" class="form-control"
+                 placeholder="증권번호/계약자/성명/사번/차량번호" value="{{ filter_q }}">
         </div>
 
-        <div class="col-12 col-md-2 d-flex gap-2">
-          <button type="submit" class="btn btn-primary flex-grow-1 text-nowrap">조회</button>
+        <div class="d-flex gap-2 ms-auto" style="white-space:nowrap;">
+          <button type="submit" class="btn btn-primary text-nowrap">조회</button>
           <a href="{% url 'dash_sales' %}" class="btn btn-outline-secondary text-nowrap">초기화</a>
         </div>
+
+        <input type="hidden" name="page_size" value="{{ page_size|default:50 }}">
       </form>
 
-      <div class="mt-3 text-muted">
-        총 <b>{{ total_count }}</b>건 (페이지당 50건)
-      </div>
     </div>
   </div>
 
-  <!-- ✅ 업로드된 SalesRecord 테이블 -->
+  <!-- =========================
+       Chart Card
+  ========================== -->
+  <div class="card mb-3">
+    <div class="card-body">
+
+      <div class="row g-3">
+        <!-- (좌) 손생 장기매출 -->
+        <div class="col-12 col-lg-6">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="fw-bold">손생 장기매출</div>
+            <div class="text-muted small">
+              기준 월도: <b>{{ filter_ym }}</b>
+            </div>
+          </div>
+
+          {{ chart_labels|json_script:"chart-labels" }}
+          {{ chart_cumsum|json_script:"chart-cumsum" }}
+
+          <div class="mt-3" style="height:260px;">
+            <canvas id="dailyCumsumChart"></canvas>
+          </div>
+          <div id="chartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
+
+          {% if not chart_labels %}
+            <div class="text-muted text-center mt-2">
+              표시할 데이터가 없습니다.
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- (우) 자동차 매출 -->
+        <div class="col-12 col-lg-6">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="fw-bold">자동차 매출</div>
+            <div class="text-muted small">
+              기준 월도: <b>{{ filter_ym }}</b>
+            </div>
+          </div>
+
+          {{ car_chart_labels|json_script:"car-chart-labels" }}
+          {{ car_chart_cumsum|json_script:"car-chart-cumsum" }}
+
+          <div class="mt-3" style="height:260px;">
+            <canvas id="carDailyCumsumChart"></canvas>
+          </div>
+          <div id="carChartWarn" class="text-muted text-center mt-2" style="display:none;"></div>
+
+          {% if not car_chart_labels %}
+            <div class="text-muted text-center mt-2">
+              표시할 데이터가 없습니다.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- =========================
+       Table Card
+  ========================== -->
   <div class="card">
     <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div class="text-muted">
+          총 <b>{{ total_count }}</b>건 (페이지당 {{ page_size|default:50 }}건)
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-label mb-0 fw-semibold">조회건수</label>
+          <select id="pageSizeSelect" class="form-select form-select-sm" style="width:140px;">
+            <option value="50"  {% if page_size|default:50 == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+            <option value="250" {% if page_size == 250 %}selected{% endif %}>250</option>
+            <option value="500" {% if page_size == 500 %}selected{% endif %}>500</option>
+          </select>
+        </div>
+      </div>
+
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
           <thead class="table-light">
@@ -74,6 +203,7 @@
               <th>보험사</th>
               <th>증권번호(PK)</th>
               <th>계약자</th>
+              <th>차량번호</th>
               <th>영수일자</th>
               <th class="text-end">영수금</th>
               <th>설계사(사번)</th>
@@ -88,15 +218,19 @@
               <tr>
                 <td class="text-center">{{ r.ym }}</td>
                 <td class="text-center">
-                  <span class="badge {% if r.life_nl == '손보' %}bg-primary{% elif r.life_nl == '생보' %}bg-success{% else %}bg-secondary{% endif %}">
+                  <span class="badge
+                    {% if r.life_nl == '손보' %}bg-danger
+                    {% elif r.life_nl == '생보' %}bg-primary
+                    {% else %}bg-warning text-dark{% endif %}">
                     {{ r.life_nl }}
                   </span>
                 </td>
                 <td class="text-center">{{ r.insurer }}</td>
                 <td style="white-space:nowrap;">{{ r.policy_no }}</td>
                 <td>{{ r.contractor|default:"-" }}</td>
+                <td class="text-center" style="white-space:nowrap;">{{ r.vehicle_no|default:"-" }}</td>
                 <td class="text-center">{{ r.receipt_date|date:"Y-m-d"|default:"-" }}</td>
-                <td class="text-end money-cell">
+                <td class="text-end">
                   {% if r.receipt_amount %}{{ r.receipt_amount|intcomma }}{% else %}-{% endif %}
                 </td>
                 <td class="text-center" style="white-space:nowrap;">
@@ -117,7 +251,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="12" class="text-center text-muted py-4">
+                <td colspan="13" class="text-center text-muted py-4">
                   조회 결과가 없습니다. (먼저 엑셀 업로드를 실행해보세요)
                 </td>
               </tr>
@@ -126,69 +260,97 @@
         </table>
       </div>
 
-      <!-- ✅ 페이지네이션 -->
       {% if page_obj.paginator.num_pages > 1 %}
         <nav class="mt-3">
           <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {% if page_obj.number == 1 %}disabled{% endif %}">
+              <a class="page-link"
+                 href="?year={{ filter_year }}&month={{ filter_month }}&part={{ filter_part }}&branch={{ filter_branch }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page_size={{ page_size|default:50 }}&page=1">처음</a>
+            </li>
+
             {% if page_obj.has_previous %}
               <li class="page-item">
                 <a class="page-link"
-                   href="?ym={{ filter_ym }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page={{ page_obj.previous_page_number }}">이전</a>
+                   href="?year={{ filter_year }}&month={{ filter_month }}&part={{ filter_part }}&branch={{ filter_branch }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page_size={{ page_size|default:50 }}&page={{ page_obj.previous_page_number }}">이전</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">이전</span></li>
             {% endif %}
 
-            <li class="page-item disabled">
-              <span class="page-link">
-                {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-              </span>
-            </li>
+            {% for n in page_obj.paginator.page_range %}
+              {% if n >= start_page and n <= end_page %}
+                {% if n == page_obj.number %}
+                  <li class="page-item active"><span class="page-link">{{ n }}</span></li>
+                {% else %}
+                  <li class="page-item">
+                    <a class="page-link"
+                       href="?year={{ filter_year }}&month={{ filter_month }}&part={{ filter_part }}&branch={{ filter_branch }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page_size={{ page_size|default:50 }}&page={{ n }}">{{ n }}</a>
+                  </li>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
 
             {% if page_obj.has_next %}
               <li class="page-item">
                 <a class="page-link"
-                   href="?ym={{ filter_ym }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page={{ page_obj.next_page_number }}">다음</a>
+                   href="?year={{ filter_year }}&month={{ filter_month }}&part={{ filter_part }}&branch={{ filter_branch }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page_size={{ page_size|default:50 }}&page={{ page_obj.next_page_number }}">다음</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">다음</span></li>
             {% endif %}
+
+            <li class="page-item {% if page_obj.number == total_pages %}disabled{% endif %}">
+              <a class="page-link"
+                 href="?year={{ filter_year }}&month={{ filter_month }}&part={{ filter_part }}&branch={{ filter_branch }}&life_nl={{ filter_life_nl }}&insurer={{ filter_insurer }}&q={{ filter_q }}&page_size={{ page_size|default:50 }}&page={{ total_pages }}">끝</a>
+            </li>
           </ul>
         </nav>
       {% endif %}
     </div>
   </div>
 
-  <!-- 업로드 모달 -->
-  <div class="modal fade" id="salesUploadModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-md modal-dialog-centered" style="max-width:720px;">
-      <div class="modal-content">
-        <form id="salesUploadForm" enctype="multipart/form-data">
-          {% csrf_token %}
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold">자동실적입력 업로드</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
-          </div>
-
-          <div class="modal-body">
-            <div class="mb-3">
-              <input class="form-control" type="file" name="excel_file" id="salesExcelFile" accept=".xlsx" required>
+  <!-- =========================
+       Upload Modal (superuser)
+  ========================== -->
+  {% if user.grade == 'superuser' %}
+    <div class="modal fade" id="salesUploadModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-md modal-dialog-centered" style="max-width:720px;">
+        <div class="modal-content">
+          <form id="salesUploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold">자동실적입력 업로드</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
             </div>
-            <div id="salesUploadResult" class="mt-3"></div>
-          </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-            <button type="submit" class="btn btn-primary" id="salesUploadSubmitBtn">
-              업로드 실행
-            </button>
-          </div>
-        </form>
+            <div class="modal-body">
+              <div class="mb-3">
+                <input class="form-control" type="file" name="excel_file" id="salesExcelFile" accept=".xlsx" required>
+              </div>
+              <div id="salesUploadResult" class="mt-3"></div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+              <button type="submit" class="btn btn-primary" id="salesUploadSubmitBtn">업로드 실행</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  </div>
-
+  {% endif %}
 </div>
 
+<!-- =========================
+     Scripts
+========================== -->
+
+{# ✅ Chart.js: 로컬 static 파일(배포/CSP 안전) #}
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+
+{# ✅ dash_sales 전용 페이지 스크립트(인라인 제거) #}
+<script src="{% static 'js/dash/dash_sales_page.js' %}"></script>
+
+{# ✅ 기존 업로드 모듈 유지 #}
 <script type="module" src="{% static 'js/dash/sales_upload.js' %}"></script>
 {% endblock %}
