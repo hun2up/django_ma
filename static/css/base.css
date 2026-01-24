@@ -619,6 +619,11 @@ textarea[name="content"] {
 }
 
 /* ---------- Dash wide layout (Sales Dashboard) ---------- */
+/* 매출 대시보드 하단 계약리스트 숨김 */
+#sales-table-card {
+  display: none;
+}
+
 #dash-sales {
   width: 86vw;
   max-width: none;
@@ -1810,4 +1815,35 @@ a.manual-item.manual-editing {
 #manage-efficiency #mainTable {
   width: 100% !important;
   table-layout: fixed;
+}
+
+/* 개인정보 워터마크 (대형 1개) */
+.privacy-watermark{
+  position: fixed;
+  inset: 0;                    /* 화면 전체 덮기 */
+  display: flex;
+  align-items: center;          /* 세로 중앙 */
+  justify-content: center;      /* 가로 중앙 */
+  pointer-events: none;
+  user-select: none;
+  z-index: 2147483000;          /* 사실상 최상단 */
+}
+
+.privacy-watermark__text{
+  /* 크기: 화면 거의 꽉 차게 */
+  font-size: clamp(90px, 9vw, 220px);
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-align: center;
+  white-space: nowrap;
+
+  /* 색상/투명도: 옅은 회색 + 매우 투명(80~90% 투명) */
+  color: rgba(0, 0, 0, 0.01);   /* 0.10 = 90% 투명 */
+  /* 더 흐리게: 0.08 / 조금 진하게: 0.12~0.15 */
+
+  /* “글자만” 회전 */
+  transform: rotate(-22deg);
+
+  /* 살짝 부드럽게 보이게 */
+  text-shadow: 0 0 1px rgba(0,0,0,0.05);
 }

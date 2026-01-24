@@ -1,104 +1,60 @@
 # django_ma/accounts/admin.py
-# ============================================================
-# 📂 관리자 페이지 설정 — CustomUser Excel Import/Export 관리
-# ============================================================
 
+# =============================================================================
+# 📂 관리자 페이지 설정 — CustomUser Excel Import / Export
+# =============================================================================
 from __future__ import annotations
 
 import os
 import uuid
+import re
+from pathlib import Path
 
-from io import BytesIO
-from datetime import datetime, date
-
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import PatternFill
-
-from django.contrib import admin, messages
+from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.staticfiles import finders
-from django.http import HttpResponse, FileResponse, Http404
+from django.core.cache import cache
+from django.http import Http404, HttpResponse, FileResponse
 from django.shortcuts import render
-from django.urls import path
-from django.conf import settings
+from django.urls import path, reverse
+
+from openpyxl import Workbook
 
 from .forms import ExcelUploadForm
 from .models import CustomUser
 from .custom_admin import custom_admin_site
 from .tasks import process_users_excel_task
 
-from django.core.cache import cache
 
-
-# ============================================================
-# ✅ 전역 상수
-# ============================================================
+# =============================================================================
+# 0) 상수
+# =============================================================================
 EXCEL_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-UPLOAD_SHEET_NAME = "업로드"
 
-# ✅ 템플릿 파일 (앱 static 기준)
-TEMPLATE_REL_PATH = "accounts/excel/양식_계정관리.xlsx"  # accounts/static/accounts/excel/양식_계정관리.xlsx
+TEMPLATE_REL_PATH = "accounts/excel/양식_계정관리.xlsx"
 TEMPLATE_DOWNLOAD_NAME = "양식_계정관리.xlsx"
-
-GRADE_MAP = {
-    "superuser": "superuser",
-    "main_admin": "main_admin",
-    "sub_admin": "sub_admin",
-    "basic": "basic",
-    "inactive": "inactive",
-}
 
 GRADE_DISPLAY = {
     "superuser": "Superuser",
     "main_admin": "Main Admin",
     "sub_admin": "Sub Admin",
     "basic": "Basic",
+    "resign": "Resign",
     "inactive": "Inactive",
 }
 
 
-# ============================================================
-# ✅ 유틸리티 함수
-# ============================================================
-def _to_str(v) -> str:
-    return ("" if v is None else str(v)).strip()
-
-
-def parse_date(value) -> date | None:
-    """문자열 또는 datetime/date 객체를 안전하게 date로 변환"""
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    s = _to_str(value)
-    if not s:
-        return None
-    try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
-    except ValueError:
-        return None
-
-
-def parse_bool(value, default: bool = True) -> bool:
-    """엑셀에서 들어올 수 있는 다양한 bool 표현을 안전하게 파싱"""
-    s = _to_str(value).lower()
-    if s in {"true", "1", "yes", "y", "t"}:
-        return True
-    if s in {"false", "0", "no", "n", "f"}:
-        return False
-    return default
-
-
+# =============================================================================
+# 1) Export helpers
+# =============================================================================
 def export_users_as_excel(queryset, filename: str) -> HttpResponse:
-    """사용자 데이터를 엑셀 파일로 내보내기"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Users"
 
     headers = [
-        "ID", "Name", "Branch", "Channel", "Part",
+        "ID", "Name", "Branch", "Channel", "Division", "Part",
         "Grade", "Status", "입사일", "퇴사일", "Is Staff", "Is Active",
     ]
     ws.append(headers)
@@ -108,8 +64,9 @@ def export_users_as_excel(queryset, filename: str) -> HttpResponse:
             user.id,
             user.name,
             user.branch,
-            getattr(user, "channel", ""),
-            getattr(user, "part", ""),
+            user.channel,
+            user.division,
+            user.part,
             GRADE_DISPLAY.get(user.grade, user.grade),
             user.status,
             user.enter.strftime("%Y-%m-%d") if user.enter else "",
@@ -124,130 +81,128 @@ def export_users_as_excel(queryset, filename: str) -> HttpResponse:
     return response
 
 
-def _make_upload_result_workbook(
-    results: list[list],
-    total: int,
-    new_cnt: int,
-    upd_cnt: int,
-    err_cnt: int,
-) -> Workbook:
-    """업로드 처리 결과 리포트 엑셀 생성"""
-    result_wb = Workbook()
-    ws = result_wb.active
-    ws.title = "UploadResult"
-
-    ws.append(["Row", "ID", "Name", "Result"])
-
-    fill_new = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")      # 연녹색
-    fill_update = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")  # 연회색
-    fill_error = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")   # 연분홍
-
-    for row in results:
-        ws.append(row)
-        last = ws.max_row
-        result_text = _to_str(row[-1])
-
-        if "신규" in result_text:
-            ws[f"D{last}"].fill = fill_new
-        elif "업데이트" in result_text:
-            ws[f"D{last}"].fill = fill_update
-        elif "오류" in result_text or "누락" in result_text:
-            ws[f"D{last}"].fill = fill_error
-
-    ws.append([])
-    ws.append(["총 데이터", total])
-    ws.append(["신규 추가", new_cnt])
-    ws.append(["업데이트", upd_cnt])
-    ws.append(["오류", err_cnt])
-
-    return result_wb
+def export_selected_users_to_excel(modeladmin, request, queryset):
+    return export_users_as_excel(queryset, "selected_custom_users.xlsx")
 
 
-def _load_upload_sheet(excel_file):
-    """
-    업로드 엑셀 파일에서 '업로드' 시트를 열고,
-    (headers, worksheet) 반환
-    - ✅ rows를 list로 만들지 않음(대용량 대비)
-    """
-    wb = load_workbook(excel_file, read_only=True, data_only=True)
-
-    if UPLOAD_SHEET_NAME not in wb.sheetnames:
-        raise ValueError(f"'{UPLOAD_SHEET_NAME}' 시트를 찾을 수 없습니다.")
-
-    ws = wb[UPLOAD_SHEET_NAME]
-
-    if ws.sheet_state in ["hidden", "veryHidden"]:
-        raise ValueError("'업로드' 시트가 숨김 상태입니다.")
-
-    headers = [_to_str(c.value) for c in ws[1]]
-    return headers, ws
+def export_all_users_excel_view(request):
+    return export_users_as_excel(CustomUser.objects.all(), "all_custom_users.xlsx")
 
 
-# ============================================================
-# ✅ 사용자 업로드 처리 로직 (Admin View)
-# ============================================================
+# =============================================================================
+# 2) Admin Views — Upload / Result / Template
+# =============================================================================
 def upload_users_from_excel_view(request):
-    if request.method != "POST":
-        return render(request, "admin/accounts/customuser/upload_excel.html", {"form": ExcelUploadForm()})
+    """
+    CustomUser Excel 업로드(Admin View)
 
+    - GET
+      업로드 폼 렌더 (task_id가 있으면 진행률 UI도 함께 표시 가능)
+
+    - POST
+      1) 업로드 파일을 임시 폴더에 저장
+      2) 진행률/상태 cache 초기화
+      3) Celery task 실행 (비동기)
+      4) task_id를 템플릿에 내려줘서 progress polling 시작
+    """
+    template_name = "admin/accounts/customuser/upload_excel.html"
+
+    # ---------------------------------------------------------------------
+    # 0) task_id (GET으로 재진입/새로고침 등에서 진행률 UI 유지 목적)
+    # ---------------------------------------------------------------------
+    incoming_task_id = (request.GET.get("task_id") or request.POST.get("task_id") or "").strip()
+
+    # ---------------------------------------------------------------------
+    # 1) GET: 업로드 폼
+    # ---------------------------------------------------------------------
+    if request.method != "POST":
+        return render(request, template_name, {
+            "form": ExcelUploadForm(),
+            "task_id": incoming_task_id,
+        })
+
+    # ---------------------------------------------------------------------
+    # 2) POST: 폼 검증
+    # ---------------------------------------------------------------------
     form = ExcelUploadForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(request, "admin/accounts/customuser/upload_excel.html", {"form": form, "error": "폼이 유효하지 않습니다."})
+        return render(request, template_name, {
+            "form": form,
+            "task_id": incoming_task_id,
+            "error": "폼이 유효하지 않습니다.",
+        })
 
-    excel_file = request.FILES["file"]
+    excel_file = request.FILES.get("file")
+    if not excel_file:
+        return render(request, template_name, {
+            "form": form,
+            "task_id": incoming_task_id,
+            "error": "파일이 첨부되지 않았습니다.",
+        })
 
-    # 1) task_id 생성
+    # ---------------------------------------------------------------------
+    # 3) 업로드 작업용 task_id 생성 (POST마다 새로 발급)
+    # ---------------------------------------------------------------------
     task_id = uuid.uuid4().hex
 
-    # 2) 업로드 파일을 MEDIA_ROOT 아래 임시 저장
-    temp_dir = getattr(settings, "UPLOAD_TEMP_DIR", settings.MEDIA_ROOT / "upload_temp")
-    os.makedirs(temp_dir, exist_ok=True)
+    # ---------------------------------------------------------------------
+    # 4) 임시 저장 경로 준비 (MEDIA_ROOT가 str이어도 안전하게 Path로 처리)
+    # ---------------------------------------------------------------------
+    media_root = Path(getattr(settings, "MEDIA_ROOT", "media"))
+    default_temp_dir = media_root / "upload_temp"
+    temp_dir = Path(getattr(settings, "UPLOAD_TEMP_DIR", default_temp_dir))
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
-    save_name = f"accounts_upload_{task_id}_{excel_file.name}"
-    save_path = os.path.join(str(temp_dir), save_name)
+    # 파일명 sanitize (윈도우/리눅스/특수문자 이슈 방지)
+    safe_name = re.sub(r"[^0-9A-Za-z가-힣._-]+", "_", excel_file.name or "upload.xlsx")
 
-    # Django storage로 저장(윈도우 경로 이슈 최소화)
-    # 단, default_storage는 경로가 MEDIA_ROOT 기준일 수 있어 직접 저장해도 됩니다.
+    save_path = temp_dir / f"accounts_upload_{task_id}_{safe_name}"
+
+    # ---------------------------------------------------------------------
+    # 5) 파일 저장
+    # ---------------------------------------------------------------------
     with open(save_path, "wb") as f:
         for chunk in excel_file.chunks():
             f.write(chunk)
 
-    # 3) cache 초기화
-    cache.set(f"upload_progress:{task_id}", 0, timeout=60*60)
-    cache.set(f"upload_status:{task_id}", "PENDING", timeout=60*60)
+    # ---------------------------------------------------------------------
+    # 6) progress cache 초기화 (views.upload_progress_view와 키 규칙 동일)
+    # ---------------------------------------------------------------------
+    cache_timeout = 60 * 60  # 1 hour
+    cache.set(f"upload_progress:{task_id}", 0, timeout=cache_timeout)
+    cache.set(f"upload_status:{task_id}", "PENDING", timeout=cache_timeout)
+    probe = cache.get(f"upload_status:{task_id}")
+    print("DEBUG upload cache probe:", task_id, probe)
+    cache.delete(f"upload_error:{task_id}")
+    cache.delete(f"upload_result_path:{task_id}")
 
-    # 4) Celery task 실행 (즉시 반환)
-    process_users_excel_task.delay(task_id=task_id, file_path=save_path, batch_size=500)
+    # ---------------------------------------------------------------------
+    # 7) Celery task 실행 (kwargs 대신 positional로 안전 호출 권장)
+    # ---------------------------------------------------------------------
+    # tasks.py 시그니처: process_users_excel_task(self, task_id, file_path, batch_size=500)
+    process_users_excel_task.delay(task_id, str(save_path), 500)
 
-    # 5) 같은 템플릿을 다시 렌더하고 task_id를 내려줘서 진행률 폴링 시작
-    return render(request, "admin/accounts/customuser/upload_excel.html", {
+    # ---------------------------------------------------------------------
+    # 8) task_id를 내려서 템플릿에서 progress polling 시작
+    # ---------------------------------------------------------------------
+    return render(request, template_name, {
         "form": ExcelUploadForm(),
         "task_id": task_id,
         "message": "업로드 작업을 시작했습니다. 진행률을 확인하세요.",
     })
 
 
-# ============================================================
-# ✅ 기타 유틸 뷰
-# ============================================================
-def export_selected_users_to_excel(modeladmin, request, queryset):
-    return export_users_as_excel(queryset, filename="selected_custom_users.xlsx")
-
-
-def export_all_users_excel_view(request):
-    return export_users_as_excel(CustomUser.objects.all(), filename="all_custom_users.xlsx")
+def upload_users_result_view(request, task_id: str):
+    path_ = cache.get(f"upload_result_path:{task_id}")
+    if not path_ or not os.path.exists(path_):
+        raise Http404("결과 파일을 찾을 수 없습니다.")
+    return FileResponse(open(path_, "rb"), as_attachment=True, filename=os.path.basename(path_))
 
 
 def upload_excel_template_view(request):
-    """
-    업로드용 양식 파일 다운로드
-    - accounts/static/accounts/excel/양식_계정관리.xlsx 를 찾아 내려줌
-    - 배포/collectstatic 환경에서도 동작하도록 staticfiles finders 사용
-    """
     abs_path = finders.find(TEMPLATE_REL_PATH)
     if not abs_path or not os.path.exists(abs_path):
         raise Http404("업로드 양식 파일을 찾을 수 없습니다.")
-
     return FileResponse(
         open(abs_path, "rb"),
         content_type=EXCEL_CONTENT_TYPE,
@@ -256,53 +211,31 @@ def upload_excel_template_view(request):
     )
 
 
-def upload_users_result_view(request, task_id: str):
-    path = cache.get(f"upload_result_path:{task_id}")
-    if not path or not os.path.exists(path):
-        raise Http404("결과 파일을 찾을 수 없습니다.")
-    return FileResponse(open(path, "rb"), as_attachment=True, filename=os.path.basename(path))
-
-# ============================================================
-# ✅ 관리자 페이지 커스터마이징
-# ============================================================
+# =============================================================================
+# 3) CustomUser Admin
+# =============================================================================
 @admin.register(CustomUser)
 @admin.register(CustomUser, site=custom_admin_site)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
     actions = [export_selected_users_to_excel]
+    change_list_template = "admin/accounts/customuser/change_list.html"
 
     list_display = (
-        "id", "name", "channel", "part", "branch",
+        "id", "name", "channel", "division", "part", "branch",
         "grade", "status", "enter", "quit",
         "is_staff", "is_active",
     )
-    search_fields = ("id", "name", "branch")
-    ordering = ("id",)
+    search_fields = ("id", "name", "channel", "division", "part", "branch", "grade", "status")
+    ordering = ("id", "name", "channel", "division", "part", "branch")
 
     fieldsets = (
         (None, {"fields": ("id", "password")}),
-        ("Personal Info", {"fields": (
-            "name", "channel", "part", "branch",
-            "grade", "status", "enter", "quit",
-        )}),
-        ("Permissions", {"fields": (
-            "is_active", "is_staff", "is_superuser", "groups", "user_permissions",
-        )}),
-    )
-
-    add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": (
-                "id", "password1", "password2",
-                "name", "channel", "part", "branch",
-                "grade", "status", "enter", "quit",
-            ),
-        }),
+        ("Personal Info", {"fields": ("name", "channel", "division", "part", "branch", "grade", "status", "enter", "quit")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
     )
 
     def save_model(self, request, obj, form, change):
-        """퇴사일 입력 시 자동으로 상태(status)를 '퇴사'로 변경"""
         if obj.quit:
             obj.status = "퇴사"
         super().save_model(request, obj, form, change)
@@ -310,27 +243,10 @@ class CustomUserAdmin(UserAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path(
-                "export-all/",
-                self.admin_site.admin_view(export_all_users_excel_view),
-                name="export_all_users_excel",
-            ),
-            path(
-                "upload-excel/",
-                self.admin_site.admin_view(upload_users_from_excel_view),
-                name="upload_users_excel",
-            ),
-            path(
-                "upload-template/",
-                self.admin_site.admin_view(upload_excel_template_view),
-                name="upload_excel_template",
-            ),
-            path(
-                "upload-result/<str:task_id>/",
-                self.admin_site.admin_view(upload_users_result_view),
-                name="upload_users_result",
-            ),
+            # ✅ change_list.html에서 쓰는 name과 "완전히 동일"하게 맞춤
+            path("export-all/", self.admin_site.admin_view(export_all_users_excel_view), name="export_all_users_excel"),
+            path("upload-excel/", self.admin_site.admin_view(upload_users_from_excel_view), name="upload_users_excel"),
+            path("upload-template/", self.admin_site.admin_view(upload_excel_template_view), name="upload_excel_template"),
+            path("upload-result/<str:task_id>/", self.admin_site.admin_view(upload_users_result_view), name="upload_users_result"),
         ]
         return custom_urls + urls
-
-    change_list_template = "admin/accounts/customuser/change_list.html"

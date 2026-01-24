@@ -83,9 +83,8 @@ urlpatterns = [
     path("api/fetch/", views.structure_fetch, name="ajax_fetch"),
     path("api/save/", views.structure_save, name="ajax_save"),
     path("api/delete/", views.structure_delete, name="ajax_delete"),
-    path(
-        "api/update-process-date/",
-        views.structure_update_process_date,
-        name="ajax_update_process_date",
-    ),
+    path("api/update-process-date/",views.structure_update_process_date,name="ajax_update_process_date",),
+
+    path("api/add-sub-admin/", views.ajax_add_sub_admin, name="ajax_add_sub_admin"),
+    path("ajax/delete-subadmin/", views.ajax_delete_subadmin, name="ajax_delete_subadmin"),
 ]

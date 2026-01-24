@@ -26,7 +26,7 @@ from home import views as home_views  # 메인 페이지 뷰
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
-from accounts.views import SessionCloseLoginView
+from accounts.views import SessionCloseLoginView, upload_progress_view
 
 
 
@@ -39,16 +39,17 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
     # ✅ 커스텀 관리자
     path('admin/', custom_admin_site.urls),
+    path("accounts/upload-progress/", upload_progress_view, name="accounts_upload_progress"),
     path('', home_redirect, name='home'),
     path('login/', SessionCloseLoginView.as_view(template_name='registration/login.html'), name='login'),
     path('join/', include('join.urls')),
     path('board/', include('board.urls')),
     path('commission/', include('commission.urls')),
     path('dash/', include('dash.urls')),
-    path('partner/', include('partner.urls')),
+    path('partner/', include(('partner.urls', 'partner'), namespace='partner')),
     path("api/accounts/", include("accounts.urls")),
     path('manual/', include('manual.urls')),
-    # path("ckeditor/", include("ckeditor_uploader.urls")),
+    path("ckeditor/", include("ckeditor_uploader.urls")),
 ]
 
 # 운영에서도 서빙
@@ -57,3 +58,6 @@ urlpatterns += [
             login_required(serve),
             {"document_root": settings.MEDIA_ROOT}),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

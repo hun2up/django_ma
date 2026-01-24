@@ -133,6 +133,20 @@
       {{ nonlife_chart_cumsum|json_script:"nonlife-chart-cumsum" }}
       {{ life_chart_cumsum|json_script:"life-chart-cumsum" }}
 
+      {{ prev_ym|json_script:"prev-ym" }}
+
+      {{ prev_chart_cumsum|json_script:"prev-chart-cumsum" }}
+      {{ prev_car_chart_cumsum|json_script:"prev-car-chart-cumsum" }}
+      {{ prev_nonlife_chart_cumsum|json_script:"prev-nonlife-chart-cumsum" }}
+      {{ prev_life_chart_cumsum|json_script:"prev-life-chart-cumsum" }}
+
+      {{ prev_year_ym|json_script:"prev-year-ym" }}
+
+      {{ py_chart_cumsum|json_script:"py-chart-cumsum" }}
+      {{ py_car_chart_cumsum|json_script:"py-car-chart-cumsum" }}
+      {{ py_nonlife_chart_cumsum|json_script:"py-nonlife-chart-cumsum" }}
+      {{ py_life_chart_cumsum|json_script:"py-life-chart-cumsum" }}
+
       <div class="row g-3">
         <div class="col-12 col-lg-6">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -185,7 +199,7 @@
   <!-- =========================
        Table Card
   ========================== -->
-  <div class="card">
+  <div class="card" id="sales-table-card">
     <div class="card-body">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
         <div class="text-muted">
