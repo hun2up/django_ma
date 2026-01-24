@@ -279,7 +279,7 @@ def _inline_update_common(
 # =========================================================
 # ✅ 직원업무 게시판
 # =========================================================
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def task_list(request):
     p = _read_list_params(request)
@@ -333,7 +333,7 @@ def task_list(request):
 
 
 @require_POST
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def ajax_update_task_field(request):
     task_id = request.POST.get("task_id")
@@ -356,7 +356,7 @@ def ajax_update_task_field(request):
 
 
 @require_POST
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def ajax_update_task_field_detail(request, pk):
     action = request.POST.get("action_type")
@@ -377,7 +377,7 @@ def ajax_update_task_field_detail(request, pk):
     )
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def task_detail(request, pk):
     task = get_object_or_404(Task, pk=pk)
@@ -426,7 +426,7 @@ def task_detail(request, pk):
     })
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def task_create(request):
     if request.method == "POST":
@@ -455,7 +455,7 @@ def task_create(request):
     return render(request, "board/task_create.html", {"form": form})
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 @login_required
 def task_edit(request, pk):
     task = get_object_or_404(Task, pk=pk)

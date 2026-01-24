@@ -1,4 +1,12 @@
-# web_ma/celery.py
+"""
+Celery config for web_ma project.
+
+- settings의 CELERY_*를 자동 로드
+- INSTALLED_APPS 내 tasks.py 자동 탐색
+"""
+
+# django_ma/web_ma/celery.py
+
 import os
 from celery import Celery
 
@@ -9,6 +17,7 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # ✅ 모든 INSTALLED_APPS에서 tasks.py 자동 탐색
 app.autodiscover_tasks()
+
 
 @app.task(bind=True)
 def debug_task(self):

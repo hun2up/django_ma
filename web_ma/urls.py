@@ -1,63 +1,78 @@
 """
 URL configuration for web_ma project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-# django_ma > web_ma > urls.py
-from django.contrib import admin
-from django.contrib.auth import views as auth_views
-from django.contrib.auth.decorators import login_required
-from django.urls import path, include, re_path
-from django.views.static import serve
-from accounts.custom_admin import custom_admin_site
-from home import views as home_views  # 메인 페이지 뷰
+# django_ma/web_ma/urls.py
+
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.auth import views as auth_views
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
-from accounts.views import SessionCloseLoginView, upload_progress_view
+from django.urls import include, path, re_path
+from django.views.static import serve
 
+from accounts.custom_admin import custom_admin_site
+from accounts.views import SessionCloseLoginView
 
 
 def home_redirect(request):
     """홈(/) 접속 시 게시판으로 리다이렉트"""
-    return redirect('post_list')
+    return redirect("post_list")
+
 
 urlpatterns = [
-    # ✅ 일반 사용자 로그아웃 (admin.site.logout 제거)
-    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
-    # ✅ 커스텀 관리자
-    path('admin/', custom_admin_site.urls),
-    path("accounts/upload-progress/", upload_progress_view, name="accounts_upload_progress"),
-    path('', home_redirect, name='home'),
-    path('login/', SessionCloseLoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('join/', include('join.urls')),
-    path('board/', include('board.urls')),
-    path('commission/', include('commission.urls')),
-    path('dash/', include('dash.urls')),
-    path('partner/', include(('partner.urls', 'partner'), namespace='partner')),
-    path("api/accounts/", include("accounts.urls")),
-    path('manual/', include('manual.urls')),
+    # ---------------------------------------------------------------------
+    # Auth
+    # ---------------------------------------------------------------------
+    path("login/", SessionCloseLoginView.as_view(template_name="registration/login.html"), name="login"),
+    path("logout/", auth_views.LogoutView.as_view(next_page="/"), name="logout"),
+
+    # ---------------------------------------------------------------------
+    # Admin (custom admin site)
+    # ---------------------------------------------------------------------
+    path("admin/", custom_admin_site.urls),
+
+    # ---------------------------------------------------------------------
+    # Home
+    # ---------------------------------------------------------------------
+    path("", home_redirect, name="home"),
+
+    # ---------------------------------------------------------------------
+    # Apps
+    # ---------------------------------------------------------------------
+    path("join/", include("join.urls")),
+    path("board/", include("board.urls")),
+    path("commission/", include("commission.urls")),
+    path("dash/", include("dash.urls")),
+    path("partner/", include(("partner.urls", "partner"), namespace="partner")),
+    path("manual/", include("manual.urls")),
     path("ckeditor/", include("ckeditor_uploader.urls")),
+
+    # ---------------------------------------------------------------------
+    # Accounts APIs
+    # ✅ accounts/urls.py에서:
+    #   - upload-progress/
+    #   - api/accounts/search-user/
+    #   - search-user/ (legacy alias)
+    # 를 관리하고 있으므로, 여기서는 prefix 1번만 붙여 위임합니다.
+    # ---------------------------------------------------------------------
+    path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
 ]
 
-# 운영에서도 서빙
+# -------------------------------------------------------------------------
+# Media serving
+# - 운영에서도 접근이 필요하고, 인증 필요라면 login_required(serve) 유지
+# - (주의) serve는 개발용에 가까움. 운영은 Nginx/S3/Cloudflare 권장
+# -------------------------------------------------------------------------
 urlpatterns += [
-    re_path(r"^media/(?P<path>.*)$",
-            login_required(serve),
-            {"document_root": settings.MEDIA_ROOT}),
+    re_path(
+        r"^media/(?P<path>.*)$",
+        login_required(serve),
+        {"document_root": settings.MEDIA_ROOT},
+    ),
 ]
 
+# DEBUG일 때는 Django가 MEDIA_URL도 보조 서빙
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

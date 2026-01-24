@@ -1,3 +1,5 @@
+# django_ma/Dockerfile
+
 # Django용 베이스 이미지
 FROM python:3.10
 

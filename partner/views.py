@@ -1494,7 +1494,7 @@ def ajax_update_level(request):
 # ------------------------------------------------------------
 # Part/Branch utilities
 # ------------------------------------------------------------
-@grade_required(["superuser"])
+@grade_required("superuser")
 def ajax_fetch_parts(request):
     exclude_list = ["1인GA사업부", "MA사업0부"]
     parts = (
@@ -1508,7 +1508,7 @@ def ajax_fetch_parts(request):
     return JsonResponse({"parts": list(parts)})
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def ajax_fetch_branches(request):
     part = request.GET.get("part")
     if not part:

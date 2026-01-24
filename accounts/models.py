@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.core.exceptions import ValidationError
 
 
 # =============================================================================
@@ -9,21 +10,35 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 # =============================================================================
 class CustomUserManager(BaseUserManager):
     """
+    CustomUser 생성 로직을 한 곳에서 일관되게 관리합니다.
+
     - create_user: 일반 사용자 생성
     - create_superuser: 관리자 생성
     """
 
-    def create_user(self, id, password=None, **extra_fields):
+    def create_user(self, id: str, password: str | None = None, **extra_fields):
+        """
+        일반 사용자 생성.
+        - id(사원번호)는 필수
+        - name은 실무에서 필수값이므로 누락 시 ValidationError
+        """
         if not id:
-            raise ValueError("ID는 반드시 입력되어야 합니다.")
+            raise ValueError("ID(사원번호)는 반드시 입력되어야 합니다.")
+
+        # name은 REQUIRED_FIELDS로도 관리되지만, create_user 직접 호출 시 누락될 수 있어 안전장치 추가
+        name = (extra_fields.get("name") or "").strip()
+        if not name:
+            raise ValidationError("name(성명)은 반드시 입력되어야 합니다.")
 
         user = self.model(id=id, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, id, password=None, **extra_fields):
-        # 관리자 기본 속성 강제
+    def create_superuser(self, id: str, password: str | None = None, **extra_fields):
+        """
+        Django superuser 생성.
+        """
         extra_fields.setdefault("grade", "superuser")
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_staff", True)
@@ -43,7 +58,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     GRADE_CHOICES = [
         ("superuser", "Superuser"),
         ("main_admin", "Main Admin"),
+        ("head", "Head"),          # decorator alias_map("head") 호환 목적
         ("sub_admin", "Sub Admin"),
+        ("leader", "Leader"),      # decorator alias_map("leader") 호환 목적
         ("basic", "Basic"),
         ("resign", "Resign"),
         ("inactive", "Inactive"),
@@ -52,7 +69,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # -------------------------------------------------------------------------
     # 기본 식별/개인정보
     # -------------------------------------------------------------------------
-    id = models.CharField(max_length=30, unique=True, primary_key=True)  # 사원번호
+    id = models.CharField(max_length=30, unique=True, primary_key=True)  # 사원번호 (USERNAME_FIELD)
     name = models.CharField(max_length=100)
 
     regist = models.CharField(max_length=50, blank=True, null=True)
@@ -64,9 +81,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # 조직 정보 (위계)
     # -------------------------------------------------------------------------
     channel = models.CharField(max_length=10, blank=True, default="", verbose_name="부문")
-    division = models.CharField(max_length=30, blank=True, null=True, default="", verbose_name="총괄")
+    division = models.CharField(max_length=30, blank=True, default="", verbose_name="총괄")
     part = models.CharField(max_length=10, blank=True, default="", verbose_name="부서")
-    branch = models.CharField(max_length=100, blank=True, null=True, verbose_name="지점")
+    branch = models.CharField(max_length=100, blank=True, default="", verbose_name="지점")
 
     # -------------------------------------------------------------------------
     # 권한/상태
@@ -76,6 +93,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+
+    # ⚠️ PermissionsMixin에도 is_superuser가 존재하는 것이 일반적입니다.
+    # 이 필드가 이미 DB/마이그레이션에 존재하는 프로젝트라면 호환을 위해 유지합니다.
+    # (새 프로젝트라면 PermissionsMixin의 is_superuser를 그대로 쓰는 것이 정석입니다.)
     is_superuser = models.BooleanField(default=False)
 
     # -------------------------------------------------------------------------
@@ -83,15 +104,24 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # -------------------------------------------------------------------------
     USERNAME_FIELD = "id"
     REQUIRED_FIELDS = ["name"]
-
     objects = CustomUserManager()
 
     # -------------------------------------------------------------------------
-    # 기타
+    # Model hooks / representation
     # -------------------------------------------------------------------------
-    def __str__(self):
+    def save(self, *args, **kwargs):
+        """
+        정책:
+        - grade == inactive 인 경우 is_active는 반드시 False
+        - inactive가 아닌 경우 is_active를 자동 True로 돌리지는 않음(수동 제어 여지 유지)
+        """
+        if self.grade == "inactive":
+            self.is_active = False
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
         return f"{self.id} ({self.name})"
 
     class Meta:
-        verbose_name = "users"
+        verbose_name = "user"
         verbose_name_plural = "users"
