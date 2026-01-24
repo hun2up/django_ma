@@ -16,32 +16,17 @@
   <!-- ✅ Project base style (cache-buster) -->
   <link rel="stylesheet" href="{% static 'css/base.css' %}?v={% now 'U' %}">
 
-  <!-- ✅ Mobile Offcanvas tweak (optional but recommended) -->
+  <!-- ✅ Mobile Offcanvas tweak -->
   <style>
-    /* Mobile offcanvas width */
-    #mobileOffcanvas {
-      width: min(60vw, 360px);
-    }
-    #mobileOffcanvas .accordion-button {
-      padding: 14px 16px;
-      font-weight: 700;
-    }
-    #mobileOffcanvas .accordion-body a {
-      color: #333;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    #mobileOffcanvas .accordion-body a:hover {
-      color: #005BAC;
-    }
+    #mobileOffcanvas { width: min(60vw, 360px); }
+    #mobileOffcanvas .accordion-button { padding: 14px 16px; font-weight: 700; }
+    #mobileOffcanvas .accordion-body a { color:#333; font-weight:600; text-decoration:none; }
+    #mobileOffcanvas .accordion-body a:hover { color:#005BAC; }
   </style>
 
-  <!-- ✅ Page extra head -->
   {% block extra_head %}{% endblock %}
 
-  <!-- =====================================================
-       ✅ DataTables CSS (옵션)
-  ====================================================== -->
+  <!-- DataTables CSS (옵션) -->
   {% block enable_datatables %}{% endblock %}
 </head>
 
@@ -50,8 +35,6 @@
 {% if user.is_authenticated %}
   <!-- =====================================================
        ✅ Navbar
-       - Desktop: 기존 상단 dropdown 유지
-       - Mobile: 오른쪽 Offcanvas(날개메뉴)로 전체 메뉴 제공
   ====================================================== -->
   <nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-white">
     <div class="container-fluid position-relative">
@@ -61,7 +44,7 @@
         <img src="{% static 'images/logo.png' %}" alt="인카 로고" style="height: 40px;">
       </a>
 
-      <!-- 🔹 Mobile Offcanvas button (only mobile) -->
+      <!-- 🔹 Mobile Offcanvas button -->
       <button class="navbar-toggler d-lg-none ms-auto"
               type="button"
               data-bs-toggle="offcanvas"
@@ -76,8 +59,8 @@
            id="navbarContent" style="width: fit-content;">
         <ul class="navbar-nav mb-2 mb-lg-0">
 
-          {% if user.grade in 'superuser main_admin' %}
-            <!-- ✅ Dashboard -->
+          <!-- ✅ Dashboard (superuser/main_admin only) -->
+          {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle {% if '/dash' in request.path %}active{% else %}inactive{% endif %}"
                  href="#" id="dashMenu" data-bs-toggle="dropdown">대시보드</a>
@@ -85,6 +68,9 @@
                 <li><a class="dropdown-item" href="{% url 'dash_sales' %}">매출현황</a></li>
                 <li><a class="dropdown-item" href="{% url 'dash_recruit' %}">리쿠르팅</a></li>
                 <li><a class="dropdown-item" href="{% url 'dash_retention' %}">유지율</a></li>
+                {% if user.grade == 'superuser' %}
+                  <li><a class="dropdown-item" href="{% url 'dash_goals' %}">목표관리</a></li>
+                {% endif %}
               </ul>
             </li>
           {% endif %}
@@ -105,25 +91,24 @@
             </ul>
           </li>
 
-          
           <!-- ✅ Partner -->
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
-                href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
+               href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
             <ul class="dropdown-menu" aria-labelledby="partnerMenu">
               <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
-              {% if user.grade in 'superuser main_admin sub_admin' %}
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
                 <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
               {% endif %}
-              {% if user.grade in 'superuser main_admin' %}
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
                 <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
                 <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
               {% endif %}
             </ul>
           </li>
-          
+
           {% if user.grade == 'superuser' %}
             <!-- ✅ Commission -->
             <li class="nav-item dropdown">
@@ -139,9 +124,9 @@
           {% if user.grade != 'inactive' %}
             <!-- ✅ Manual -->
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle {% if '/join' in request.path %}active{% else %}inactive{% endif %}"
-                 href="#" id="joinMenu" data-bs-toggle="dropdown">매뉴얼</a>
-              <ul class="dropdown-menu" aria-labelledby="joinMenu">
+              <a class="nav-link dropdown-toggle {% if '/manual' in request.path %}active{% else %}inactive{% endif %}"
+                 href="#" id="manualMenu" data-bs-toggle="dropdown">매뉴얼</a>
+              <ul class="dropdown-menu" aria-labelledby="manualMenu">
                 <li><a class="dropdown-item" href="{% url 'manual:manual_list' %}">업무매뉴얼</a></li>
                 <li><a class="dropdown-item" href="{% url 'manual:rules_home' %}">영업기준안</a></li>
               </ul>
@@ -151,10 +136,9 @@
           {% if user.grade == 'superuser' %}
             <li class="nav-item">
               <a class="nav-link text-nowrap {% if '/admin' in request.path %}active{% else %}inactive{% endif %}"
-                 href="/admin/">관리자</a>
+                 href="{% url 'admin:index' %}">관리자</a>
             </li>
           {% endif %}
-
         </ul>
       </div>
 
@@ -172,9 +156,19 @@
     </div>
   </nav>
 
+
+  {% if user.is_authenticated %}
+    <div class="privacy-watermark" aria-hidden="true">
+      <span class="privacy-watermark__text">
+        {{ user.branch|default:"" }}
+        <br>
+        {{ user.name }} / {{ user.id }}
+      </span>
+    </div>
+  {% endif %}
+
   <!-- =====================================================
        ✅ Mobile Offcanvas (Right Wing Menu)
-       - 프로젝트명 클릭 → 하위 메뉴는 Accordion 드랍다운
   ====================================================== -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileOffcanvas" aria-labelledby="mobileOffcanvasLabel">
     <div class="offcanvas-header">
@@ -190,7 +184,7 @@
     <div class="offcanvas-body p-0">
       <div class="accordion accordion-flush" id="mobileMenuAccordion">
 
-        <!-- 업무요청 (프로젝트) -->
+        <!-- 업무요청 -->
         <div class="accordion-item">
           <h2 class="accordion-header" id="mBoardHead">
             <button class="accordion-button collapsed" type="button"
@@ -213,7 +207,7 @@
           </div>
         </div>
 
-        {% if user.grade in 'superuser main_admin' %}
+        {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
           <!-- 대시보드 -->
           <div class="accordion-item">
             <h2 class="accordion-header" id="mDashHead">
@@ -228,6 +222,9 @@
                 <a class="d-block py-2" href="{% url 'dash_sales' %}">매출현황</a>
                 <a class="d-block py-2" href="{% url 'dash_recruit' %}">리쿠르팅</a>
                 <a class="d-block py-2" href="{% url 'dash_retention' %}">유지율</a>
+                {% if user.grade == 'superuser' %}
+                  <a class="d-block py-2" href="{% url 'dash_goals' %}">목표관리</a>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -245,19 +242,19 @@
           <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
             <div class="accordion-body pt-0">
               <a class="d-block py-2" href="{% url 'partner:join_form' %}">위촉서류</a>
-              {% if user.grade in 'superuser main_admin sub_admin' %}
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' or user.grade == 'sub_admin' %}
                 <a class="d-block py-2" href="{% url 'partner:manage_charts' %}">편제변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_rate' %}">요율변경</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_calculate' %}">지점효율</a>
               {% endif %}
-              {% if user.grade in 'superuser main_admin' %}
+              {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
                 <a class="d-block py-2" href="{% url 'partner:manage_grades' %}">권한관리</a>
                 <a class="d-block py-2" href="{% url 'partner:manage_tables' %}">테이블관리</a>
               {% endif %}
             </div>
           </div>
         </div>
-        
+
         {% if user.grade == 'superuser' %}
           <!-- 수수료 -->
           <div class="accordion-item">
@@ -297,9 +294,9 @@
         {% endif %}
 
         {% if user.grade == 'superuser' %}
-          <!-- 관리자(커스텀 admin) -->
+          <!-- 관리자 -->
           <div class="px-3 py-2 border-top">
-            <a class="d-block py-2 fw-bold" href="{% url 'home' %}admin/">관리자</a>
+            <a class="d-block py-2 fw-bold" href="{% url 'admin:index' %}">관리자</a>
           </div>
         {% endif %}
 
@@ -331,12 +328,10 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'js/base_ui.js' %}?v={% now 'U' %}"></script>
 
-<!-- =====================================================
-     ✅ DataTables JS (옵션)
-====================================================== -->
+<!-- DataTables JS (옵션) -->
 {% block datatables_bundle %}{% endblock %}
 
-<!-- ✅ page extra scripts -->
+<!-- Page extra scripts -->
 {% block extra_js %}{% endblock %}
 
 </body>

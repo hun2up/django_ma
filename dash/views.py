@@ -122,6 +122,31 @@ def dash_sales(request):
             running += int(daily_map.get(day, 0))
             cumsum.append(running)
         return cumsum
+    
+    def _build_cumsum_prevmonth_aligned(qs_prev, current_labels, prev_ym_str: str):
+        # current_labels: 당월 YYYY-MM-DD 라벨 (1~말일)
+        # prev_ym_str: 전월 "YYYY-MM"
+        py_s, pm_s = prev_ym_str.split("-")
+        py = int(py_s); pm = int(pm_s)
+        prev_last_day = calendar.monthrange(py, pm)[1]
+
+        daily_map = _daily_sum_map(qs_prev)  # key: "YYYY-MM-DD"
+        running = 0
+        out = []
+
+        for day_str in current_labels:
+            # day_str = "YYYY-MM-DD" (당월) -> 일자만 뽑아서 전월 날짜로 변환
+            d = int(day_str[-2:])
+            if d <= prev_last_day:
+                prev_day_str = f"{py:04d}-{pm:02d}-{d:02d}"
+                running += int(daily_map.get(prev_day_str, 0))
+                out.append(running)
+            else:
+                # 전월에는 존재하지 않는 날짜(예: 당월 31일, 전월 30일까지)
+                # running은 유지되지만 JS에서 "마지막 증가 이후 null" 처리로 선이 끊깁니다.
+                out.append(running)
+
+        return out
 
     def _nice_step_and_max(max_value: int):
         mv = int(max_value or 0)
@@ -142,6 +167,43 @@ def dash_sales(request):
 
         y_max = ((mv + step - 1) // step) * step
         return int(step), int(y_max)
+    
+    def _prev_ym_str(ym_str: str) -> str:
+        y_s, m_s = ym_str.split("-")
+        y = int(y_s); m = int(m_s)
+        if m == 1:
+            return f"{y-1:04d}-12"
+        return f"{y:04d}-{m-1:02d}"
+    
+    def _prev_year_ym_str(ym_str: str) -> str:
+        y_s, m_s = ym_str.split("-")
+        y = int(y_s); m = int(m_s)
+        return f"{y-1:04d}-{m:02d}"
+
+
+    def _build_cumsum_othermonth_aligned(qs_other, current_labels, other_ym_str: str):
+        """
+        current_labels: 당월 라벨(YYYY-MM-DD) 길이에 맞춰,
+        other_ym_str(전월/전년동월)의 1~말일을 동일한 '일' 기준으로 매핑.
+        """
+        oy_s, om_s = other_ym_str.split("-")
+        oy = int(oy_s); om = int(om_s)
+        other_last_day = calendar.monthrange(oy, om)[1]
+
+        daily_map = _daily_sum_map(qs_other)
+        running = 0
+        out = []
+
+        for day_str in current_labels:
+            d = int(day_str[-2:])
+            if d <= other_last_day:
+                other_day_str = f"{oy:04d}-{om:02d}-{d:02d}"
+                running += int(daily_map.get(other_day_str, 0))
+                out.append(running)
+            else:
+                out.append(running)
+
+        return out
 
     # -----------------------------
     # 3) base QS: 권한 + 월도(ym)
@@ -239,9 +301,15 @@ def dash_sales(request):
     qs_final = qs_final.select_related("user").order_by("-updated_at")
 
     # -----------------------------
-    # 9) ✅ 그래프 데이터(4개) - 공통 라벨(1~말일) 정렬
+    # 9) ✅ 그래프 데이터(4개) + 전월(4개) - 공통 라벨(1~말일) 정렬
     # -----------------------------
-    chart_day_labels = _month_day_labels(ym)
+    chart_day_labels = _month_day_labels(ym)   # 당월 YYYY-MM-DD 라벨
+    prev_ym = _prev_ym_str(ym)                 # 전월 "YYYY-MM"
+    prev_year_ym = _prev_year_ym_str(ym)       # 전년도 동월
+
+    # =========================================================
+    # (A) 당월 4개 시리즈
+    # =========================================================
 
     # (1) 손생 장기매출: 자동차 제외 + 일시납 제외
     qs_chart_long = (
@@ -271,12 +339,153 @@ def dash_sales(request):
     )
     life_chart_cumsum = _build_cumsum_aligned(qs_chart_life, chart_day_labels)
 
-    # ✅ 손보/생보 2개만 y축 눈금 통일
+    # ✅ 손보/생보 2개만 y축 눈금 통일(당월 기준으로 산정)
     y_max_value_nl_l = max(
         max(nonlife_chart_cumsum or [0]),
         max(life_chart_cumsum or [0]),
     )
     nl_l_y_step, nl_l_y_max = _nice_step_and_max(y_max_value_nl_l)
+
+    # =========================================================
+    # (B) 전월 4개 시리즈 (당월 라벨 길이에 맞춰 정렬)
+    #   - 당월과 "동일 필터(part/branch/life_nl/insurer/q + main_admin 권한)" 적용
+    # =========================================================
+
+    qs_prev_base = SalesRecord.objects.all()
+
+    # ✅ main_admin 정책: 본인 지점 데이터만
+    if request.user.grade == "main_admin":
+        my_branch = (request.user.branch or "").strip()
+        if not my_branch:
+            qs_prev_base = qs_prev_base.none()
+        else:
+            qs_prev_base = qs_prev_base.filter(Q(branch_snapshot=my_branch) | Q(user__branch=my_branch))
+
+    # 전월 ym
+    qs_prev_base = qs_prev_base.filter(ym=prev_ym)
+
+    # 당월과 동일하게 part/branch/q 적용
+    qs_prev_scope = qs_prev_base
+    if filter_part:
+        qs_prev_scope = qs_prev_scope.filter(Q(user__part=filter_part) | Q(part_snapshot=filter_part))
+    if filter_branch:
+        qs_prev_scope = qs_prev_scope.filter(Q(user__branch=filter_branch) | Q(branch_snapshot=filter_branch))
+    if filter_q:
+        qs_prev_scope = qs_prev_scope.filter(
+            Q(policy_no__icontains=filter_q)
+            | Q(contractor__icontains=filter_q)
+            | Q(name_snapshot__icontains=filter_q)
+            | Q(emp_id_snapshot__icontains=filter_q)
+            | Q(user__id__icontains=filter_q)
+            | Q(user__name__icontains=filter_q)
+            | Q(vehicle_no__icontains=filter_q)
+        )
+
+    # 당월과 동일하게 life_nl / insurer 적용
+    qs_prev_pre_insurer = qs_prev_scope
+    if filter_life_nl:
+        qs_prev_pre_insurer = qs_prev_pre_insurer.filter(life_nl=filter_life_nl)
+
+    qs_prev_final = qs_prev_pre_insurer
+    if filter_insurer:
+        qs_prev_final = qs_prev_final.filter(insurer=filter_insurer)
+
+    # (1) 전월 손생 장기매출
+    qs_prev_long = (
+        qs_prev_final
+        .exclude(life_nl="자동차")
+        .exclude(pay_method__icontains="일시납")
+    )
+    prev_chart_cumsum = _build_cumsum_prevmonth_aligned(qs_prev_long, chart_day_labels, prev_ym)
+
+    # (2) 전월 자동차
+    qs_prev_car = qs_prev_final.filter(life_nl="자동차")
+    prev_car_chart_cumsum = _build_cumsum_prevmonth_aligned(qs_prev_car, chart_day_labels, prev_ym)
+
+    # (3) 전월 손보 장기매출
+    qs_prev_nonlife = (
+        qs_prev_final
+        .filter(life_nl="손보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    prev_nonlife_chart_cumsum = _build_cumsum_prevmonth_aligned(qs_prev_nonlife, chart_day_labels, prev_ym)
+
+    # (4) 전월 생보 장기매출
+    qs_prev_life = (
+        qs_prev_final
+        .filter(life_nl="생보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    prev_life_chart_cumsum = _build_cumsum_prevmonth_aligned(qs_prev_life, chart_day_labels, prev_ym)
+
+    # =========================================================
+    # (C) 전년도 동월 4개 시리즈 (당월 라벨 길이에 맞춰 정렬)
+    #   - 필터는 당월과 동일(part/branch/life_nl/insurer/q + 권한)
+    # =========================================================
+
+    qs_py_base = SalesRecord.objects.all()
+
+    if request.user.grade == "main_admin":
+        my_branch = (request.user.branch or "").strip()
+        if not my_branch:
+            qs_py_base = qs_py_base.none()
+        else:
+            qs_py_base = qs_py_base.filter(Q(branch_snapshot=my_branch) | Q(user__branch=my_branch))
+
+    qs_py_base = qs_py_base.filter(ym=prev_year_ym)
+
+    qs_py_scope = qs_py_base
+    if filter_part:
+        qs_py_scope = qs_py_scope.filter(Q(user__part=filter_part) | Q(part_snapshot=filter_part))
+    if filter_branch:
+        qs_py_scope = qs_py_scope.filter(Q(user__branch=filter_branch) | Q(branch_snapshot=filter_branch))
+    if filter_q:
+        qs_py_scope = qs_py_scope.filter(
+            Q(policy_no__icontains=filter_q)
+            | Q(contractor__icontains=filter_q)
+            | Q(name_snapshot__icontains=filter_q)
+            | Q(emp_id_snapshot__icontains=filter_q)
+            | Q(user__id__icontains=filter_q)
+            | Q(user__name__icontains=filter_q)
+            | Q(vehicle_no__icontains=filter_q)
+        )
+
+    qs_py_pre_insurer = qs_py_scope
+    if filter_life_nl:
+        qs_py_pre_insurer = qs_py_pre_insurer.filter(life_nl=filter_life_nl)
+
+    qs_py_final = qs_py_pre_insurer
+    if filter_insurer:
+        qs_py_final = qs_py_final.filter(insurer=filter_insurer)
+
+    # (1) 전년도 손생 장기매출
+    qs_py_long = (
+        qs_py_final
+        .exclude(life_nl="자동차")
+        .exclude(pay_method__icontains="일시납")
+    )
+    py_chart_cumsum = _build_cumsum_othermonth_aligned(qs_py_long, chart_day_labels, prev_year_ym)
+
+    # (2) 전년도 자동차
+    qs_py_car = qs_py_final.filter(life_nl="자동차")
+    py_car_chart_cumsum = _build_cumsum_othermonth_aligned(qs_py_car, chart_day_labels, prev_year_ym)
+
+    # (3) 전년도 손보 장기매출
+    qs_py_nonlife = (
+        qs_py_final
+        .filter(life_nl="손보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    py_nonlife_chart_cumsum = _build_cumsum_othermonth_aligned(qs_py_nonlife, chart_day_labels, prev_year_ym)
+
+    # (4) 전년도 생보 장기매출
+    qs_py_life = (
+        qs_py_final
+        .filter(life_nl="생보")
+        .exclude(pay_method__icontains="일시납")
+    )
+    py_life_chart_cumsum = _build_cumsum_othermonth_aligned(qs_py_life, chart_day_labels, prev_year_ym)
+
 
     # -----------------------------
     # 10) 부서/지점 옵션: CustomUser + SalesRecord snapshot/user "합집합"
@@ -404,6 +613,20 @@ def dash_sales(request):
         # ✅ 손보/생보만 y축 눈금 통일
         "nl_l_y_step": nl_l_y_step,
         "nl_l_y_max": nl_l_y_max,
+
+        "prev_ym": prev_ym,
+
+        "prev_chart_cumsum": prev_chart_cumsum,
+        "prev_car_chart_cumsum": prev_car_chart_cumsum,
+        "prev_nonlife_chart_cumsum": prev_nonlife_chart_cumsum,
+        "prev_life_chart_cumsum": prev_life_chart_cumsum,
+
+        "prev_year_ym": prev_year_ym,
+
+        "py_chart_cumsum": py_chart_cumsum,
+        "py_car_chart_cumsum": py_car_chart_cumsum,
+        "py_nonlife_chart_cumsum": py_nonlife_chart_cumsum,
+        "py_life_chart_cumsum": py_life_chart_cumsum,
     }
     return render(request, "dash/dash_sales.html", context)
 
@@ -417,6 +640,9 @@ def dash_recruit(request):
 def dash_retention(request):
     return render(request, "dash/dash_retention.html")
 
+@grade_required(["superuser"])
+def dash_goals(request):
+    return render(request, "dash/dash_goals.html")
 
 # -----------------------------
 # 유틸
@@ -516,6 +742,23 @@ def _to_policy_no(v) -> Optional[str]:
 
     return s
 
+def _normalize_part_snapshot(part: str | None) -> str | None:
+    """
+    엑셀 업로드 시 부서명 정규화
+    - '1인GA사업부' → 'MA사업4부'
+    - 'MA사업4부' → 'MA사업4부'
+    """
+    if not part:
+        return part
+
+    part = str(part).strip()
+
+    PART_MAP = {
+        "1인GA사업부": "MA사업4부",
+        "MA사업4부": "MA사업4부",
+    }
+
+    return PART_MAP.get(part, part)
 
 def _life_nl_from_insurer(insurer: str) -> str:
     insurer = (insurer or "").strip()
@@ -568,7 +811,7 @@ def upload_sales_excel(request):
 
     df = df[~df["증권번호"].isna()].copy()
 
-    created_users = updated_users = upserted_rows = skipped_rows = 0
+    matched_users = missing_users = upserted_rows = skipped_rows = 0
     first_row_error = None
 
     try:
@@ -588,24 +831,19 @@ def upload_sales_excel(request):
                     if is_auto:
                         emp_id = _to_str_emp_id(r.get("담당자코드"))
                         name = (str(r.get("담당자명")).strip() if not pd.isna(r.get("담당자명")) else None)
-                        part = (str(r.get("소속")).strip() if not pd.isna(r.get("소속")) else None)
+                        raw_part = (str(r.get("소속")).strip() if not pd.isna(r.get("소속")) else None)
+                        part = _normalize_part_snapshot(raw_part)
                         branch = (str(r.get("파트너")).strip() if not pd.isna(r.get("파트너")) else None)
 
                         if not emp_id:
                             skipped_rows += 1
                             continue
 
-                        user_defaults = {}
-                        if name:
-                            user_defaults["name"] = name
-                        if part:
-                            user_defaults["part"] = part
-                        if branch:
-                            user_defaults["branch"] = branch
-
-                        user, created = CustomUser.objects.update_or_create(id=emp_id, defaults=user_defaults)
-                        created_users += int(created)
-                        updated_users += int(not created)
+                        user = CustomUser.objects.filter(id=emp_id).first()
+                        if user:
+                            matched_users += 1
+                        else:
+                            missing_users += 1
 
                         ins_start, ins_end = _parse_ins_period(r.get("보험기간"))
 
@@ -652,24 +890,19 @@ def upload_sales_excel(request):
                     else:
                         emp_id = _to_str_emp_id(r.get("설계사CD"))
                         name = (str(r.get("설계사")).strip() if not pd.isna(r.get("설계사")) else None)
-                        part = (str(r.get("소속")).strip() if not pd.isna(r.get("소속")) else None)
+                        raw_part = (str(r.get("소속")).strip() if not pd.isna(r.get("소속")) else None)
+                        part = _normalize_part_snapshot(raw_part)
                         branch = (str(r.get("영업가족")).strip() if not pd.isna(r.get("영업가족")) else None)
 
                         if not emp_id:
                             skipped_rows += 1
                             continue
 
-                        user_defaults = {}
-                        if name:
-                            user_defaults["name"] = name
-                        if part:
-                            user_defaults["part"] = part
-                        if branch:
-                            user_defaults["branch"] = branch
-
-                        user, created = CustomUser.objects.update_or_create(id=emp_id, defaults=user_defaults)
-                        created_users += int(created)
-                        updated_users += int(not created)
+                        user = CustomUser.objects.filter(id=emp_id).first()
+                        if user:
+                            matched_users += 1
+                        else:
+                            missing_users += 1
 
                         receipt_amount = _to_int_money(r.get("영수금"))
 
@@ -719,8 +952,8 @@ def upload_sales_excel(request):
                 "message": "업로드 완료",
                 "summary": {
                     "detected_type": "auto" if is_auto else "default",
-                    "users_created": created_users,
-                    "users_updated": updated_users,
+                    "users_matched": matched_users,
+                    "users_missing_in_accounts": missing_users,
                     "rows_upserted": upserted_rows,
                     "rows_skipped": skipped_rows,
                     "rows_in_file": int(len(df)),

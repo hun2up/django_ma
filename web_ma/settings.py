@@ -28,7 +28,7 @@ ENV_PATH = ENV_FILE or (".env.prod" if APP_ENV in ("prod", "production") else ".
 config = Config(RepositoryEnv(ENV_PATH))
 
 SECRET_KEY = config("SECRET_KEY")
-DEBUG = config("DEBUG", cast=bool, default=(APP_ENV not in ("prod", "production")))
+DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
 # ============================================================
 # 1) HOSTS / CSRF
@@ -192,9 +192,17 @@ CSRF_COOKIE_SECURE = not DEBUG
 # ============================================================
 # 10) REDIS / CELERY (.env 기반)
 # ============================================================
-REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/0")
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=REDIS_URL)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL)
 
 # ============================================================
 # 11) UPLOAD LIMITS
@@ -206,7 +214,7 @@ UPLOAD_TEMP_DIR = MEDIA_ROOT / "upload_temp"
 # ============================================================
 # 12) CKEDITOR
 # ============================================================
-CKEDITOR_UPLOAD_PATH = "uploads/manual/"
+CKEDITOR_UPLOAD_PATH = "uploads/"
 CKEDITOR_CONFIGS = {
     "default": {
         "toolbar": "full",

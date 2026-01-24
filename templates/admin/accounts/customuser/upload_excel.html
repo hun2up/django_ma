@@ -1,18 +1,17 @@
+<!-- django_ma/templates/admin/accounts/customuser/upload_excel.html -->
+
 {% extends "admin/base_site.html" %}
 {% load static %}
 
 {% block content %}
 <div class="container mt-4" style="max-width:600px;">
 
-  <!-- 제목 -->
   <h3 class="fw-bold mb-4 text-center">사용자 엑셀 업로드</h3>
 
-  <!-- 알림 메시지 -->
   {% if messages %}
     {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
+      <div class="alert alert-{{ message.tags }} text-center">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endfor %}
   {% endif %}
@@ -22,16 +21,83 @@
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {{ form.as_p }}
-      <button type="submit" class="btn btn-primary w-100 mt-3 fw-bold">업로드 시작</button>
+      <button type="submit" class="btn btn-primary w-100 mt-3 fw-bold">
+        업로드 시작
+      </button>
     </form>
 
-    <!-- 뒤로가기 버튼 -->
     <div class="text-center mt-4">
-      <a href="{% url 'admin:accounts_customuser_changelist' %}" class="btn btn-outline-secondary">
+      <a href="{% url 'admin:accounts_customuser_changelist' %}"
+         class="btn btn-outline-secondary">
         이전으로 돌아가기
       </a>
     </div>
   </div>
 
+  {% if task_id %}
+  <!-- 진행률 UI -->
+  <div class="mt-4" id="uploadProgressBox" data-task-id="{{ task_id }}">
+    <div class="progress" style="height:20px;">
+      <div id="progBar" class="progress-bar" style="width:0%">0%</div>
+    </div>
+    <div class="mt-2"><span id="progText">처리 중...</span></div>
+    <div class="mt-3">
+      <a id="downloadBtn" class="btn btn-success disabled" href="#">결과 다운로드</a>
+    </div>
+    <div class="text-danger mt-2" id="errText"></div>
+  </div>
+  {% endif %}
+
 </div>
+
+{% if task_id %}
+<script>
+(function(){
+  if (window.__usersUploadPolling) return;
+  window.__usersUploadPolling = true;
+
+  const taskId = "{{ task_id|escapejs }}";
+  const progressUrl = "{% url 'accounts_upload_progress' %}";  // ✅ 컨텍스트 불필요
+  const bar = document.getElementById("progBar");
+  const text = document.getElementById("progText");
+  const err = document.getElementById("errText");
+  const btn = document.getElementById("downloadBtn");
+
+  async function tick(){
+    try {
+      const res = await fetch(`${progressUrl}?task_id=${encodeURIComponent(taskId)}`, {cache:"no-store"});
+      const data = await res.json();
+
+      const p = Number(data.percent || 0);
+      bar.style.width = p + "%";
+      bar.textContent = p + "%";
+      text.textContent = `${data.status} (${p}%)`;
+
+      if (data.status === "FAILURE") {
+        err.textContent = data.error || "처리 실패";
+        return;
+      }
+
+      if (data.status === "SUCCESS") {
+        if (data.download_url) {
+          btn.href = data.download_url;
+          btn.classList.remove("disabled");
+          text.textContent = "완료!";
+        } else {
+          err.textContent = "완료되었지만 다운로드 링크를 찾지 못했습니다.";
+        }
+        return;
+      }
+
+      setTimeout(tick, 1000);
+    } catch(e) {
+      err.textContent = "진행률 조회 오류";
+      setTimeout(tick, 3000);
+    }
+  }
+  tick();
+})();
+</script>
+{% endif %}
+
 {% endblock %}
