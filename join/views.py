@@ -158,7 +158,7 @@ def manual_detail(request, pk):
             return redirect("join:manual_list")
     return render(request, "manual/manual_detail.html", {"manual": manual})
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def manual_create(request):
     if request.method == "POST":
         form = ManualForm(request.POST, request.FILES)
@@ -169,7 +169,7 @@ def manual_create(request):
         form = ManualForm()
     return render(request, "manual/manual_form.html", {"form": form, "mode": "create"})
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def manual_edit(request, pk):
     manual = get_object_or_404(Manual, pk=pk)
     if request.method == "POST":

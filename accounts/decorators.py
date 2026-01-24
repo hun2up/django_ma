@@ -1,25 +1,80 @@
-# accounts/decorators.py
-from functools import wraps
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+# django_ma/accounts/decorators.py
+from __future__ import annotations
 
-def grade_required(allowed_grades):
+from functools import wraps
+from typing import Iterable, Set
+
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.shortcuts import render
+
+
+# =============================================================================
+# Grade-based Permission Decorators
+# =============================================================================
+
+# 별칭: 호출부에서는 head/leader처럼 쓰되,
+# 실제 시스템 grade 값(main_admin/sub_admin 등)을 함께 허용
+GRADE_ALIAS_MAP = {
+    "head": {"head", "main_admin"},
+    "leader": {"leader", "sub_admin"},
+}
+
+
+def _expand_allowed_grades(allowed: Iterable[str]) -> Set[str]:
+    expanded: Set[str] = set()
+    for g in allowed:
+        expanded |= GRADE_ALIAS_MAP.get(g, {g})
+    return expanded
+
+
+def grade_required(*allowed_grades: str, forbidden_template: str = "no_permission_popup.html"):
+    """
+    등급(grade) 기반 접근 제어 데코레이터.
+
+    사용 예)
+      @grade_required("head")          -> head + main_admin 허용
+      @grade_required("leader")        -> leader + sub_admin 허용
+      @grade_required("superuser")     -> superuser만
+      @grade_required("head", "leader")-> head/main_admin + leader/sub_admin 허용
+
+    forbidden_template
+      - 기본: 프로젝트 UX와 맞춘 팝업 템플릿 렌더
+      - None/"": API 등에서 템플릿 없이 403 반환
+    """
+    # grade_required(["superuser", "main_admin"]) 형태도 지원
+    if len(allowed_grades) == 1 and isinstance(allowed_grades[0], (list, tuple, set)):
+        allowed_grades = tuple(allowed_grades[0])
+
+    allowed_set = _expand_allowed_grades(allowed_grades)
+
     def decorator(view_func):
         @login_required
-        def _wrapped_view(request, *args, **kwargs):
-            if request.user.grade in allowed_grades:
-                return view_func(request, *args, **kwargs)
-            return render(request, "no_permission_popup.html")
+        @wraps(view_func)
+        def _wrapped_view(request: HttpRequest, *args, **kwargs) -> HttpResponse:
+            user_grade = getattr(request.user, "grade", None)
+
+            if user_grade not in allowed_set:
+                if forbidden_template:
+                    return render(request, forbidden_template)
+                return HttpResponseForbidden("권한이 없습니다.")
+
+            return view_func(request, *args, **kwargs)
+
         return _wrapped_view
+
     return decorator
 
 
 def not_inactive_required(view_func):
+    """
+    grade == 'inactive' 사용자는 접근 차단 (템플릿 팝업 방식)
+    """
     @login_required
     @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        # inactive만 차단, 나머지는 통과
+    def _wrapped(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         if getattr(request.user, "grade", None) == "inactive":
             return render(request, "no_permission_popup.html")
         return view_func(request, *args, **kwargs)
+
     return _wrapped

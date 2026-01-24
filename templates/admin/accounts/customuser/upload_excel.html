@@ -1,31 +1,40 @@
-<!-- django_ma/templates/admin/accounts/customuser/upload_excel.html -->
-
 {% extends "admin/base_site.html" %}
 {% load static %}
 
 {% block content %}
-<div class="container mt-4" style="max-width:600px;">
+<div class="container mt-4" style="max-width: 640px;">
 
+  <!-- Page title -->
   <h3 class="fw-bold mb-4 text-center">사용자 엑셀 업로드</h3>
 
+  <!-- Django messages (optional) -->
   {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} text-center">
-        {{ message }}
-      </div>
-    {% endfor %}
+    <div class="mb-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} text-center mb-2">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
   {% endif %}
 
-  <!-- 업로드 폼 -->
+  <!-- Upload form card -->
   <div class="card shadow-sm p-4 border-0 rounded-4">
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="excelUploadForm">
       {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit" class="btn btn-primary w-100 mt-3 fw-bold">
+
+      <!-- Excel file input -->
+      <div class="mb-3">
+        {{ form.as_p }}
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn btn-primary w-100 fw-bold">
         업로드 시작
       </button>
     </form>
 
+    <!-- Back to changelist -->
     <div class="text-center mt-4">
       <a href="{% url 'admin:accounts_customuser_changelist' %}"
          class="btn btn-outline-secondary">
@@ -35,69 +44,37 @@
   </div>
 
   {% if task_id %}
-  <!-- 진행률 UI -->
-  <div class="mt-4" id="uploadProgressBox" data-task-id="{{ task_id }}">
-    <div class="progress" style="height:20px;">
-      <div id="progBar" class="progress-bar" style="width:0%">0%</div>
+  <!-- Progress box (data only): JS reads task_id + progress_url from dataset -->
+  <div class="mt-4"
+       id="uploadProgressBox"
+       data-task-id="{{ task_id|escape }}"
+       data-progress-url="{% url 'accounts:accounts_upload_progress' %}">
+    <div class="card p-3 border-0 shadow-sm rounded-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-bold">처리 진행률</div>
+        <div class="small text-muted" id="progressStatusText">대기 중...</div>
+      </div>
+
+      <div class="progress" style="height: 20px;">
+        <div id="progressBar" class="progress-bar" style="width: 0%;">0%</div>
+      </div>
+
+      <div class="text-danger mt-2" id="progressErrorText"></div>
+
+      <div class="mt-3">
+        <a id="resultDownloadBtn" class="btn btn-success disabled" href="#" aria-disabled="true">
+          결과 다운로드
+        </a>
+      </div>
     </div>
-    <div class="mt-2"><span id="progText">처리 중...</span></div>
-    <div class="mt-3">
-      <a id="downloadBtn" class="btn btn-success disabled" href="#">결과 다운로드</a>
-    </div>
-    <div class="text-danger mt-2" id="errText"></div>
   </div>
   {% endif %}
 
 </div>
 
 {% if task_id %}
-<script>
-(function(){
-  if (window.__usersUploadPolling) return;
-  window.__usersUploadPolling = true;
-
-  const taskId = "{{ task_id|escapejs }}";
-  const progressUrl = "{% url 'accounts_upload_progress' %}";  // ✅ 컨텍스트 불필요
-  const bar = document.getElementById("progBar");
-  const text = document.getElementById("progText");
-  const err = document.getElementById("errText");
-  const btn = document.getElementById("downloadBtn");
-
-  async function tick(){
-    try {
-      const res = await fetch(`${progressUrl}?task_id=${encodeURIComponent(taskId)}`, {cache:"no-store"});
-      const data = await res.json();
-
-      const p = Number(data.percent || 0);
-      bar.style.width = p + "%";
-      bar.textContent = p + "%";
-      text.textContent = `${data.status} (${p}%)`;
-
-      if (data.status === "FAILURE") {
-        err.textContent = data.error || "처리 실패";
-        return;
-      }
-
-      if (data.status === "SUCCESS") {
-        if (data.download_url) {
-          btn.href = data.download_url;
-          btn.classList.remove("disabled");
-          text.textContent = "완료!";
-        } else {
-          err.textContent = "완료되었지만 다운로드 링크를 찾지 못했습니다.";
-        }
-        return;
-      }
-
-      setTimeout(tick, 1000);
-    } catch(e) {
-      err.textContent = "진행률 조회 오류";
-      setTimeout(tick, 3000);
-    }
-  }
-  tick();
-})();
-</script>
+<!-- Upload progress polling script (external) -->
+<script src="{% static 'js/accounts/admin_upload_progress.js' %}?v={{ STATIC_VER|default:'1' }}"></script>
 {% endif %}
 
 {% endblock %}

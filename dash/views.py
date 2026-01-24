@@ -640,7 +640,7 @@ def dash_recruit(request):
 def dash_retention(request):
     return render(request, "dash/dash_retention.html")
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def dash_goals(request):
     return render(request, "dash/dash_goals.html")
 
@@ -787,7 +787,7 @@ def _parse_ins_period(v) -> Tuple[Optional[date], Optional[date]]:
 # -----------------------------
 # 업로드 API
 # -----------------------------
-@grade_required(["superuser"])
+@grade_required("superuser")
 @require_POST
 def upload_sales_excel(request):
     f = request.FILES.get("excel_file")

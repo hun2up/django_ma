@@ -1,14 +1,12 @@
-import os
-from celery import Celery
+"""
+[DEPRECATED]
+이 파일은 과거 버전 Celery 설정 파일입니다.
 
-# Django 프로젝트의 settings 모듈 지정
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "web_ma.settings")
+✅ 현재 프로젝트는 web_ma/celery.py를 사용합니다.
+- web_ma/__init__.py에서 celery_app을 import
+- Celery worker 실행 시 -A web_ma.celery:app 사용 권장
 
-# Celery 앱 생성
-app = Celery("web_ma")
+이 파일은 참조/호환을 위해 남겨두는 경우에만 유지하세요.
+"""
 
-# Django 설정에서 CELERY로 시작하는 설정 불러오기
-app.config_from_object("django.conf:settings", namespace="CELERY")
-
-# 모든 Django 앱의 tasks.py 모듈 자동 탐색
-app.autodiscover_tasks()
+# intentionally left minimal

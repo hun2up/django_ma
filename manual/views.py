@@ -96,7 +96,7 @@ def manual_detail(request, pk):
     return render(request, "manual/manual_detail.html", {"m": manual, "sections": sections})
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def manual_create(request):
     """✅ superuser 전용: 폼 기반 생성(관리용)"""
     if request.method == "POST":
@@ -112,7 +112,7 @@ def manual_create(request):
     return render(request, "manual/manual_form.html", {"form": form, "mode": "create"})
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def manual_edit(request, pk):
     """✅ superuser 전용: 폼 기반 수정(관리용)"""
     obj = get_object_or_404(Manual, pk=pk)

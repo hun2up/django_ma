@@ -1291,7 +1291,7 @@ def _handle_upload_ls_total_from_file(file_path: str, original_name: str):
 # APIs
 # =========================================================
 @csrf_exempt
-@grade_required(["superuser"])
+@grade_required("superuser")
 def upload_excel(request):
     if request.method != "POST":
         return _json_error("잘못된 요청 방식입니다.", status=405)
@@ -1397,7 +1397,7 @@ def upload_excel(request):
             pass
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def search_user(request):
     # ✅ 다양한 검색 모달 구현체를 흡수 (q/keyword/query/term)
     q = (
@@ -1420,7 +1420,7 @@ def search_user(request):
     items = [{"id": str(u.id), "name": u.name, "branch": u.branch or ""} for u in qs]
     return _json_ok(items=items)
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def api_user_detail(request):
     user_id = (request.GET.get("user") or "").strip()
     if not user_id:
@@ -1470,7 +1470,7 @@ def api_user_detail(request):
     )
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def api_deposit_summary(request):
     user_id = (request.GET.get("user") or "").strip()
     if not user_id:
@@ -1636,7 +1636,7 @@ def api_deposit_summary(request):
     return _json_ok(summary=summary)
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def api_deposit_surety_list(request):
     user_id = (request.GET.get("user") or "").strip()
     if not user_id:
@@ -1659,7 +1659,7 @@ def api_deposit_surety_list(request):
     return _json_ok(items=items, count=len(items))
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def api_deposit_other_list(request):
     user_id = (request.GET.get("user") or "").strip()
     if not user_id:
@@ -1712,7 +1712,7 @@ def _retire_state(user):
 
     return "퇴사자" if retire_disp else "재직자"
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def api_support_pdf(request):
     """
     ✅ 지원신청서 PDF 다운로드 (워드 양식처럼: 들여쓰기 + 표)
@@ -2044,12 +2044,12 @@ def api_support_pdf(request):
 # =========================================================
 # Pages
 # =========================================================
-@grade_required(["superuser"])
+@grade_required("superuser")
 def redirect_to_deposit(request):
     return redirect("commission:deposit_home")
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def deposit_home(request):
     parts = list(
         CustomUser.objects.exclude(part__isnull=True)
@@ -2077,13 +2077,13 @@ def deposit_home(request):
     return render(request, "commission/deposit_home.html", context)
 
 
-@grade_required(["superuser"])
+@grade_required("superuser")
 def support_home(request):
     return render(request, "commission/support_home.html")
 
 
 @login_required
-@grade_required(["superuser"])
+@grade_required("superuser")
 def approval_home(request):
     # 현재 연/월
     now = timezone.localtime(timezone.now())
@@ -2191,7 +2191,7 @@ def _pad2(n: int) -> str:
     return f"{n:02d}"
 
 @csrf_exempt
-@grade_required(["superuser"])
+@grade_required("superuser")
 def approval_upload_excel(request):
     if request.method != "POST":
         return _json_error("잘못된 요청 방식입니다.", status=405)
@@ -2626,7 +2626,7 @@ def _handle_upload_efficiency_pay_excess(file_path: str, original_name: str, ym:
 
 
 @require_GET
-@grade_required(["superuser"])
+@grade_required("superuser")
 def download_approval_pending_excel(request):
     year = (request.GET.get("year") or "").strip()
     month = (request.GET.get("month") or "").strip()
@@ -2717,7 +2717,7 @@ def download_approval_pending_excel(request):
 
 
 @require_GET
-@grade_required(["superuser"])
+@grade_required("superuser")
 def download_efficiency_excess_excel(request):
     """
     지점효율지급 초과현황 엑셀 다운로드

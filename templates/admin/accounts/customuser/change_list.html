@@ -1,10 +1,36 @@
-<!-- django_ma/templates/admin/accounts/customuser/change_list.html -->
-
 {% extends "admin/change_list.html" %}
 
 {% block object-tools %}
-    {{ block.super }}
-        <a href="{% url 'admin:export_all_users_excel' %}" class="button">엑셀 다운로드</a>
-        <a href="{% url 'admin:upload_users_excel' %}" class="button" >엑셀 업로드</a>
-        <a href="{% url 'admin:upload_excel_template' %}" class="button" style="background:#4CAF50; color:white;">양식 다운로드</a>
+  <!--
+    Django admin default object-tools 구조를 그대로 유지하기 위해:
+    - block.super가 생성하는 <ul class="object-tools"> 내부에
+      추가 <li>만 주입합니다. (ul 중첩 금지)
+  -->
+  {{ block.super }}
+
+  <!-- Custom tools: Export / Upload / Template -->
+  <li>
+    <a href="{% url 'admin:export_all_users_excel' %}" class="button">
+      엑셀 다운로드
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'admin:upload_users_excel' %}" class="button">
+      엑셀 업로드
+    </a>
+  </li>
+
+  <!--
+    양식 다운로드
+    - 기능은 유지
+    - 현재는 사용하지 않으므로 화면에서 숨김
+    - 필요 시 style 제거만 하면 즉시 복구 가능
+  -->
+  <li style="display: none;">
+    <a href="{% url 'admin:upload_excel_template' %}"
+       class="button"
+       style="background:#4CAF50; color:#fff;">
+      양식 다운로드
+    </a>
+  </li>
 {% endblock %}

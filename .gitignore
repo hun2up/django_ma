@@ -1,3 +1,5 @@
+# django_ma/.gitignore
+
 # 가상환경 폴더
 venv/
 # dotenv files
