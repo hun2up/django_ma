@@ -38,7 +38,7 @@ from .utils import (
 )
 
 
-@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
+@grade_required("superuser", "head", "leader", "basic")
 def redirect_to_manual(request):
     return redirect("manual:manual_list")
 
@@ -52,7 +52,7 @@ def manual_list(request):
     """
     ✅ 매뉴얼 목록
     - 직원전용(is_published=False)은 superuser만 노출
-    - 관리자전용(admin_only=True)은 superuser/main_admin만 노출
+    - 관리자전용(admin_only=True)은 superuser/head만 노출
     """
     grade = getattr(request.user, "grade", "")
 
@@ -62,8 +62,8 @@ def manual_list(request):
     if grade != "superuser":
         qs = qs.filter(is_published=True)
 
-    # 관리자전용은 superuser/main_admin만
-    if grade not in ("superuser", "main_admin"):
+    # 관리자전용은 superuser/head만
+    if grade not in ("superuser", "head"):
         qs = qs.filter(admin_only=False)
 
     qs = qs.order_by("sort_order", "-updated_at")

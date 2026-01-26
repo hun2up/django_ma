@@ -11,7 +11,7 @@
 
 {% block content %}
 
-{% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+{% if user.grade != 'superuser' and user.grade != 'head' %}
   <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% else %}
 
@@ -30,12 +30,16 @@
 <div id="manage-grades"
      data-user-grade="{{ user.grade }}"
      data-user-branch="{{ user.branch|default:''|escapejs }}"
+     data-selected-channel="{{ selected_channel|default:''|escapejs }}"
      data-selected-part="{{ selected_part|default:''|escapejs }}"
      data-selected-branch="{{ selected_branch|default:''|escapejs }}"
      data-update-level-url="{% url 'partner:ajax_update_level' %}"
      data-delete-subadmin-url="{% url 'partner:ajax_delete_subadmin' %}"
      data-add-subadmin-url="{% url 'partner:ajax_add_sub_admin' %}"
-     data-search-url="/api/accounts/search-user/">
+     data-search-url="/api/accounts/search-user/"
+     data-fetch-channels-url="{% url 'partner:ajax_fetch_channels' %}"
+     data-fetch-parts-url="{% url 'partner:ajax_fetch_parts' %}"
+     data-fetch-branches-url="{% url 'partner:ajax_fetch_branches' %}">
 
   <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">권한관리 페이지</h3>
 
@@ -45,13 +49,24 @@
   {% if user.grade == 'superuser' %}
   <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
     <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3" method="get">
+
+      <!-- 부문 선택 -->
       <div style="flex:0 0 220px;">
-        <label for="partSelect" class="form-label fw-semibold">부서</label>
-        <select id="partSelect" name="part" class="form-select form-select-sm">
+        <label for="channelSelect" class="form-label fw-semibold">부문</label>
+        <select id="channelSelect" name="channel" class="form-select form-select-sm">
           <option value="">불러오는 중...</option>
         </select>
       </div>
 
+      <!-- 부서 선택  -->
+      <div style="flex:0 0 220px;">
+        <label for="partSelect" class="form-label fw-semibold">부서</label>
+        <select id="partSelect" name="part" class="form-select form-select-sm" disabled>
+          <option value="">부문을 먼저 선택하세요</option>
+        </select>
+      </div>
+
+      <!-- 지점 선택 -->
       <div style="flex:0 0 300px;">
         <label for="branchSelect" class="form-label fw-semibold">지점</label>
         <select id="branchSelect" name="branch" class="form-select form-select-sm" disabled>
@@ -64,6 +79,7 @@
       </div>
 
       {# ✅ 초기값: view에서 내려주는 값(JS가 우선 사용) #}
+      <input type="hidden" id="selectedChannelInit" value="{{ selected_channel|default:'' }}">
       <input type="hidden" id="selectedPartInit" value="{{ selected_part|default:'' }}">
       <input type="hidden" id="selectedBranchInit" value="{{ selected_branch|default:'' }}">
     </form>
@@ -142,7 +158,7 @@
                 <td>{{ u.team_b|default:"-" }}</td>
                 <td>{{ u.team_c|default:"-" }}</td>
                 <td>
-                  {% if user.grade == "superuser" or user.grade == "main_admin" %}
+                  {% if user.grade == "superuser" or user.grade == "head" %}
                     <button type="button"
                             class="btn btn-sm btn-danger js-delete-subadmin"
                             data-user-id="{{ u.user.id }}"
@@ -167,7 +183,7 @@
   <div class="card shadow p-3 border-0 rounded-4">
     <h5 class="fw-bold mb-3" style="color:#003f7d;">전체설계사 명단</h5>
 
-    {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+    {% if user.grade != 'superuser' and user.grade != 'head' %}
       <div class="alert alert-warning py-2">
         부서/지점을 선택해야 전체설계사 명단을 조회할 수 있습니다.
       </div>
@@ -204,7 +220,7 @@
   <!----------------------------------------------------------------
      ✅ 중간관리자 추가 모달 (검색 + 승격)
      - superuser: 전체 검색 (scope 없음)
-     - main_admin: 본인지점 검색 (scope=branch, branch 파라미터 없이 서버가 request.user.branch로 제한)
+     - head: 본인지점 검색 (scope=branch, branch 파라미터 없이 서버가 request.user.branch로 제한)
      -------------------------------------------------------------->
   <div class="modal fade" id="addSubAdminModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -272,573 +288,7 @@
 {# ✅ XLSX (클라이언트 엑셀 생성) #}
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-{# ✅ 공용: 부서/지점 셀렉터 #}
-<script type="module" src="{% static 'js/common/part_branch_selector.js' %}?v=20260123_01"></script>
-
-<script>
-/* =========================================================
-   Manage Grades (Final Refactor v2)
-   - DataTables emptyTable/zeroRecords 안정
-   - destroy/re-init 안전(BFCache/pageshow)
-   - CSRF robust (hidden input 우선 + cookie fallback)
-   - 중간관리자: 레벨 변경 + ✅ 삭제(ajax_delete_subadmin)
-   - ✅ "중간관리자 추가" 모달: 검색(/api/accounts/search-user/) + 승격(ajax_add_sub_admin)
-   - 이벤트 바인딩: 1회 + 위임 방식(중복 방지)
-========================================================= */
-(function () {
-  "use strict";
-
-  /* -----------------------------
-   * Utils
-   * ----------------------------- */
-  const U = {
-    str(v) { return String(v ?? "").trim(); },
-    qs(sel, root) { return (root || document).querySelector(sel); },
-    qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); },
-    on(el, type, handler, opts) { if (el) el.addEventListener(type, handler, opts); },
-    escHtml(v) {
-      const s = String(v ?? "");
-      return s
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    },
-    getCookie(name) {
-      const value = `; ${document.cookie || ""}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-      return "";
-    },
-    buildUrl(base, params) {
-      const url = new URL(base, window.location.origin);
-      Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v ?? ""));
-      return url.toString();
-    },
-    async parseJson(res) {
-      const text = await res.text();
-      try {
-        return { ok: res.ok, status: res.status, data: JSON.parse(text), text };
-      } catch {
-        return { ok: false, status: res.status, data: null, text };
-      }
-    },
-  };
-
-  /* -----------------------------
-   * Root / Context
-   * ----------------------------- */
-  function getRoot() {
-    return document.getElementById("manage-grades");
-  }
-
-  function getCSRFToken() {
-    const input =
-      U.qs('#csrfForm input[name="csrfmiddlewaretoken"]') ||
-      U.qs('input[name="csrfmiddlewaretoken"]');
-    const fromInput = U.str(input?.value);
-    if (fromInput) return fromInput;
-    return U.str(U.getCookie("csrftoken"));
-  }
-
-  function showToast(message, isSuccess) {
-    const toastElement = document.getElementById("statusToast");
-    const toastTitle = document.getElementById("toastTitle");
-    const toastBody = document.getElementById("toastBody");
-
-    if (!toastElement || !toastTitle || !toastBody) {
-      alert(message);
-      return;
-    }
-
-    if (isSuccess) {
-      toastTitle.textContent = "✅ 처리 성공";
-      toastElement.classList.remove("text-bg-danger");
-      toastElement.classList.add("text-bg-success");
-    } else {
-      toastTitle.textContent = "❌ 처리 실패";
-      toastElement.classList.remove("text-bg-success");
-      toastElement.classList.add("text-bg-danger");
-    }
-
-    toastBody.textContent = message;
-
-    if (window.bootstrap?.Toast) new bootstrap.Toast(toastElement, { delay: 3000 }).show();
-    else alert(message);
-  }
-
-  function isAllowedGrade(grade) {
-    return grade === "superuser" || grade === "main_admin";
-  }
-
-  function getContext() {
-    const root = getRoot();
-    const d = root?.dataset || {};
-    return {
-      root,
-      userGrade: U.str(d.userGrade),
-      userBranch: U.str(d.userBranch),
-      selectedPart: U.str(d.selectedPart),
-      selectedBranch: U.str(d.selectedBranch),
-
-      // dataset (urls)
-      addSubadminUrl: U.str(d.addSubadminUrl),
-      deleteSubadminUrl: U.str(d.deleteSubadminUrl), // ✅ 추가(템플릿에서 주입 권장)
-      updateLevelUrl: U.str(d.updateLevelUrl),       // ✅ 추가(템플릿에서 주입 권장)
-      searchUrl: U.str(d.searchUrl || "/api/accounts/search-user/"),
-    };
-  }
-
-  function canInitDataTables(ctx) {
-    if (!isAllowedGrade(ctx.userGrade)) return false;
-    if (ctx.userGrade === "superuser" && (!ctx.selectedPart || !ctx.selectedBranch)) return false;
-    if (!ctx.selectedPart || !ctx.selectedBranch) return false;
-    return true;
-  }
-
-  /* -----------------------------
-   * DataTables helpers
-   * ----------------------------- */
-  function safeDestroyDataTable($table) {
-    if (!$table || !$table.length) return;
-    if ($.fn.DataTable && $.fn.DataTable.isDataTable($table)) {
-      try {
-        $table.DataTable().clear().destroy(true);
-      } catch (e) {
-        console.warn("DataTable destroy failed:", e);
-      }
-    }
-  }
-
-  function initTables() {
-    const ctx = getContext();
-    if (!canInitDataTables(ctx)) {
-      console.log("DataTables 초기화 조건 불충족 — 생략");
-      return;
-    }
-
-    const $subTable = $("#subAdminTable");
-    const $allTable = $("#allUserTable");
-
-    const ajaxBase = U.str($allTable.data("ajax-base"));
-    if (!ajaxBase) return console.warn("ajax-base 누락 — allUserTable 초기화 불가");
-
-    const ajaxUrl = U.buildUrl(ajaxBase, { part: ctx.selectedPart, branch: ctx.selectedBranch });
-
-    safeDestroyDataTable($subTable);
-    safeDestroyDataTable($allTable);
-
-    // ✅ 중간관리자 명단
-    $subTable.DataTable({
-      paging: true,
-      searching: true,
-      info: true,
-      pageLength: 10,
-      autoWidth: false,
-      lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
-      language: {
-        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
-        lengthMenu: "페이지당 인원 _MENU_",
-        search: "검색:",
-        zeroRecords: "표시할 데이터가 없습니다.",
-        emptyTable: "해당 부서/지점의 중간관리자가 없습니다.",
-        info: "총 _TOTAL_명 중 _START_–_END_ 표시",
-        infoEmpty: "데이터 없음",
-      },
-      dom: `
-        <'d-flex justify-content-between align-items-center mb-2'
-          <'d-flex align-items-center gap-2'l>
-          f
-        >rtip
-      `,
-    });
-
-    // ✅ 전체 사용자 목록 (Ajax)
-    $allTable.DataTable({
-      serverSide: true,
-      processing: true,
-      ajax: { url: ajaxUrl, type: "GET" },
-      columns: [
-        { data: "part" },
-        { data: "branch" },
-        { data: "name" },
-        { data: "user_id" },
-        { data: "position" },
-        { data: "team_a" },
-        { data: "team_b" },
-        { data: "team_c" },
-      ],
-      pageLength: 10,
-      autoWidth: false,
-      lengthMenu: [[10, 25, 50, 100], ["10명", "25명", "50명", "100명"]],
-      language: {
-        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json",
-        lengthMenu: "페이지당 인원 _MENU_",
-        search: "검색:",
-        processing: "로딩 중...",
-        zeroRecords: "표시할 데이터가 없습니다.",
-        emptyTable: "표시할 데이터가 없습니다.",
-      },
-      dom: `
-        <'d-flex justify-content-between align-items-center mb-2'
-          <'d-flex align-items-center gap-2'lB>
-          f
-        >rtip
-      `,
-      buttons: [
-        {
-          text: "<i class='bi bi-download'></i> 엑셀 다운로드",
-          className: "btn btn-success btn-sm",
-          action: function () {
-            const url = U.buildUrl(ajaxUrl, { length: 999999 });
-
-            fetch(url, { credentials: "same-origin" })
-              .then((res) => {
-                if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
-                return res.json();
-              })
-              .then((data) => {
-                if (!data.data || !Array.isArray(data.data)) {
-                  throw new Error("서버에서 잘못된 형식의 데이터를 반환했습니다.");
-                }
-
-                const rows = data.data.map((u) => ({
-                  성명: u.name || "",
-                  사번: u.user_id || "",
-                  직급: u.position || "",
-                  팀A: u.team_a || "",
-                  팀B: u.team_b || "",
-                  팀C: u.team_c || "",
-                }));
-
-                if (!rows.length) return alert("다운로드할 데이터가 없습니다.");
-
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.json_to_sheet(rows);
-                XLSX.utils.book_append_sheet(wb, ws, "전체설계사명단");
-                XLSX.writeFile(wb, "전체설계사명단.xlsx");
-              })
-              .catch((err) => {
-                alert("엑셀 생성 중 오류가 발생했습니다.");
-                console.error("엑셀 다운로드 오류:", err);
-              });
-          },
-        },
-        {
-          text: "<i class='bi bi-upload'></i> 엑셀 업로드",
-          className: "btn btn-success btn-sm",
-          action: function () {
-            document.getElementById("excelFile")?.click();
-          },
-        },
-      ],
-    });
-
-    // ✅ Excel Upload bind (1회)
-    const excelFile = document.getElementById("excelFile");
-    const excelForm = document.getElementById("excelUploadForm");
-    if (excelFile && excelForm && !excelFile.dataset.bound) {
-      excelFile.dataset.bound = "1";
-      excelFile.addEventListener("change", function () {
-        if (!this.files.length) return;
-        const fileName = this.files[0].name;
-        if (confirm(`"${fileName}" 파일을 업로드하시겠습니까?`)) {
-          excelForm.submit();
-        } else {
-          this.value = "";
-        }
-      });
-    }
-  }
-
-  /* -----------------------------
-   * API calls
-   * ----------------------------- */
-  function buildHeaders() {
-    const csrf = getCSRFToken();
-    const headers = {
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-    };
-    if (csrf) headers["X-CSRFToken"] = csrf;
-    return headers;
-  }
-
-  async function postForm(url, params) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: buildHeaders(),
-      credentials: "same-origin",
-      body: new URLSearchParams(params || {}),
-    });
-    const parsed = await U.parseJson(res);
-    if (!parsed.ok || !parsed.data) {
-      console.error("서버가 JSON이 아닌 응답:", { status: parsed.status, text: parsed.text });
-      throw new Error(`서버 응답이 JSON이 아닙니다. (${parsed.status})`);
-    }
-    if (!res.ok) throw new Error(parsed.data?.error || parsed.data?.message || `요청 실패 (${res.status})`);
-    if (parsed.data.success === false || parsed.data.ok === false) throw new Error(parsed.data?.error || "처리 실패");
-    return parsed.data;
-  }
-
-  /* -----------------------------
-   * Delegated handlers (Subadmin)
-   * - level change
-   * - delete
-   * ----------------------------- */
-  async function handleLevelChange(selectEl) {
-    const ctx = getContext();
-    const updateUrl = ctx.updateLevelUrl || "{% url 'partner:ajax_update_level' %}";
-
-    const tr = selectEl.closest("tr");
-    const userId = U.str(tr?.dataset?.userId || tr?.getAttribute("data-user-id"));
-    const newLevel = U.str(selectEl.value);
-
-    if (!userId) return showToast("user_id를 찾을 수 없습니다.", false);
-
-    try {
-      await postForm(updateUrl, { user_id: userId, level: newLevel });
-      showToast(`레벨이 ${newLevel}로 변경되었습니다.`, true);
-    } catch (err) {
-      console.error("레벨 변경 오류:", err);
-      showToast(err?.message || "서버 요청 중 오류가 발생했습니다.", false);
-    }
-  }
-
-  async function handleSubadminDelete(btnEl) {
-    const ctx = getContext();
-    const deleteUrl = ctx.deleteSubadminUrl || "{% url 'partner:ajax_delete_subadmin' %}";
-
-    const tr = btnEl.closest("tr");
-    const userId =
-      U.str(btnEl.dataset.userId) ||
-      U.str(tr?.dataset?.userId || tr?.getAttribute("data-user-id"));
-
-    const userName =
-      U.str(btnEl.dataset.userName) ||
-      U.str(tr?.dataset?.userName) ||
-      "";
-
-    if (!userId) return showToast("user_id를 찾을 수 없습니다.", false);
-
-    const label = userName ? `[${userName}]` : `[${userId}]`;
-    if (!confirm(`${label} 중간관리자를 삭제할까요?\n(계정은 유지되고 grade가 basic으로 변경됩니다.)`)) return;
-
-    btnEl.disabled = true;
-
-    try {
-      await postForm(deleteUrl, { user_id: userId });
-
-      // DataTable 행 제거(가능하면)
-      const $subTable = $("#subAdminTable");
-      if ($subTable.length && $.fn.DataTable?.isDataTable($subTable)) {
-        const dt = $subTable.DataTable();
-        dt.row($(tr)).remove().draw(false);
-      } else if (tr) {
-        tr.remove();
-      }
-
-      showToast("중간관리자가 삭제되었습니다. (grade=basic)", true);
-    } catch (err) {
-      console.error("삭제 오류:", err);
-      showToast(err?.message || "삭제 처리 중 오류가 발생했습니다.", false);
-      btnEl.disabled = false;
-    }
-  }
-
-  function bindSubAdminDelegation() {
-    const table = document.getElementById("subAdminTable");
-    if (!table || table.dataset.bound) return;
-    table.dataset.bound = "1";
-
-    table.addEventListener("change", (e) => {
-      const sel = e.target?.closest?.(".level-select");
-      if (!sel) return;
-      handleLevelChange(sel);
-    });
-
-    table.addEventListener("click", (e) => {
-      const btn = e.target?.closest?.(".js-delete-subadmin");
-      if (!btn) return;
-      handleSubadminDelete(btn);
-    });
-  }
-
-  /* -----------------------------
-   * Add SubAdmin Modal
-   * ----------------------------- */
-  function openAddModal() {
-    const modalEl = document.getElementById("addSubAdminModal");
-    const keywordEl = document.getElementById("addSubAdminKeyword");
-    const resultsEl = document.getElementById("addSubAdminResults");
-    if (!modalEl) return;
-
-    const ctx = getContext();
-
-    // UX 제한
-    if (ctx.userGrade === "superuser" && (!ctx.selectedPart || !ctx.selectedBranch)) {
-      return alert("부서/지점을 선택 후 검색하세요.");
-    }
-    if (ctx.userGrade === "main_admin" && !ctx.userBranch) {
-      return alert("본인 지점 정보가 없습니다. 관리자에게 문의해주세요.");
-    }
-
-    if (keywordEl) keywordEl.value = "";
-    if (resultsEl) {
-      resultsEl.innerHTML = `<div class="text-center py-3 text-muted">검색어를 입력 후 검색하세요.</div>`;
-    }
-
-    if (window.bootstrap?.Modal) new bootstrap.Modal(modalEl).show();
-    else modalEl.classList.add("show");
-  }
-
-  async function runAddSearch(keyword) {
-    const ctx = getContext();
-    const resultsEl = document.getElementById("addSubAdminResults");
-    if (!resultsEl) return;
-
-    resultsEl.innerHTML = `<div class="text-center py-3 text-muted">검색 중...</div>`;
-
-    try {
-      const url = new URL(ctx.searchUrl, window.location.origin);
-      url.searchParams.set("q", keyword);
-
-      if (ctx.userGrade === "main_admin") {
-        url.searchParams.set("scope", "branch");
-        // branch 파라미터는 보내지 않음(서버가 request.user.branch로 제한)
-      }
-
-      const res = await fetch(url.toString(), {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-        credentials: "same-origin",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json().catch(() => ({}));
-      const list = Array.isArray(data?.results) ? data.results : [];
-
-      if (!list.length) {
-        resultsEl.innerHTML = `<div class="text-center py-3 text-danger">검색 결과가 없습니다.</div>`;
-        return;
-      }
-
-      resultsEl.innerHTML = list.map((u0) => {
-        const u = u0 || {};
-        const name = U.escHtml(u.name || "");
-        const id = U.escHtml(u.id || "");
-        const branch = U.escHtml(u.branch || "");
-        const part = U.escHtml(u.part || "");
-        const regist = U.escHtml(u.regist || "");
-        const enter = U.escHtml(u.enter || "-");
-        const quit = U.escHtml(u.quit || "재직중");
-
-        return `
-          <button type="button"
-                  class="list-group-item list-group-item-action addsub-result"
-                  data-user-id="${U.escHtml(u.id)}"
-                  data-user-name="${U.escHtml(u.name)}">
-            <div class="d-flex justify-content-between">
-              <span><strong>${name}</strong> (${id}) ${regist ? `(${regist})` : ""}</span>
-              <small class="text-muted">${branch}</small>
-            </div>
-            <small class="text-muted">부서: ${part || "-"} / 입사일: ${enter} / 퇴사일: ${quit}</small>
-          </button>
-        `;
-      }).join("");
-    } catch (err) {
-      console.error("검색 오류:", err);
-      resultsEl.innerHTML = `<div class="text-center text-danger py-3">검색 실패</div>`;
-    }
-  }
-
-  async function promoteToSubAdmin(userId) {
-    const ctx = getContext();
-    if (!ctx.addSubadminUrl) throw new Error("승격 URL이 설정되지 않았습니다.");
-    return postForm(ctx.addSubadminUrl, { user_id: userId });
-  }
-
-  function bindAddSubAdminModal() {
-    const ctx = getContext();
-    if (!isAllowedGrade(ctx.userGrade)) return;
-
-    const btn = document.getElementById("btnOpenAddSubAdmin");
-    const form = document.getElementById("addSubAdminSearchForm");
-    const keywordEl = document.getElementById("addSubAdminKeyword");
-    const resultsEl = document.getElementById("addSubAdminResults");
-    const modalEl = document.getElementById("addSubAdminModal");
-
-    if (btn && !btn.dataset.bound) {
-      btn.dataset.bound = "1";
-      btn.addEventListener("click", openAddModal);
-    }
-
-    if (form && !form.dataset.bound) {
-      form.dataset.bound = "1";
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const kw = U.str(keywordEl?.value);
-        if (!kw) return alert("검색어를 입력하세요.");
-        await runAddSearch(kw);
-      });
-    }
-
-    if (resultsEl && !resultsEl.dataset.bound) {
-      resultsEl.dataset.bound = "1";
-      resultsEl.addEventListener("click", async (e) => {
-        const item = e.target?.closest?.(".addsub-result");
-        if (!item) return;
-
-        const userId = U.str(item.dataset.userId);
-        const userName = U.str(item.dataset.userName);
-
-        if (!userId) return;
-
-        if (!confirm(`[${userName || userId}] 사용자를 중간관리자(sub_admin)로 추가할까요?`)) return;
-
-        try {
-          await promoteToSubAdmin(userId);
-          showToast("중간관리자로 추가되었습니다. (grade=sub_admin)", true);
-
-          // 모달 닫기
-          try {
-            const inst = window.bootstrap?.Modal?.getInstance?.(modalEl);
-            if (inst) inst.hide();
-          } catch (_) {}
-
-          // 가장 안전: 페이지 리로드 (subadmin 명단 + 전체명단 재반영)
-          window.location.reload();
-        } catch (err) {
-          console.error("승격 오류:", err);
-          showToast(err?.message || "승격 처리 중 오류가 발생했습니다.", false);
-        }
-      });
-    }
-
-    if (modalEl && !modalEl.dataset.bound) {
-      modalEl.dataset.bound = "1";
-      modalEl.addEventListener("hidden.bs.modal", () => {
-        if (keywordEl) keywordEl.value = "";
-        if (resultsEl) resultsEl.innerHTML = `<div class="text-center py-3 text-muted">검색어를 입력 후 검색하세요.</div>`;
-      });
-    }
-  }
-
-  /* -----------------------------
-   * init (with BFCache)
-   * ----------------------------- */
-  function initAll() {
-    const ctx = getContext();
-    if (!isAllowedGrade(ctx.userGrade)) return;
-
-    initTables();
-    bindSubAdminDelegation();
-    bindAddSubAdminModal();
-  }
-
-  document.addEventListener("DOMContentLoaded", initAll);
-  window.addEventListener("pageshow", (e) => { if (e.persisted) initAll(); });
-})();
-</script>
+<!-- ✅ manage_grades 전용 JS (channel→part→branch 포함) -->
+<script src="{% static 'js/partner/manage_grades/index.js' %}?v=20260125_01"></script>
 
 {% endblock %}

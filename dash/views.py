@@ -48,12 +48,12 @@ AUTO_REQUIRED_COLS = [
 ]
 
 
-@grade_required(["superuser", "main_admin"])
+@grade_required("superuser", "head")
 def redirect_to_sales(request):
     return redirect("dash_sales")
 
 
-@grade_required(["superuser", "main_admin"])
+@grade_required("superuser", "head")
 def dash_sales(request):
     now = datetime.now()
     default_year = str(now.year)
@@ -210,8 +210,8 @@ def dash_sales(request):
     # -----------------------------
     qs_base = SalesRecord.objects.all()
 
-    # ✅ main_admin 정책: 본인 지점 데이터만
-    if request.user.grade == "main_admin":
+    # ✅ head 정책: 본인 지점 데이터만
+    if request.user.grade == "head":
         my_branch = (request.user.branch or "").strip()
         if not my_branch:
             qs_base = qs_base.none()
@@ -348,13 +348,13 @@ def dash_sales(request):
 
     # =========================================================
     # (B) 전월 4개 시리즈 (당월 라벨 길이에 맞춰 정렬)
-    #   - 당월과 "동일 필터(part/branch/life_nl/insurer/q + main_admin 권한)" 적용
+    #   - 당월과 "동일 필터(part/branch/life_nl/insurer/q + head 권한)" 적용
     # =========================================================
 
     qs_prev_base = SalesRecord.objects.all()
 
-    # ✅ main_admin 정책: 본인 지점 데이터만
-    if request.user.grade == "main_admin":
+    # ✅ head 정책: 본인 지점 데이터만
+    if request.user.grade == "head":
         my_branch = (request.user.branch or "").strip()
         if not my_branch:
             qs_prev_base = qs_prev_base.none()
@@ -425,7 +425,7 @@ def dash_sales(request):
 
     qs_py_base = SalesRecord.objects.all()
 
-    if request.user.grade == "main_admin":
+    if request.user.grade == "head":
         my_branch = (request.user.branch or "").strip()
         if not my_branch:
             qs_py_base = qs_py_base.none()
@@ -490,13 +490,13 @@ def dash_sales(request):
     # -----------------------------
     # 10) 부서/지점 옵션: CustomUser + SalesRecord snapshot/user "합집합"
     # -----------------------------
-    sr_scope = qs_base  # ym + 권한(main_admin) 적용된 scope
+    sr_scope = qs_base  # ym + 권한(head) 적용된 scope
 
     user_part_vals = list(
         CustomUser.objects.exclude(part__isnull=True).exclude(part__exact="")
         .values_list("part", flat=True).distinct()
     )
-    if request.user.grade == "main_admin":
+    if request.user.grade == "head":
         my_branch = (request.user.branch or "").strip()
         if my_branch:
             user_part_vals = list(
@@ -519,7 +519,7 @@ def dash_sales(request):
         CustomUser.objects.exclude(branch__isnull=True).exclude(branch__exact="")
         .values_list("branch", flat=True).distinct()
     )
-    if request.user.grade == "main_admin":
+    if request.user.grade == "head":
         my_branch = (request.user.branch or "").strip()
         user_branch_vals = [my_branch] if my_branch else []
 
@@ -540,7 +540,7 @@ def dash_sales(request):
             .exclude(branch__isnull=True).exclude(branch__exact="")
             .values_list("branch", flat=True).distinct()
         )
-        if request.user.grade == "main_admin":
+        if request.user.grade == "head":
             my_branch = (request.user.branch or "").strip()
             u_br = [my_branch] if my_branch else []
 
@@ -631,12 +631,12 @@ def dash_sales(request):
     return render(request, "dash/dash_sales.html", context)
 
 
-@grade_required(["superuser", "main_admin"])
+@grade_required("superuser", "head")
 def dash_recruit(request):
     return render(request, "dash/dash_recruit.html")
 
 
-@grade_required(["superuser", "main_admin"])
+@grade_required("superuser", "head")
 def dash_retention(request):
     return render(request, "dash/dash_retention.html")
 

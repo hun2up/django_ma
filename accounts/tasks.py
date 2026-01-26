@@ -222,6 +222,8 @@ def _infer_channel(part_text: str) -> str:
         return "CA부문"
     if "PA" in t:
         return "PA부문"
+    if "1인GA사업부" in t:
+        return "MA부문"
     return "전략부문"
 
 
