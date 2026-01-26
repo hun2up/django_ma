@@ -61,6 +61,7 @@ urlpatterns = [
     path("api/update-level/", views.ajax_update_level, name="ajax_update_level"),
 
     # Part/Branch utilities
+    path("ajax/fetch-channels/", views.ajax_fetch_channels, name="ajax_fetch_channels"),
     path("ajax/fetch-parts/", views.ajax_fetch_parts, name="ajax_fetch_parts"),
     path("ajax/fetch-branches/", views.ajax_fetch_branches, name="ajax_fetch_branches"),
 

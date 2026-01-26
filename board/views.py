@@ -727,7 +727,7 @@ def post_edit(request, pk):
 # 📘 업무요청서/소명서 폼
 # =========================================================
 @login_required
-@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
+@grade_required("superuser", "head", "leader", "basic")
 def support_form(request):
     fields = [("성명", "target_name_"), ("사번", "target_code_"), ("입사일", "target_join_"), ("퇴사일", "target_leave_")]
     contracts = [("보험사", "insurer_", 3), ("증권번호", "policy_no_", 3), ("계약자(피보험자)", "contractor_", 3), ("보험료", "premium_", 2)]
@@ -735,7 +735,7 @@ def support_form(request):
 
 
 @login_required
-@grade_required(["superuser", "main_admin", "sub_admin", "basic"])
+@grade_required("superuser", "head", "leader", "basic")
 def states_form(request):
     fields = [("성명", "target_name_"), ("사번", "target_code_"), ("입사일", "target_join_"), ("퇴사일", "target_leave_")]
     contracts = [("보험사", "insurer_", 3), ("증권번호", "policy_no_", 3), ("계약자(피보험자)", "contractor_", 3), ("보험료", "premium_", 2)]
