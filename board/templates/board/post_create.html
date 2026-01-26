@@ -14,7 +14,7 @@
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      {% url "post_list" as list_url %}
+      {% url "board:post_list" as list_url %}
       {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="postForm" %}
     </div>
 

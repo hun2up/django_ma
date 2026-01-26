@@ -22,6 +22,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import grade_required
+from accounts.search_api import search_users_for_api
 from accounts.models import CustomUser
 from .forms import PostForm, CommentForm, TaskForm, TaskCommentForm
 from .models import (
@@ -747,19 +748,12 @@ def states_form(request):
 # =========================================================
 @login_required
 def search_user(request):
-    keyword = request.GET.get("q", "").strip()
-    if not keyword:
-        return JsonResponse({"results": []})
-
-    qs = CustomUser.objects.all()
-    if request.user.grade != "superuser":
-        qs = qs.filter(branch=request.user.branch)
-
-    users = (
-        qs.filter(Q(name__icontains=keyword) | Q(id__icontains=keyword))
-        .values("id", "name", "regist", "branch", "enter", "quit")[:20]
-    )
-    return JsonResponse({"results": list(users)})
+    """
+    ✅ Legacy alias (board)
+    - 기존 /board/search-user/ 호환 유지
+    - 실제 구현은 accounts.search_api.search_users_for_api(SSOT)
+    """
+    return JsonResponse(search_users_for_api(request))
 
 
 # =========================================================

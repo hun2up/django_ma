@@ -39,7 +39,10 @@ RESPONSE_FIELD_CANDIDATES: tuple[str, ...] = (
     "quit",
     "grade",
     "status",
-    "rank",  # optional
+    "rank",
+    "team_a",
+    "team_b",
+    "team_c",
 )
 
 
@@ -106,9 +109,9 @@ def _apply_permission_scope(qs: QuerySet[CustomUser], *, user, p: SearchParams) 
     - superuser:
         * 전체 검색 허용
         * scope=branch AND branch 파라미터 있으면 해당 branch로 제한 가능
-    - main_admin:
+    - head:
         * 무조건 본인 branch로 제한
-    - sub_admin:
+    - leader:
         * scope=branch면 "본인 branch 전체 검색" 허용 (요청하신 개선 포인트)
         * scope!=branch면 SubAdminTemp(level/team) 기준으로 팀 제한 (기존 유지)
           - 조건 불명확/정보 없음 → branch fallback
@@ -124,10 +127,10 @@ def _apply_permission_scope(qs: QuerySet[CustomUser], *, user, p: SearchParams) 
             return qs.filter(branch=p.requested_branch)
         return qs
 
-    if grade == "main_admin":
+    if grade == "head":
         return qs.filter(branch=p.user_branch)
 
-    if grade == "sub_admin":
+    if grade == "leader":
         if p.scope == "branch":
             return qs.filter(branch=p.user_branch)
 

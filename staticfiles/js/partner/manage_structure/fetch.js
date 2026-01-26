@@ -29,6 +29,7 @@ function dsUrl(keys = []) {
 }
 
 function getFetchUrl() {
+  // template: data-data-fetch-url => dataset.dataFetchUrl
   return dsUrl(["fetchUrl", "dataFetchUrl", "dataDataFetchUrl", "dataFetch"]);
 }
 function getUpdateProcessDateUrl() {
@@ -38,16 +39,19 @@ function getDeleteUrl() {
   return dsUrl(["deleteUrl", "dataDeleteUrl", "dataDataDeleteUrl", "dataDelete"]);
 }
 
+/* =========================================================
+   Permission helpers
+========================================================= */
 function getUserGrade() {
   return toStr(els.root?.dataset?.userGrade || window.currentUser?.grade || "");
 }
 function canEditProcessDate() {
   const g = getUserGrade();
-  return g === "superuser" || g === "main_admin";
+  return g === "superuser" || g === "head";
 }
 function canDeleteRow() {
   const g = getUserGrade();
-  return g === "superuser" || g === "main_admin";
+  return g === "superuser" || g === "head";
 }
 
 /* =========================================================
@@ -57,7 +61,7 @@ function revealSections() {
   if (els.inputSection) els.inputSection.hidden = false;
   if (els.mainSheet) els.mainSheet.hidden = false;
 
-  // ✅ DT 폭 계산은 “표시된 다음 프레임”에서 해야 안정적
+  // DT 폭 계산은 “표시된 다음 프레임”에서 해야 안정적
   requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
 }
 
@@ -103,9 +107,23 @@ function renderAfterCell(val) {
   return `<span class="cell-after">${escapeHtml(v)}</span>`;
 }
 
+function fmtRequester(name, id) {
+  const n = toStr(name);
+  const i = toStr(id);
+  if (n && i) return `${n}(${i})`;
+  return n || i || "";
+}
+
+function fmtPerson(name, id) {
+  const n = toStr(name);
+  const i = toStr(id);
+  if (n && i) return `${n}(${i})`;
+  return n || i || "";
+}
+
 /**
  * ✅ OR 컬럼: 체크박스(읽기전용) 렌더
- * - 기존 기능 영향 X (정렬/검색 제외, 비활성)
+ * - 정렬/검색 제외, 비활성
  */
 function renderOrFlag(val) {
   const checked = !!val ? "checked" : "";
@@ -120,8 +138,8 @@ function renderProcessDateCell(_value, _type, row) {
   const grade = getUserGrade();
   const val = toStr(row.process_date || "");
 
-  // sub_admin은 읽기만
-  if (grade === "sub_admin") return `<span>${escapeHtml(val)}</span>`;
+  // leader은 읽기만
+  if (grade === "leader") return `<span>${escapeHtml(val)}</span>`;
 
   return `
     <input type="date"
@@ -189,22 +207,36 @@ async function deleteStructureRow(id) {
 }
 
 /* =========================================================
-   DataTables columns (14 cols)
+   DataTables columns (✅ 13 cols: 요청자 통합 반영)
 ========================================================= */
 const MAIN_COLUMNS = [
-  { data: "requester_name", defaultContent: "" },
-  { data: "requester_id", defaultContent: "" },
-  { data: "requester_branch", defaultContent: "" },
+  // 1) 요청자: requester_name + (requester_id)
+  {
+    data: null,
+    defaultContent: "",
+    render: (_v, _t, row) => escapeHtml(fmtPerson(row.requester_name, row.requester_id)),
+  },
 
-  { data: "target_name", defaultContent: "" },
-  { data: "target_id", defaultContent: "" },
+  // 2) 대상자: target_name + (target_id)
+  {
+    data: null,
+    defaultContent: "",
+    render: (_v, _t, row) => escapeHtml(fmtPerson(row.target_name, row.target_id)),
+  },
+
+  // 3) 소속(변경전) = target_branch
   { data: "target_branch", defaultContent: "" },
 
+  // 4) 소속(변경후)
   { data: "chg_branch", defaultContent: "", render: (v) => renderAfterCell(v) },
+
+  // 5) 직급(변경전)
   { data: "rank", defaultContent: "" },
+
+  // 6) 직급(변경후)
   { data: "chg_rank", defaultContent: "", render: (v) => renderAfterCell(v) },
 
-  // ✅ OR: 체크박스 렌더 + 검색/정렬 제외(기존 의도 유지)
+  // 7) OR
   {
     data: "or_flag",
     defaultContent: false,
@@ -214,9 +246,13 @@ const MAIN_COLUMNS = [
     render: (v) => renderOrFlag(!!v),
   },
 
+  // 8) 비고
   { data: "memo", defaultContent: "" },
+
+  // 9) 요청일자
   { data: "request_date", defaultContent: "" },
 
+  // 10) 처리일자
   {
     data: "process_date",
     orderable: false,
@@ -224,6 +260,8 @@ const MAIN_COLUMNS = [
     render: renderProcessDateCell,
     defaultContent: "",
   },
+
+  // 11) 삭제
   {
     data: "id",
     orderable: false,
@@ -259,8 +297,7 @@ function bindResizeOnce() {
 
 /**
  * ✅ DataTables는 “한 번 붙으면 컬럼 정의가 고정”
- * - 스크립트/캐시/중복 로드로 기존 DT가 남아있을 수 있음
- * - mainDT가 null인데 isDataTable이면 destroy(true) 후 재생성
+ * - 기존 DT 남아있으면 destroy(true) 후 재생성
  */
 function ensureMainDT() {
   if (!canUseDataTables()) return null;
@@ -326,12 +363,8 @@ function renderFallback(rows) {
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
-      <td>${escapeHtml(r.requester_name)}</td>
-      <td>${escapeHtml(r.requester_id)}</td>
-      <td>${escapeHtml(r.requester_branch)}</td>
-
-      <td>${escapeHtml(r.target_name)}</td>
-      <td>${escapeHtml(r.target_id)}</td>
+      <td>${escapeHtml(fmtPerson(r.requester_name, r.requester_id))}</td>
+      <td>${escapeHtml(fmtPerson(r.target_name, r.target_id))}</td>
       <td>${escapeHtml(r.target_branch)}</td>
 
       <td>${renderAfterCell(r.chg_branch)}</td>
@@ -345,7 +378,7 @@ function renderFallback(rows) {
 
       <td class="text-center">
         ${
-          grade === "sub_admin"
+          grade === "leader"
             ? `<span>${escapeHtml(proc)}</span>`
             : `<input type="date"
                       class="form-control form-control-sm processDateInput"
@@ -419,12 +452,12 @@ function bindDelegationOnce() {
       await deleteStructureRow(id);
 
       // ✅ 현재 선택값 기준으로 재조회
-      const y = toStr(els.year?.value || "");
-      const m = toStr(els.month?.value || "");
+      const y = toStr(els.year?.value || els.yearSelect?.value || "");
+      const m = toStr(els.month?.value || els.monthSelect?.value || "");
       const ym = `${y}-${String(m).padStart(2, "0")}`;
 
       const branch =
-        toStr(els.branch?.value || "") ||
+        toStr(els.branch?.value || els.branchSelect?.value || "") ||
         toStr(window.currentUser?.branch || "") ||
         "";
 
@@ -440,7 +473,7 @@ function bindDelegationOnce() {
 }
 
 /* =========================================================
-   Normalize
+   Normalize (서버 키 변화 흡수)
 ========================================================= */
 function normalizeRow(row = {}) {
   return {
@@ -459,7 +492,6 @@ function normalizeRow(row = {}) {
 
     rank: row.rank || row.target_rank || row.tg_rank || "",
 
-    // ✅ OR: truthy/falsey 안전
     or_flag: !!row.or_flag,
 
     memo: row.memo || "",
@@ -471,7 +503,7 @@ function normalizeRow(row = {}) {
 /* =========================================================
    Fetch (public)
 ========================================================= */
-export async function fetchData(ym, branch, _metaIgnored) {
+export async function fetchData(ym, branch) {
   if (!els.root) return;
 
   bindDelegationOnce();

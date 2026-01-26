@@ -50,7 +50,7 @@ export async function saveRows() {
       body: JSON.stringify({
         rows: payload,
         month: selectedYM(els.year, els.month),
-        part: els.branch?.value || window.currentUser?.part || "",
+        part: els.part?.value || window.currentUser?.part || "",
         branch: els.branch?.value || window.currentUser?.branch || "",
       }),
     });
@@ -76,7 +76,7 @@ export async function saveRows() {
 
       // 🔹 재조회 (안전 실행)
       try {
-        const ym = `${els.year.value}-${els.month.value}`;
+        const ym = selectedYM(els.year, els.month);
         const branch = els.branch?.value || window.currentUser?.branch || "";
         await fetchData(ym, branch);
       } catch (reErr) {

@@ -1,24 +1,24 @@
 // django_ma/static/js/common/manage_boot.js
 // =========================================================
-// ✅ Manage Boot (FINAL - Single Fetch Owner)
+// ✅ Manage Boot (FINAL - No Selector Ownership / No Fetch)
 // - Context별 root/boot 자동 탐색
 // - Firefox select value set 안정화(옵션 보장 → value set)
-// - superuser 부서/지점 로더(loadPartsAndBranches) 대기/1회 보장
+// - ✅ superuser: 부문/부서/지점 로드는 part_branch_selector.js에 "위임" (충돌 방지)
 // - ✅ fetch 실행은 하지 않는다 (각 페이지 index.js가 단독 실행)
 // - autoLoad payload(ym/branch)를 window.__manageBootAutoPayload에 저장
-// - 중복 초기화 방지
+// - BFCache/pageshow 포함 중복 초기화 방지
 // - (옵션) inputTable 말줄임 + hover 툴팁(title) 동기화 유틸 제공
 // =========================================================
 
 import { pad2 } from "./manage/ym.js";
 
 console.log("✅ manage_boot.js LOADED", {
-  build: "2026-01-08-manageboot-final-single-fetch-owner",
+  build: "2026-01-26-manageboot-final-guarded-selector-delegation",
   url: import.meta?.url,
-});
+}); 
 
 /* =========================================================
-   Global guards
+   Global guards / namespaces
 ========================================================= */
 const g = window;
 
@@ -73,6 +73,8 @@ function resolveRootId(ctxName) {
   if (ctxName === "structure") return "manage-structure";
   if (ctxName === "rate") return "manage-rate";
   if (ctxName === "efficiency") return "manage-efficiency";
+  if (ctxName === "grades") return "manage-grades";
+  if (ctxName === "table") return "manage-table";
   return null;
 }
 
@@ -80,6 +82,8 @@ function resolveBoot(ctxName) {
   if (ctxName === "structure") return g.ManageStructureBoot || {};
   if (ctxName === "rate") return g.ManageRateBoot || {};
   if (ctxName === "efficiency") return g.ManageEfficiencyBoot || g.ManageefficiencyBoot || {};
+  if (ctxName === "grades") return g.ManageGradesBoot || {};
+  if (ctxName === "table") return g.ManageTableBoot || {};
   return {};
 }
 
@@ -160,7 +164,7 @@ function initYearMonthSelects({ root, boot }) {
   const okY = setSelectValueSafe(yearEl, y);
   const okM = setSelectValueSafe(monthEl, m);
 
-  // 일부 브라우저(특히 Firefox)에서 초기 값 반영/연동을 위해 change 이벤트를 한번 쏴줌
+  // Firefox 등에서 초기 연동을 위해 change 이벤트 1회
   if (okY) yearEl.dispatchEvent(new Event("change", { bubbles: true }));
   if (okM) monthEl.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -195,39 +199,50 @@ function showSections() {
 }
 
 /* =========================================================
-   superuser parts/branches loader (1회 보장)
+   ✅ superuser selector loader delegation (충돌 없는 최종 가드)
+   - manage_boot는 "부문/부서/지점" 로딩 로직을 소유하지 않는다.
+   - part_branch_selector.js가 2단/3단을 알아서 처리하므로
+     여기서는 window.loadPartsAndBranches(rootId)만 1회 호출한다.
 ========================================================= */
-function loadPartsForSuperuserOnce(rootId) {
+function delegateSelectorsToPartBranchSelectorOnce(rootId) {
   if (!rootId) return;
+
+  // rootId 기준 1회만
   if (g.__manageBootPartsLoaded[rootId]) return;
   g.__manageBootPartsLoaded[rootId] = true;
 
+  const MAX_RETRY = 12;
+  const RETRY_MS = 250;
+
   const tryLoad = async (retry = 0) => {
-    if (typeof g.loadPartsAndBranches !== "function") {
-      if (retry < 12) {
-        console.warn(`⏳ loadPartsAndBranches 대기중 (${retry + 1}/12)`);
-        setTimeout(() => tryLoad(retry + 1), 250);
+    // ✅ 채널 셀렉트가 있든 없든 part_branch_selector가 판단한다.
+    const fn = g.loadPartsAndBranches;
+
+    if (typeof fn !== "function") {
+      if (retry < MAX_RETRY) {
+        console.warn(`⏳ [ManageBoot] loadPartsAndBranches 대기중 (${retry + 1}/${MAX_RETRY})`);
+        setTimeout(() => tryLoad(retry + 1), RETRY_MS);
         return;
       }
-      console.error("🚨 loadPartsAndBranches 함수가 정의되지 않았습니다.");
+      console.error("🚨 [ManageBoot] loadPartsAndBranches 함수가 정의되지 않았습니다.");
       return;
     }
 
     try {
-      console.log("➡️ 부서/지점 목록 로드 시도:", rootId);
-      await g.loadPartsAndBranches(rootId);
-      console.log("✅ 부서/지점 목록 로드 완료:", rootId);
+      console.log("➡️ [ManageBoot] selector 로더 위임 호출:", { rootId });
+      await fn(rootId);
+      console.log("✅ [ManageBoot] selector 로더 위임 완료:", { rootId });
     } catch (e) {
-      console.error("❌ 부서/지점 목록 로드 실패:", e);
+      console.error("❌ [ManageBoot] selector 로더 위임 실패:", e);
     }
   };
 
+  // part_branch_selector가 DOMContentLoaded에서 붙을 수도 있으니 약간 지연
   setTimeout(() => tryLoad(0), 150);
 }
 
 /* =========================================================
    (옵션) 말줄임 + hover 툴팁(title) 동기화
-   - input/select의 값이 잘릴 경우, 마우스 hover 시 전체가 보이게
 ========================================================= */
 export function bindEllipsisTooltips(root = document) {
   const host = root?.querySelector?.("#inputTable") ? root : document;
@@ -235,10 +250,8 @@ export function bindEllipsisTooltips(root = document) {
   if (!table) return;
 
   const syncTitle = (el) => {
-    // select는 선택된 option 텍스트가 더 유용할 때가 많아서 둘 다 고려
     if (!el) return;
     let t = "";
-
     if (el.tagName === "SELECT") {
       const opt = el.options?.[el.selectedIndex];
       t = toStr(opt?.textContent || el.value);
@@ -263,7 +276,7 @@ export function initManageBoot(contextName) {
   const ctxName = toStr(contextName);
   if (!ctxName) return null;
 
-  // 컨텍스트별 1회만
+  // 컨텍스트별 1회만 (BFCache에서도 재호출될 수 있으니, index.js는 별도 1회가드 권장)
   if (g.__manageBootInited[ctxName]) {
     return g.__manageBootCtx[ctxName] || {};
   }
@@ -273,7 +286,7 @@ export function initManageBoot(contextName) {
   const root = rootId ? document.getElementById(rootId) : null;
 
   if (!root) {
-    console.warn(`⚠️ ManageBoot root 없음: ${rootId || ctxName}`, { ctxName, rootId });
+    console.warn(`⚠️ [ManageBoot] root 없음: ${rootId || ctxName}`, { ctxName, rootId });
     g.__manageBootCtx[ctxName] = {};
     return null;
   }
@@ -281,7 +294,6 @@ export function initManageBoot(contextName) {
   const boot = resolveBoot(ctxName);
   const user = g.currentUser || {};
   const ctxObj = { root, boot, user };
-
   g.__manageBootCtx[ctxName] = ctxObj;
 
   console.group(`🔧 [ManageBoot] 초기화 (${ctxName})`);
@@ -289,10 +301,12 @@ export function initManageBoot(contextName) {
   console.log("BOOT:", boot);
   console.log("USER:", user);
 
-  // superuser: parts/branches 로드
+  // ✅ superuser: selector 로더는 part_branch_selector.js에 위임 (충돌 방지)
   onReady(() => {
     const grade = getGrade(user, root);
-    if (grade === "superuser") loadPartsForSuperuserOnce(rootId);
+    if (grade === "superuser") {
+      delegateSelectorsToPartBranchSelectorOnce(rootId);
+    }
   });
 
   // year/month init + autoload payload 준비
@@ -308,7 +322,7 @@ export function initManageBoot(contextName) {
 
     // ✅ payload는 main_admin/sub_admin만 자동 준비
     if (!autoLoad || !["main_admin", "sub_admin"].includes(grade)) {
-      console.log("🟡 autoLoad payload skip:", { ctxName, grade, autoLoad });
+      console.log("🟡 [ManageBoot] autoLoad payload skip:", { ctxName, grade, autoLoad });
       console.groupEnd();
       return;
     }
@@ -317,7 +331,7 @@ export function initManageBoot(contextName) {
     const branch = getBranch({ user, boot, root });
 
     if (!branch) {
-      console.warn("⚠️ autoLoad payload 중단: branch 없음", {
+      console.warn("⚠️ [ManageBoot] autoLoad payload 중단: branch 없음", {
         ctxName,
         grade,
         boot,
@@ -331,10 +345,7 @@ export function initManageBoot(contextName) {
     showSections();
 
     g.__manageBootAutoPayload[ctxName] = { ym, branch };
-    console.log("🟢 autoLoad payload ready:", { ctxName, ym, branch });
-
-    // (옵션) input 말줄임+툴팁 동기화: 원하면 켜도 됨
-    // bindEllipsisTooltips(root);
+    console.log("🟢 [ManageBoot] autoLoad payload ready:", { ctxName, ym, branch });
 
     console.groupEnd();
   });

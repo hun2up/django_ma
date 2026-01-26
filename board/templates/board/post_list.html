@@ -5,7 +5,7 @@
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
-  <div id="postListBoot" data-update-url="{% url 'ajax_update_post_field' %}" class="d-none"></div>
+  <div id="postListBoot" data-update-url="{% url 'board:ajax_update_post_field' %}" class="d-none"></div>
 
   <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">
     영업가족 업무요청 게시판
@@ -28,7 +28,7 @@
       {% endif %}
 
       <div class="d-flex justify-content-end mb-3">
-        <a href="{% url 'post_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
+        <a href="{% url 'board:post_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
       </div>
 
       {# ✅ 모바일(sm 이하) 카드형 리스트 #}
@@ -43,7 +43,7 @@
                 {# 좌측: 제목/메타 #}
                 <div class="flex-grow-1" style="min-width:0;">
                   <div class="board-mobile-title">
-                    <a href="{% url 'post_detail' post.pk %}"
+                    <a href="{% url 'board:post_detail' post.pk %}"
                       class="text-decoration-none text-dark">
                       {{ post.title }}
                     </a>
@@ -129,7 +129,7 @@
 
             <div class="collapse" id="mobilePostFilter">
               <div class="p-3 pt-2">
-                <form method="get" action="{% url 'post_list' %}">
+                <form method="get" action="{% url 'board:post_list' %}">
                   <div class="row g-2">
 
                     <div class="col-5">
@@ -194,7 +194,7 @@
 
                     <div class="col-12 d-flex gap-2 mt-1">
                       <button type="submit" class="btn btn-primary btn-sm flex-fill">검색</button>
-                      <a href="{% url 'post_list' %}" class="btn btn-outline-secondary btn-sm flex-fill">초기화</a>
+                      <a href="{% url 'board:post_list' %}" class="btn btn-outline-secondary btn-sm flex-fill">초기화</a>
                     </div>
 
                   </div>
@@ -242,7 +242,7 @@
                     <td>{{ post.category|default:"-" }}</td>
 
                     <td class="text-start">
-                      <a href="{% url 'post_detail' post.pk %}" class="text-decoration-none text-primary">
+                      <a href="{% url 'board:post_detail' post.pk %}" class="text-decoration-none text-primary">
                         {{ post.title }}
                       </a>
                       <span class="text-muted fw-semibold">
@@ -313,7 +313,7 @@
         </div>
 
         {# 검색/필터 #}
-        <form method="get" action="{% url 'post_list' %}" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
+        <form method="get" action="{% url 'board:post_list' %}" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
           <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
             <div class="d-flex align-items-center gap-2">
               <label class="filter-label mb-0">표시</label>
@@ -372,7 +372,7 @@
 
             <div class="d-flex align-items-center gap-2">
               <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
-              <a href="{% url 'post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
+              <a href="{% url 'board:post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
             </div>
           </div>
 
@@ -387,7 +387,7 @@
 
             <div class="d-flex align-items-center gap-2">
               <button type="submit" class="btn btn-sm btn-primary px-3">기간적용</button>
-              <a href="{% url 'post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
+              <a href="{% url 'board:post_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
             </div>
           </div>
         </form>

@@ -65,10 +65,17 @@ def ajax_fetch_branches(request):
     if not part:
         return JsonResponse({"branches": []})
 
-    qs = CustomUser.objects.filter(part__iexact=part).exclude(branch__isnull=True).exclude(branch__exact="")
+    exclude_list = ["", "-", None]
+    qs = (
+        CustomUser.objects
+        .filter(part__iexact=part)
+        .exclude(branch__in=exclude_list)
+    )
 
     if channel:
         qs = qs.filter(channel__iexact=channel)
 
-    branches = qs.values_list("branch", flat=True).distinct().order_by("branch")
+    qs = qs.annotate(branch_trim=Trim("branch")).exclude(branch_trim__exact="")
+    branches = qs.values_list("branch_trim", flat=True).distinct().order_by("branch_trim")
+    
     return JsonResponse({"branches": list(branches)})
