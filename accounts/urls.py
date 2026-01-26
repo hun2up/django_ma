@@ -19,8 +19,16 @@ urlpatterns = [
     path(
         "upload-progress/",
         views.upload_progress_view,
-        name="upload_progress",
+        name="accounts_upload_progress",
     ),
+
+    # ✅ 결과 파일 다운로드 (추가한 부분)
+    path(
+        "upload-result/<str:task_id>/",
+        views.upload_result_view,
+        name="accounts_upload_result",
+    ),
+
 
     # ---------------------------------------------------------------------
     # User search API (SSOT)

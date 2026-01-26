@@ -8,6 +8,7 @@ from django.db.models import Q, QuerySet
 
 from partner.models import SubAdminTemp
 from .models import CustomUser
+from .utils import build_affiliation_display
 
 
 # =============================================================================
@@ -213,4 +214,18 @@ def search_users_for_api(request) -> dict:
         .values(*fields)[:RESULT_LIMIT]
     )
 
-    return {"results": list(users)}
+    results = []
+    for u in users:
+        results.append({
+            **u,
+            "affiliation_display": build_affiliation_display(
+                branch=u.get("branch", ""),
+                level=u.get("level", ""),
+                team_a=u.get("team_a", ""),
+                team_b=u.get("team_b", ""),
+                team_c=u.get("team_c", ""),
+            )
+        })
+
+    return {"results": results}
+

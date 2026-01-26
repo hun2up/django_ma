@@ -4,8 +4,8 @@
 // - dataset/key 안전화
 // - requester autofill 안정화
 // - superuser parts/branches loader 대기
-// - table check modal 안전화
-// - ✅ autoload 중복 방지(manage_boot vs index)
+// - table check modal 안전화 (bootstrap 유무 대응)
+// - ✅ autoload 중복 방지 강화 (manage_boot vs index 전역 가드)
 // =========================================================
 
 import { els } from "./dom_refs.js";
@@ -13,8 +13,19 @@ import { fetchData } from "./fetch.js";
 import { pad2, alertBox } from "./utils.js";
 import { initInputRowEvents } from "./input_rows.js";
 
-const AUTOLOAD_GRADES = new Set(["main_admin", "sub_admin"]);
-let autoLoaded = false;
+/* =========================================================
+   constants / guards
+========================================================= */
+const AUTOLOAD_GRADES = new Set(["head", "leader"]);
+
+// 페이지 중복 init 방지 (BFCache/partial reload 대비)
+const INIT_FLAG = "__manageRateIndexInited";
+
+/**
+ * 전역 1회 autoload 가드:
+ * - manage_boot 또는 index 중 “누군가”가 이미 autoload를 수행하면, 다시는 실행하지 않음.
+ */
+const AUTOLOAD_FLAG = "__manageRateAutoLoaded";
 
 /* =========================================================
    dataset helpers
@@ -22,23 +33,28 @@ let autoLoaded = false;
 function ds(key, fallback = "") {
   return String(els.root?.dataset?.[key] ?? fallback).trim();
 }
+
 function getGrade() {
   return ds("userGrade", window.currentUser?.grade || "");
 }
+
 function getDefaultBranch() {
   return ds("defaultBranch", window.currentUser?.branch || "");
 }
+
 function getEffectiveBranch() {
   const grade = getGrade();
   if (grade === "superuser") return String(els.branchSelect?.value || "").trim();
   return getDefaultBranch();
 }
+
 function getYMFromSelectors() {
   const y = String(els.yearSelect?.value || "").trim();
   const m = String(els.monthSelect?.value || "").trim();
   if (!y || !m) return "";
   return `${y}-${pad2(m)}`;
 }
+
 function buildFetchPayload(ym) {
   return {
     ym,
@@ -60,9 +76,11 @@ function fillRequesterRow(row) {
     const el = row?.querySelector?.(`[name="${name}"]`);
     if (el) el.value = val ?? "";
   };
+
   set("rq_name", u.name || "");
   set("rq_id", u.id || "");
 }
+
 function fillRequesterAllRows() {
   document
     .querySelectorAll("#inputTable tbody tr.input-row")
@@ -70,32 +88,37 @@ function fillRequesterAllRows() {
 }
 
 /* =========================================================
-   period dropdown (Boot 우선)
-   - manage_boot.js가 이미 year/month를 세팅할 수 있으나,
-     페이지 단독 실행 대비하여 유지
+   period dropdown (Boot 우선, 단독 실행 대비 fallback 유지)
 ========================================================= */
 function fillDropdown(el, start, end, selected, suffix) {
   if (!el) return;
   el.innerHTML = "";
+
   for (let v = start; v <= end; v++) {
     const opt = document.createElement("option");
     opt.value = String(v);
     opt.textContent = `${v}${suffix}`;
     el.appendChild(opt);
   }
+
   el.value = String(selected);
 }
+
 function getBootPeriod() {
   const boot = window.ManageRateBoot || {};
   const now = new Date();
+
   const y = Number(boot.selectedYear || boot.currentYear || now.getFullYear());
-  const m = Number(boot.selectedMonth || boot.currentMonth || (now.getMonth() + 1));
+  const m = Number(boot.selectedMonth || boot.currentMonth || now.getMonth() + 1);
+
   return { y, m };
 }
+
 function initPeriodDropdowns() {
   const now = new Date();
-  const { y: selectedY, m: selectedM } = getBootPeriod();
   const baseY = now.getFullYear();
+  const { y: selectedY, m: selectedM } = getBootPeriod();
+
   fillDropdown(els.yearSelect, baseY - 1, baseY + 1, selectedY, "년");
   fillDropdown(els.monthSelect, 1, 12, selectedM, "월");
 }
@@ -123,6 +146,9 @@ async function runSearch({ ym, branch } = {}) {
 
 function initSearchButton() {
   if (!els.btnSearch) return;
+  if (els.btnSearch.dataset.bound === "1") return;
+  els.btnSearch.dataset.bound = "1";
+
   els.btnSearch.addEventListener("click", () => runSearch());
 }
 
@@ -149,6 +175,7 @@ function initSuperuserPartsBranchesWait() {
 function getTableFetchUrl(branch) {
   const base = ds("tableFetchUrl");
   if (!base) return "";
+
   const url = new URL(base, window.location.origin);
   url.searchParams.set("branch", branch);
   return url.toString();
@@ -172,12 +199,12 @@ function renderTableCheckHTML(rows) {
     .join("");
 
   return `
-    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+    <div class="table-responsive" style="max-height:300px; overflow-y:auto;">
       <table class="table table-sm table-bordered align-middle mb-0"
-             style="font-size: 0.9rem; table-layout: fixed; width: 100%; text-align: center;">
+             style="font-size:.9rem; table-layout:fixed; width:100%; text-align:center;">
         <colgroup>
-          <col style="width: 70%;">
-          <col style="width: 30%;">
+          <col style="width:70%;">
+          <col style="width:30%;">
         </colgroup>
         <thead class="table-light">
           <tr>
@@ -190,11 +217,23 @@ function renderTableCheckHTML(rows) {
     </div>`;
 }
 
+function showBootstrapModal(modalEl) {
+  // bootstrap이 없을 수도 있는 환경(스크립트 로드 실패 등) 대비
+  const bs = window.bootstrap;
+  if (!bs?.Modal) return;
+
+  const inst = bs.Modal.getInstance(modalEl) || new bs.Modal(modalEl);
+  inst.show();
+}
+
 function initTableCheckModal() {
   const btnCheck = document.getElementById("btnCheckTable");
   const modalBody = document.getElementById("tableCheckBody");
   const modalEl = document.getElementById("tableCheckModal");
   if (!btnCheck || !modalBody || !modalEl) return;
+
+  if (btnCheck.dataset.bound === "1") return;
+  btnCheck.dataset.bound = "1";
 
   btnCheck.addEventListener("click", async () => {
     const branch = getEffectiveBranch();
@@ -204,7 +243,7 @@ function initTableCheckModal() {
     if (!url) return alertBox("테이블 조회 URL이 없습니다. (data-table-fetch-url 확인)");
 
     modalBody.innerHTML = `<div class="py-4 text-muted">불러오는 중...</div>`;
-    new bootstrap.Modal(modalEl).show();
+    showBootstrapModal(modalEl);
 
     try {
       const res = await fetch(url, {
@@ -228,41 +267,55 @@ function initTableCheckModal() {
 }
 
 /* =========================================================
-   autoload (중복 방지)
-   - manage_boot.js가 이미 autoLoad를 수행할 수 있으므로,
-     index.js autoload는 "보조"로만 동작하도록 설계
+   autoload (중복 방지 강화)
+   - manage_boot가 autoLoad를 수행했으면 index는 절대 재실행 X
+   - manage_boot 미실행/실패 케이스에서만 “보조”로 1회 실행
 ========================================================= */
-function initAutoLoad() {
-  if (autoLoaded) return;
+function markAutoLoaded() {
+  window[AUTOLOAD_FLAG] = true;
+}
+function isAutoLoaded() {
+  return window[AUTOLOAD_FLAG] === true;
+}
 
-  // ✅ manage_boot가 먼저 실행했으면 중복 실행 금지
-  if (window.__manageBootInited?.rate) {
-    // 단, manage_boot가 rate 컨텍스트 init을 못 했을 수도 있으니
-    // root가 있고 main_admin/sub_admin이면 1회 보조 실행은 가능
-    // 여기서는 충돌 방지를 위해 기본적으로 종료
-    return;
-  }
-
+function shouldAutoLoadByBootOrGrade() {
   const boot = window.ManageRateBoot || {};
   const grade = getGrade();
 
-  const shouldAuto =
-    boot.autoLoad === true || (boot.autoLoad == null && AUTOLOAD_GRADES.has(grade));
+  // boot.autoLoad가 명시되면 최우선
+  if (boot.autoLoad === true) return true;
+  if (boot.autoLoad === false) return false;
 
-  if (!shouldAuto) return;
-  if (!AUTOLOAD_GRADES.has(grade) && grade !== "superuser") return;
+  // autoLoad 미설정이면 head/leader는 자동
+  return AUTOLOAD_GRADES.has(grade);
+}
+
+function buildFallbackYM() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+}
+
+function initAutoLoadAssist() {
+  // ✅ 전역 autoload 1회만
+  if (isAutoLoaded()) return;
+
+  // ✅ manage_boot가 rate init을 했으면, 여기선 절대 실행하지 않음(충돌 방지)
+  if (window.__manageBootInited?.rate) return;
+
+  const grade = getGrade();
+  if (!(grade === "superuser" || AUTOLOAD_GRADES.has(grade))) return;
+
+  if (!shouldAutoLoadByBootOrGrade()) return;
 
   const branch = getEffectiveBranch();
   if (!branch) return;
 
-  const ym =
-    getYMFromSelectors() ||
-    (() => {
-      const now = new Date();
-      return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
-    })();
+  const ym = getYMFromSelectors() || buildFallbackYM();
 
-  autoLoaded = true;
+  // 여기서부터 “autoload 실행 확정” — 즉시 가드 올림(중복 클릭/경합 방지)
+  markAutoLoaded();
+
+  // UI 초기화/로드 순서 고려하여 약간의 지연
   setTimeout(() => runSearch({ ym, branch }), 250);
 }
 
@@ -272,6 +325,10 @@ function initAutoLoad() {
 function init() {
   if (!els.root) return;
 
+  // 페이지 단위 중복 init 방지
+  if (els.root.dataset[INIT_FLAG] === "1") return;
+  els.root.dataset[INIT_FLAG] = "1";
+
   initPeriodDropdowns();     // 단독 실행 대비
   initInputRowEvents();      // 입력 이벤트
   fillRequesterAllRows();    // 요청자 자동입력
@@ -279,7 +336,9 @@ function init() {
   initSuperuserPartsBranchesWait();
   initSearchButton();
   initTableCheckModal();
-  initAutoLoad();
+
+  // ✅ autoload는 보조로만(중복 방지 강화)
+  initAutoLoadAssist();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

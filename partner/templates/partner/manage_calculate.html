@@ -51,7 +51,7 @@
         "remove": 6
       }'>
 
-    {% if user.grade not in 'superuser main_admin sub_admin' %}
+    {% if user.grade not in 'superuser head leader' %}
       <div class="alert alert-danger">접근 권한이 없습니다.</div>
     {% endif %}
 
@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    {% if user.grade == 'superuser' or user.grade == 'main_admin' %}
+    {% if user.grade == 'superuser' or user.grade == 'head' %}
       <div class="alert alert-info w-100 py-2 mb-3 text-start">
         지점효율 기능 사용 전 반드시
         <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>

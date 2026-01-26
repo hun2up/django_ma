@@ -34,16 +34,11 @@ function pickDatasetUrl(root, keys = []) {
 }
 
 function getFetchBaseUrl() {
-  // 템플릿: data-fetch-url => dataset.fetchUrl
   return pickDatasetUrl(els.root, ["fetchUrl", "dataFetchUrl", "fetchURL", "dataFetchURL"]);
 }
 
 function getUpdateProcessDateUrl() {
   return pickDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
-}
-
-function getDeleteUrl() {
-  return pickDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
 }
 
 function getUserGrade() {
@@ -52,12 +47,7 @@ function getUserGrade() {
 
 function canEditProcessDate() {
   const g = getUserGrade();
-  return g === "superuser" || g === "main_admin";
-}
-
-function canDeleteRow() {
-  const g = getUserGrade();
-  return g === "superuser" || g === "main_admin";
+  return g === "superuser" || g === "head";
 }
 
 /* =========================================================
@@ -97,7 +87,6 @@ function revealSections() {
   if (inputSec) inputSec.hidden = false;
   if (mainSec) mainSec.hidden = false;
 
-  // 표시 직후 DT 폭 재계산
   requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
 }
 
@@ -117,7 +106,7 @@ function getCSRFToken() {
 }
 
 /* =========================================================
-   Server calls
+   Server calls (process_date)
 ========================================================= */
 async function updateProcessDate(id, value) {
   const url = getUpdateProcessDateUrl();
@@ -145,28 +134,6 @@ async function updateProcessDate(id, value) {
   return data;
 }
 
-async function deleteRateRow(id) {
-  const url = getDeleteUrl();
-  if (!url) throw new Error("delete_url 누락 (data-delete-url 확인)");
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCSRFToken(),
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    credentials: "same-origin",
-    body: JSON.stringify({ id }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.status !== "success") {
-    throw new Error(data.message || `삭제 실패 (${res.status})`);
-  }
-  return data;
-}
-
 /* =========================================================
    Render helpers
 ========================================================= */
@@ -177,11 +144,14 @@ function renderAfterCell(val) {
 }
 
 function buildActionButtons(row) {
-  if (!canDeleteRow()) return "";
+  // ✅ 삭제는 delete.js(attachDeleteHandlers)가 담당
+  // 여기서는 버튼만 렌더 (권한 체크는 delete.js에서도 진행)
+  const id = String(row.id || "").trim();
+  if (!id) return "";
   return `
     <button type="button"
             class="btn btn-sm btn-outline-danger btnDeleteRow"
-            data-id="${escapeAttr(row.id || "")}">
+            data-id="${escapeAttr(id)}">
       삭제
     </button>
   `;
@@ -191,7 +161,7 @@ function renderProcessDateCell(_value, _type, row) {
   const grade = getUserGrade();
   const val = (row.process_date || "").trim();
 
-  if (grade === "sub_admin") {
+  if (grade === "leader") {
     return `<span>${escapeHtml(val || "")}</span>`;
   }
 
@@ -206,14 +176,12 @@ function renderProcessDateCell(_value, _type, row) {
 }
 
 /* =========================================================
-   DataTables
+   DataTables (메인시트 컬럼: 요청자/대상자 통합)
 ========================================================= */
 const MAIN_COLUMNS = [
-  { data: "requester_name", defaultContent: "", width: "50px" },
-  { data: "requester_id", defaultContent: "", width: "50px" },
-
-  { data: "target_name", defaultContent: "", width: "50px" },
-  { data: "target_id", defaultContent: "", width: "50px" },
+  // ✅ 통합 컬럼
+  { data: "rq_display", defaultContent: "", width: "140px" }, // 요청자성명(사번)
+  { data: "tg_display", defaultContent: "", width: "140px" }, // 대상자성명(사번)
 
   { data: "before_ftable", defaultContent: "", width: "70px" },
   { data: "before_frate", defaultContent: "", width: "70px" },
@@ -257,7 +225,6 @@ function adjustDT() {
   if (!mainDT) return;
   try {
     mainDT.columns.adjust();
-    // draw(false)로 페이징 유지
     mainDT.draw(false);
   } catch (_) {}
 }
@@ -284,7 +251,6 @@ function ensureMainDT() {
     pageLength: 10,
     lengthChange: true,
 
-    // ✅ 반응형/폭 고정 방지 핵심
     autoWidth: false,
     scrollX: true,
 
@@ -304,7 +270,7 @@ function ensureMainDT() {
 }
 
 /* =========================================================
-   Fallback render
+   Fallback render (thead와 동일한 컬럼 순서로)
 ========================================================= */
 function renderMainSheetFallback(rows) {
   if (!els.mainTable) return;
@@ -327,29 +293,26 @@ function renderMainSheetFallback(rows) {
     const proc = (r.process_date || "").trim();
 
     tr.innerHTML = `
-      <td>${escapeHtml(r.requester_name)}</td>
-      <td>${escapeHtml(r.requester_id)}</td>
+      <td>${escapeHtml(r.rq_display || "")}</td>
+      <td>${escapeHtml(r.tg_display || "")}</td>
 
-      <td>${escapeHtml(r.target_name)}</td>
-      <td>${escapeHtml(r.target_id)}</td>
+      <td>${escapeHtml(r.before_ftable || "")}</td>
+      <td class="text-center">${escapeHtml(r.before_frate || "")}</td>
 
-      <td>${escapeHtml(r.before_ftable)}</td>
-      <td class="text-center">${escapeHtml(r.before_frate)}</td>
+      <td>${renderAfterCell(r.after_ftable || "")}</td>
+      <td class="text-center">${escapeHtml(r.after_frate || "")}</td>
 
-      <td>${renderAfterCell(r.after_ftable)}</td>
-      <td class="text-center">${escapeHtml(r.after_frate)}</td>
+      <td>${escapeHtml(r.before_ltable || "")}</td>
+      <td class="text-center">${escapeHtml(r.before_lrate || "")}</td>
 
-      <td>${escapeHtml(r.before_ltable)}</td>
-      <td class="text-center">${escapeHtml(r.before_lrate)}</td>
+      <td>${renderAfterCell(r.after_ltable || "")}</td>
+      <td class="text-center">${escapeHtml(r.after_lrate || "")}</td>
 
-      <td>${renderAfterCell(r.after_ltable)}</td>
-      <td class="text-center">${escapeHtml(r.after_lrate)}</td>
-
-      <td>${escapeHtml(r.memo)}</td>
+      <td>${escapeHtml(r.memo || "")}</td>
 
       <td class="text-center">
         ${
-          grade === "sub_admin"
+          grade === "leader"
             ? `<span>${escapeHtml(proc)}</span>`
             : `<input type="date"
                       class="form-control form-control-sm processDateInput"
@@ -379,12 +342,13 @@ function renderMainSheet(rows) {
 
 /* =========================================================
    Delegation + Resize (once)
+   - 처리일자 저장만 fetch.js에서 담당
+   - 삭제는 delete.js에서 담당(중복 제거)
 ========================================================= */
 function bindDelegationOnce() {
   if (delegationBound) return;
   delegationBound = true;
 
-  // 처리일자 변경
   document.addEventListener("change", async (e) => {
     const t = e.target;
     if (!t?.classList?.contains("processDateInput")) return;
@@ -405,30 +369,6 @@ function bindDelegationOnce() {
       hideLoading();
     }
   });
-
-  // 삭제 클릭
-  document.addEventListener("click", async (e) => {
-    const btn = e.target?.closest?.(".btnDeleteRow");
-    if (!btn) return;
-    if (!els.mainTable || !els.mainTable.contains(btn)) return;
-
-    if (!canDeleteRow()) return;
-    const id = String(btn.dataset.id || "").trim();
-    if (!id) return;
-
-    if (!confirm("해당 행을 삭제할까요?")) return;
-
-    showLoading("삭제 중...");
-    try {
-      await deleteRateRow(id);
-      await fetchData(window.__lastRateFetchPayload || {});
-    } catch (err) {
-      console.error(err);
-      alertBox(err?.message || "삭제 실패");
-    } finally {
-      hideLoading();
-    }
-  });
 }
 
 function bindResizeOnce() {
@@ -437,26 +377,36 @@ function bindResizeOnce() {
 
   window.addEventListener(
     "resize",
-    () => {
-      // 리사이즈 시 DT 폭 재계산
-      requestAnimationFrame(() => adjustDT());
-    },
+    () => requestAnimationFrame(() => adjustDT()),
     { passive: true }
   );
 }
 
 /* =========================================================
-   Normalize row
+   Normalize row (✅ 요청자/대상자 표시값 통합 생성)
 ========================================================= */
+function formatNameId(name, id) {
+  const n = String(name || "").trim();
+  const i = String(id || "").trim();
+  if (!n && !i) return "";
+  if (!i) return n;
+  if (!n) return `(${i})`;
+  return `${n}(${i})`;
+}
+
 function normalizeRateRow(row = {}) {
+  const requester_name = row.requester_name || row.rq_name || "";
+  const requester_id = row.requester_id || row.rq_id || "";
+
+  const target_name = row.target_name || row.tg_name || "";
+  const target_id = row.target_id || row.tg_id || "";
+
   return {
     id: row.id || "",
 
-    requester_name: row.requester_name || row.rq_name || "",
-    requester_id: row.requester_id || row.rq_id || "",
-
-    target_name: row.target_name || row.tg_name || "",
-    target_id: row.target_id || row.tg_id || "",
+    // ✅ 통합 표시 필드 (메인시트용)
+    rq_display: formatNameId(requester_name, requester_id),
+    tg_display: formatNameId(target_name, target_id),
 
     before_ftable: row.before_ftable || "",
     before_frate: row.before_frate || "",
@@ -525,7 +475,6 @@ export async function fetchData(payload = {}) {
     safeResetInput();
     renderMainSheet(rows);
 
-    // 렌더 직후 한 번 더(숨김→표시 타이밍 보정)
     setTimeout(() => adjustDT(), 0);
   } catch (err) {
     console.error("❌ [rate/fetch] 예외:", err);
