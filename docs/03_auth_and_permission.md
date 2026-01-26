@@ -1,10 +1,12 @@
+# django_ma/docs/03_auth_and_permission.md
+
 # 인증 및 권한 정책 (Auth & Permission)
 
 ## 1. 인증(Authentication)
 
 - Django 기본 인증 시스템 사용
-- USERNAME_FIELD = id (사원번호)
 - CustomUser 기반
+- USERNAME_FIELD = id (사원번호)
 
 ---
 
@@ -15,7 +17,6 @@
 | 재직 | 정상 활동 가능 |
 | 퇴사 | 접근 제한 |
 
-> status는 업무적 상태 표현이며  
 > 실제 로그인 가능 여부는 `is_active`로 판단한다.
 
 ---
@@ -37,12 +38,24 @@
 ## 4. 핵심 규칙
 
 - grade == inactive → is_active = False
-- resign은 로그인 가능 여부 정책적으로 제한 가능
-- 권한 판단은 grade 기준
+- 권한 판단은 **grade 기준**
+- View는 직접 판단하지 않는다
 
 ---
 
-## 5. 설계 원칙
+## 5. 앱별 접근 정책 예시 (manual 앱)
+
+- 매뉴얼 접근은 서버(View)에서 최종 판단
+- 프런트 노출 여부와 무관하게 권한 차단
+
+| 조건 | 접근 가능 |
+|----|----|
+| admin_only=True | superuser, head |
+| is_published=False | superuser |
+
+---
+
+## 6. 설계 원칙
 
 - 권한 분기 로직은 View에 직접 작성하지 않는다
-- 검색/접근 정책은 반드시 중앙화
+- 접근 정책은 utils/permissions 레이어에서 중앙 관리

@@ -1,20 +1,25 @@
 <!-- django_ma/manual/templates/manual/_partials/manual_detail_boot.html -->
 <!-- -------------------------------------------------------------------------
-  Manual Detail Boot
-  - superuser only URL 주입, 비-superuser는 빈 값
-  - JS가 data-*를 읽으므로 id/키 유지
+  Manual Detail Boot (FINAL)
+  - superuser 전용: AJAX URL 주입
+  - 비-superuser: 빈 값 주입(키/ID 유지 → JS 안전)
+  - JS는 #manualDetailBoot의 data-*를 읽어 기능을 활성/비활성 처리
 --------------------------------------------------------------------------- -->
 
 {% if user.is_authenticated and user.grade == "superuser" %}
   <div id="manualDetailBoot"
        data-section-title-update-url="{% url 'manual:manual_section_title_update_ajax' %}"
        data-section-delete-url="{% url 'manual:manual_section_delete_ajax' %}"
-       data-block-delete-url="{% url 'manual:manual_block_delete_ajax' %}">
+       data-block-delete-url="{% url 'manual:manual_block_delete_ajax' %}"
+       data-block-reorder-url="{% url 'manual:manual_block_reorder_ajax' %}"
+       data-block-move-url="{% url 'manual:manual_block_move_ajax' %}">
   </div>
 {% else %}
   <div id="manualDetailBoot"
        data-section-title-update-url=""
        data-section-delete-url=""
-       data-block-delete-url="">
+       data-block-delete-url=""
+       data-block-reorder-url=""
+       data-block-move-url="">
   </div>
 {% endif %}

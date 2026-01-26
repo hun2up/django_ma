@@ -92,24 +92,26 @@
           </li>
 
           <!-- ✅ Partner -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
-               href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
-            <ul class="dropdown-menu" aria-labelledby="partnerMenu">
-              {% if user.grade != 'resign' %}
-                <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
-              {% endif %}
-              {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
-                <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
-                <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
-                <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
-              {% endif %}
-              {% if user.grade == 'superuser' or user.grade == 'head' %}
-                <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
-                <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
-              {% endif %}
-            </ul>
-          </li>
+          {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
+                href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
+              <ul class="dropdown-menu" aria-labelledby="partnerMenu">
+                {% if user.grade != 'resign' %}
+                  <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
+                {% endif %}
+                {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_charts' %}">편제변경</a></li>
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_rate' %}">요율변경</a></li>
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_calculate' %}">지점효율</a></li>
+                {% endif %}
+                {% if user.grade == 'superuser' or user.grade == 'head' %}
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_grades' %}">권한관리</a></li>
+                  <li><a class="dropdown-item" href="{% url 'partner:manage_tables' %}">테이블관리</a></li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
 
           {% if user.grade == 'superuser' %}
             <!-- ✅ Commission -->

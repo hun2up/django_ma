@@ -16,20 +16,20 @@
   <div id="manual-detail">
     <div id="manualDetailTop">
 
-      <!-----------------------------
-        1) Header: Title + badges
-      ------------------------------>
+      <!-- =========================================================
+           1) Header: Title + badges
+      ========================================================== -->
       <div class="d-flex justify-content-center align-items-center mb-2 gap-2">
         <h3 class="fw-bold mb-0 text-center manual-detail-title">{{ m.title }}</h3>
         {% if m.admin_only %}<span class="badge manual-badge-admin">관리자 전용</span>{% endif %}
         {% if not m.is_published %}<span class="badge manual-badge-staff">직원 전용</span>{% endif %}
       </div>
 
-      <!-----------------------------
-        2) Subnav: Section TOC (sticky)
-        - 클릭 시 헤더+subnav 높이 고려 스크롤
-        - 스크롤 위치에 따라 active 자동 반영
-      ------------------------------>
+      <!-- =========================================================
+           2) Subnav: Section TOC (sticky)
+           - 클릭 시 헤더+subnav 높이 고려 스크롤
+           - 스크롤 위치에 따라 active 자동 반영
+      ========================================================== -->
       <div class="manual-subnav" id="manualSubnav">
         <div class="subnav-inner">
           <div class="subnav-title">{{ m.title }}</div>
@@ -46,28 +46,45 @@
         </div>
       </div>
 
-      <!-----------------------------
-        3) Boot: JS에서 읽을 URL 주입
-      ------------------------------>
+      <!-- =========================================================
+           3) Boot: JS에서 읽을 URL 주입
+      ========================================================== -->
       {% include "manual/_partials/manual_detail_boot.html" %}
 
-      <!-----------------------------
-        4) Sections
-      ------------------------------>
-      <div id="manualSections" class="mt-3">
+      <!-- =========================================================
+           4) Sections (Cards)
+           - data-manual-id: 카드/블록 AJAX에서 사용
+           - superuser: 카드 reorder URL도 dataset에 주입
+      ========================================================== -->
+      <div id="manualSections"
+           class="mt-3"
+           data-manual-id="{{ m.id }}"
+           {% if user.is_authenticated and user.grade == "superuser" %}
+           data-section-reorder-url="{% url 'manual:manual_section_reorder_ajax' %}"
+           {% endif %}>
+
         {% for sec in sections %}
           <div class="card p-4 mb-3 manual-section"
                id="sec-{{ sec.id }}"
                data-section-id="{{ sec.id }}">
 
-            {# 카드 삭제 버튼(우상단) - superuser only #}
+            <!-- superuser only: 카드 이동/삭제 액션 -->
             {% if user.is_authenticated and user.grade == "superuser" %}
               <div class="sec-card-actions">
-                <button type="button" class="btn btn-sm btn-danger btnDeleteSection">카드 삭제</button>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary jsSectionDragHandle"
+                        title="드래그로 카드 순서 변경"
+                        aria-label="카드 순서 변경">
+                  ↕ 이동
+                </button>
+                <button type="button"
+                        class="btn btn-sm btn-danger btnDeleteSection">
+                  카드 삭제
+                </button>
               </div>
             {% endif %}
 
-            {# 소제목 + 소제목 수정 버튼 #}
+            <!-- 소제목 + superuser: 소제목 수정 -->
             <div class="sec-title-row">
               <h5 class="sec-title {% if not sec.title %}empty{% endif %}" data-role="secTitleText">
                 {% if sec.title %}{{ sec.title }}{% else %}(소제목 없음){% endif %}
@@ -82,7 +99,7 @@
               {% endif %}
             </div>
 
-            {# ----- Blocks ----- #}
+            <!-- Blocks -->
             <div class="manualBlocks" id="manualBlocks-{{ sec.id }}">
               {% for b in sec.blocks.all %}
                 <div class="border rounded-3 p-3 mb-3 manual-block"
@@ -90,7 +107,6 @@
                      data-image-url="{% if b.image %}{{ b.image.url }}{% endif %}">
 
                   <div class="manual-block-grid">
-
                     <div class="manual-block-media">
                       {% if b.image %}
                         <img src="{{ b.image.url }}"
@@ -106,16 +122,24 @@
                     </div>
                   </div>
 
-                  {# 블록 수정/삭제 - superuser only #}
+                  <!-- superuser only: 블록 수정/삭제 -->
                   {% if user.is_authenticated and user.grade == "superuser" %}
                     <div class="manual-block-actions">
+                      <button type="button"
+                              class="btn btn-sm btn-outline-secondary jsBlockDragHandle"
+                              title="드래그로 순서 변경"
+                              aria-label="블록 순서 변경">
+                        ↕ 이동
+                      </button>
+
                       <button type="button"
                               class="btn btn-sm btn-outline-secondary btn-edit-block"
                               data-bs-toggle="modal"
                               data-bs-target="#manualBlockModal">
                         수정
                       </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger btn-delete-block">
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger btn-delete-block">
                         삭제
                       </button>
                     </div>
@@ -124,7 +148,7 @@
               {% endfor %}
             </div>
 
-            {# 블록 추가 버튼 - superuser only #}
+            <!-- superuser only: 블록 추가 -->
             {% if user.is_authenticated and user.grade == "superuser" %}
               <div class="d-flex justify-content-end mt-2">
                 <button type="button"
@@ -141,9 +165,9 @@
         {% endfor %}
       </div>
 
-      <!-----------------------------
-        5) Section Add Button (superuser only)
-      ------------------------------>
+      <!-- =========================================================
+           5) Section Add Button (superuser only)
+      ========================================================== -->
       {% if user.is_authenticated and user.grade == "superuser" %}
         <div class="d-flex justify-content-end mt-2">
           <button type="button"
@@ -160,9 +184,9 @@
   </div>
 </div>
 
-<!-----------------------------
-  6) Floating Actions (FAB)
------------------------------->
+<!-- =========================================================
+     6) Floating Actions (FAB)
+========================================================== -->
 <div class="manual-fab">
   <a href="{% url 'manual:manual_list' %}" title="매뉴얼 목록으로">
     <img src="{% static 'images/manual/manual_home.png' %}" alt="HOME">
@@ -172,15 +196,21 @@
   </button>
 </div>
 
-<!-----------------------------
-  7) Superuser-only: editor + modals + scripts
------------------------------->
+<!-- =========================================================
+     7) Superuser-only: editor + modals + scripts
+     - include 중복 제거
+========================================================== -->
 {% if user.is_authenticated and user.grade == "superuser" %}
   {% include "manual/_partials/manual_detail_superuser_assets.html" %}
+  <script src="{% static 'vendor/sortablejs/Sortable.min.js' %}"></script>
+  <script type="module" src="{% static 'js/manual/manual_detail_block/index.js' %}?v=20260126_02"></script>
+  <script src="{% static 'js/manual/manual_detail_section_sort.js' %}?v=20260126_01"></script>
 {% endif %}
 
-<!-----------------------------
-  8) Subnav/GoTop (page common)
------------------------------->
+
+<!-- =========================================================
+     8) Subnav/GoTop (page common)
+========================================================== -->
 <script src="{% static 'js/manual/manual_detail_subnav.js' %}?v=20260113_01"></script>
+
 {% endblock %}
