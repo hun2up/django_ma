@@ -29,7 +29,7 @@
     data-team-c="{{ subadmin_info.team_c|default:'' }}"
     >
 
-  {% if user.grade not in 'superuser main_admin sub_admin' %}
+  {% if user.grade not in 'superuser head leader' %}
     <div class="alert alert-danger">접근 권한이 없습니다.</div>
   {% endif %}
 
@@ -73,7 +73,7 @@
     </div>
   </div>
 
-  {% if user.grade in 'superuser main_admin' %}
+  {% if user.grade in 'superuser head' %}
   <div class="alert alert-info py-2 mb-3">
     요율변경 기능 사용 전 반드시 
     <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>

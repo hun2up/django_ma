@@ -35,7 +35,7 @@ def manage_calculate(request):
         update_process_name="partner:efficiency_update_process_date",
         boot_key="ManageefficiencyBoot",
         extra_context={
-            "search_user_url": "/api/accounts/search-user/",
+            "search_user_url": reverse("api_accounts_search_user"),
             "efficiency_confirm_groups_url": reverse("partner:efficiency_confirm_groups"),
         },
     )
@@ -86,6 +86,7 @@ def manage_charts(request):
             "branches": sorted(list(BRANCH_PARTS.keys())),
             "selected_branch": selected_branch,
             "subadmin_info": subadmin_info,
+            "search_user_url": reverse("api_accounts_search_user"),
         },
     )
 

@@ -12,13 +12,14 @@ from django.shortcuts import redirect
 from django.urls import include, path, re_path
 from django.views.static import serve
 
+from accounts import views as accounts_views
 from accounts.custom_admin import custom_admin_site
 from accounts.views import SessionCloseLoginView
 
 
 def home_redirect(request):
     """홈(/) 접속 시 게시판으로 리다이렉트"""
-    return redirect("post_list")
+    return redirect("board:post_list")
 
 
 urlpatterns = [
@@ -58,6 +59,8 @@ urlpatterns = [
     # 를 관리하고 있으므로, 여기서는 prefix 1번만 붙여 위임합니다.
     # ---------------------------------------------------------------------
     path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
+    path("api/accounts/search-user/", accounts_views.api_search_user, name="api_accounts_search_user"),
+
 ]
 
 # -------------------------------------------------------------------------

@@ -14,8 +14,8 @@
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      {% url "task_list" as list_url %}
-      {% url "task_detail" task.pk as cancel_url %}
+      {% url "board:post_list" as list_url %}
+      {% url "board:post_detail" task.pk as cancel_url %}
       {% include "board/includes/_edit_form.html" with mode="edit" form=form attachments=attachments list_url=list_url cancel_url=cancel_url form_id="taskForm" %}
     </div>
 

@@ -9,12 +9,15 @@ export const els = {
     return byId("manage-structure");
   },
 
-  /* controls */
+  /* controls (정식) */
   get yearSelect() {
     return byId("yearSelect");
   },
   get monthSelect() {
     return byId("monthSelect");
+  },
+  get channelSelect() {
+    return byId("channelSelect");
   },
   get partSelect() {
     return byId("partSelect");
@@ -23,7 +26,21 @@ export const els = {
     return byId("branchSelect");
   },
   get btnSearch() {
-    return byId("btnSearchPeriod");
+    return byId("btnSearchPeriod") || byId("btnSearch");
+  },
+
+  /* ✅ controls (호환 alias: 기존 코드가 els.year/els.month/els.branch 쓰는 경우) */
+  get year() {
+    return this.yearSelect;
+  },
+  get month() {
+    return this.monthSelect;
+  },
+  get branch() {
+    return this.branchSelect;
+  },
+  get part() {
+    return this.partSelect;
   },
 
   /* sections */
