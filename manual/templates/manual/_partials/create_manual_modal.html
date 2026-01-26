@@ -1,57 +1,109 @@
 <!-- django_ma/manual/templates/manual/_partials/create_manual_modal.html -->
-<!----------------------------------------------------------------------------
-  Create Manual Modal (superuser only)
-  - id / dataset / input name 그대로 유지 (JS 의존)
------------------------------------------------------------------------------->
 
-<div class="modal fade" id="createManualModal" tabindex="-1" aria-hidden="true"
+<!-- =============================================================================
+  Create Manual Modal (superuser only)
+  - 매뉴얼 생성 전용 UI
+  - id / name / dataset 유지 (JS 의존)
+============================================================================= -->
+
+<div class="modal fade"
+     id="createManualModal"
+     tabindex="-1"
+     aria-hidden="true"
      data-create-url="{% url 'manual:manual_create_ajax' %}">
+
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content manual-modal">
+
+      <!-- Header -->
       <div class="modal-header">
-        <h5 class="modal-title fw-bold manual-modal-title">새 매뉴얼 만들기</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        <h5 class="modal-title fw-bold manual-modal-title">
+          새 매뉴얼 만들기
+        </h5>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="닫기"></button>
       </div>
 
+      <!-- Body -->
       <div class="modal-body">
         <form id="createManualForm">
           {% csrf_token %}
 
+          <!-- Title -->
           <label class="form-label fw-semibold">매뉴얼 이름</label>
-          <input type="text" class="form-control" id="manualTitleInput">
+          <input type="text"
+                 class="form-control"
+                 id="manualTitleInput"
+                 maxlength="80">
 
+          <!-- Access -->
           <div class="mt-3">
-            <label class="form-label fw-semibold mb-2">공개 범위</label>
+            <label class="form-label fw-semibold mb-2">
+              공개 범위
+            </label>
 
             <div class="d-flex flex-column gap-2">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="manualAccess"
-                       id="manualAccessNormal" value="normal" checked>
-                <label class="form-check-label fw-semibold" for="manualAccessNormal">일반</label>
+                <input class="form-check-input"
+                       type="radio"
+                       name="manualAccess"
+                       id="manualAccessNormal"
+                       value="normal"
+                       checked>
+                <label class="form-check-label fw-semibold"
+                       for="manualAccessNormal">
+                  일반
+                </label>
               </div>
 
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="manualAccess"
-                       id="manualAccessAdmin" value="admin">
-                <label class="form-check-label fw-semibold" for="manualAccessAdmin">관리자 전용</label>
+                <input class="form-check-input"
+                       type="radio"
+                       name="manualAccess"
+                       id="manualAccessAdmin"
+                       value="admin">
+                <label class="form-check-label fw-semibold"
+                       for="manualAccessAdmin">
+                  관리자 전용
+                </label>
               </div>
 
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="manualAccess"
-                       id="manualAccessStaff" value="staff">
-                <label class="form-check-label fw-semibold" for="manualAccessStaff">직원 전용</label>
+                <input class="form-check-input"
+                       type="radio"
+                       name="manualAccess"
+                       id="manualAccessStaff"
+                       value="staff">
+                <label class="form-check-label fw-semibold"
+                       for="manualAccessStaff">
+                  직원 전용
+                </label>
               </div>
             </div>
           </div>
 
-          <div class="alert alert-danger py-2 mt-3 d-none" id="manualCreateError"></div>
+          <!-- Error -->
+          <div class="alert alert-danger py-2 mt-3 d-none"
+               id="manualCreateError"></div>
 
+          <!-- Actions -->
           <div class="d-flex gap-2 justify-content-end mt-3">
-            <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
-            <button type="submit" class="btn btn-primary" id="btnCreateManualConfirm">만들기</button>
+            <button type="button"
+                    class="btn btn-light"
+                    data-bs-dismiss="modal">
+              취소
+            </button>
+            <button type="submit"
+                    class="btn btn-primary"
+                    id="btnCreateManualConfirm">
+              만들기
+            </button>
           </div>
         </form>
       </div>
+
     </div>
   </div>
 </div>

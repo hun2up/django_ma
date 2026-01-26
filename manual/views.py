@@ -599,7 +599,7 @@ def manual_block_attachment_upload_ajax(request):
     )
 
     # utils에 있는 직렬화 형태를 그대로 유지하기 위해 block_to_dict 대신 dict 직접 구성
-    from .utils import attachment_to_dict
+    from .utils_legacy import attachment_to_dict
     return ok({"attachment": attachment_to_dict(a)})
 
 
@@ -627,3 +627,57 @@ def manual_block_attachment_delete_ajax(request):
     return ok()
 
 def rules_home(request): return render(request, "manual/rules_home.html")
+
+@require_POST
+@login_required
+def manual_block_move_ajax(request):
+    """✅ superuser 전용: 블록을 다른 섹션으로 이동 + 양쪽 정렬 저장"""
+    denied = ensure_superuser_or_403(request)
+    if denied:
+        return denied
+
+    payload = json_body(request)
+    from_section_id = payload.get("from_section_id")
+    to_section_id = payload.get("to_section_id")
+    from_block_ids = payload.get("from_block_ids") or []
+    to_block_ids = payload.get("to_block_ids") or []
+
+    if (not is_digits(from_section_id)) or (not is_digits(to_section_id)):
+        return fail("section_id 값이 올바르지 않습니다.", 400)
+    if (not isinstance(from_block_ids, list)) or (not isinstance(to_block_ids, list)):
+        return fail("block_ids 형식이 올바르지 않습니다.", 400)
+
+    from_sid = int(from_section_id)
+    to_sid = int(to_section_id)
+
+    from_sec = get_object_or_404(ManualSection, pk=from_sid)
+    to_sec = get_object_or_404(ManualSection, pk=to_sid)
+
+    if from_sec.manual_id != to_sec.manual_id:
+        return fail("서로 다른 매뉴얼 간 이동은 허용되지 않습니다.", 400)
+
+    # 두 섹션에 존재하는 블록 ID 집합(이동 가능한 후보)
+    union_ids = set(
+        ManualBlock.objects.filter(section_id__in=[from_sid, to_sid]).values_list("id", flat=True)
+    )
+
+    cleaned_from = [int(x) for x in from_block_ids if is_digits(x) and int(x) in union_ids]
+    cleaned_to = [int(x) for x in to_block_ids if is_digits(x) and int(x) in union_ids]
+
+    if not cleaned_to:
+        return fail("이동 대상 블록 목록이 비어있습니다.", 400)
+
+    with transaction.atomic():
+        # to 목록에 있는 블록들은 모두 to 섹션으로 귀속
+        ManualBlock.objects.filter(id__in=cleaned_to).update(section_id=to_sid)
+
+        # from 섹션 정렬
+        for idx, bid in enumerate(cleaned_from, start=1):
+            ManualBlock.objects.filter(id=bid, section_id=from_sid).update(sort_order=idx)
+
+        # to 섹션 정렬
+        for idx, bid in enumerate(cleaned_to, start=1):
+            ManualBlock.objects.filter(id=bid, section_id=to_sid).update(sort_order=idx)
+
+    return ok()
+

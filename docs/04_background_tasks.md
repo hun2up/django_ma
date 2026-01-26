@@ -1,43 +1,54 @@
-# 백그라운드 작업 (Background Tasks)
+# django_ma/docs/04_background_tasks.md
 
-## 1. 사용 목적
+# 배포 및 운영 (Deployment)
 
-- 대용량 엑셀 업로드 처리
-- 사용자 계정 일괄 생성/수정
-- UI 블로킹 방지
-
----
-
-## 2. 기술 구성
-
-- Celery
-- Redis (Broker + Cache)
-- Django ORM
+## 1. 환경 분리
+- APP_ENV=dev / prod
+- .env.dev / .env.prod 자동 로딩
 
 ---
 
-## 3. 주요 Task
-
-### process_users_excel_task
-- 파일 경로 기반 엑셀 로딩
-- 사용자 업서트
-- 진행률 계산
-- 결과 엑셀 생성
+## 2. 필수 서비스
+- PostgreSQL
+- Redis
+- Celery Worker
 
 ---
 
-## 4. 진행률 처리 방식
+## 3. 운영 설정 특징
+- DEBUG=False 시 보안 옵션 활성화
+- Whitenoise Manifest 사용# 배포 및 운영 (Deployment)
 
-- Redis cache 사용
-- task_id 기준 키 구성
-  - upload_progress:{task_id}
-  - upload_status:{task_id}
-  - upload_result_path:{task_id}
+## 1. 환경 분리
+- APP_ENV=dev / prod
+- .env.dev / .env.prod 자동 로딩
 
 ---
 
-## 5. 실패 처리
+## 2. 필수 서비스
+- PostgreSQL
+- Redis
+- Celery Worker
 
-- 예외 발생 시 status=FAILURE
-- error 메시지 cache 저장
-- Admin UI에 즉시 노출
+---
+
+## 3. 운영 설정 특징
+- DEBUG=False 시 보안 옵션 활성화
+- Whitenoise Manifest 사용
+- 운영 DB 보호 로직 내장
+
+---
+
+## 4. 로그
+- access.log 파일 기반
+- django.security 별도 로거
+- Celery 로그는 worker 기준
+
+- 운영 DB 보호 로직 내장
+
+---
+
+## 4. 로그
+- access.log 파일 기반
+- django.security 별도 로거
+- Celery 로그는 worker 기준

@@ -5,23 +5,19 @@
 {% block title %}업무매뉴얼{% endblock %}
 
 {% block content %}
-<!------------------------------------------------------------------------------
-  Manual List Page (FINAL - Refactor)
-  - superuser: 생성/편집(정렬/삭제/일괄수정)
-  - 일반: 목록 클릭 → 상세 이동
-  - 기존 id/class/data-* 유지 (JS 의존성 영향 0)
--------------------------------------------------------------------------------->
+<!-- =============================================================================
+  Manual List Page (FINAL)
+  - superuser: 생성 / 정렬 / 삭제 / 일괄수정
+  - 일반 사용자: 목록 클릭 → 상세 페이지 이동
+  - 기존 id / class / data-* 유지 (JS 영향 없음)
+============================================================================= -->
 
 <div class="container manual-list-container">
 
-  <!-----------------------------
-    1) Page Title
-  ------------------------------>
+  <!-- 1) Page Title -->
   <h3 class="text-center fw-bold mb-4 manual-list-title">업무매뉴얼</h3>
 
-  <!-----------------------------
-    2) Controls (superuser only)
-  ------------------------------>
+  <!-- 2) Top Controls (superuser only) -->
   <div class="d-flex justify-content-end mb-3 gap-2">
     {% if user.is_authenticated and user.grade == "superuser" %}
 
@@ -32,28 +28,33 @@
         + 새 매뉴얼
       </button>
 
-      <button type="button" class="btn btn-outline-secondary" id="btnManualEditMode">
+      <button type="button"
+              class="btn btn-outline-secondary"
+              id="btnManualEditMode">
         편집
       </button>
 
-      <button type="button" class="btn btn-success d-none" id="btnManualSaveOrder">
+      <button type="button"
+              class="btn btn-success d-none"
+              id="btnManualSaveOrder">
         저장
       </button>
 
-      <button type="button" class="btn btn-light d-none" id="btnManualDone">
+      <button type="button"
+              class="btn btn-light d-none"
+              id="btnManualDone">
         완료
       </button>
 
-      {# CSRF: JS에서 읽어 POST에 사용 (CSRF_COOKIE_HTTPONLY 대응) #}
-      <form id="manualEditCsrfForm" class="d-none">{% csrf_token %}</form>
+      <!-- CSRF (JS POST 용도) -->
+      <form id="manualEditCsrfForm" class="d-none">
+        {% csrf_token %}
+      </form>
 
     {% endif %}
   </div>
 
-  <!-----------------------------
-    3) Boot Data (urls) → dataset
-    - inline script 제거 목적
-  ------------------------------>
+  <!-- 3) Boot Data (superuser only) -->
   {% if user.is_authenticated and user.grade == "superuser" %}
     <div id="manualListBoot"
          class="d-none"
@@ -63,9 +64,7 @@
     </div>
   {% endif %}
 
-  <!-----------------------------
-    4) Manual List
-  ------------------------------>
+  <!-- 4) Manual List -->
   <div class="list-group shadow-sm manual-list-group" id="manualListGroup">
     {% for m in manuals %}
       <a class="list-group-item list-group-item-action py-3 manual-item"
@@ -76,24 +75,27 @@
 
         <div class="d-flex justify-content-between align-items-start gap-2">
 
-          {# ----- Left: Title + chips ----- #}
+          <!-- Left: Title / Badges / Sections -->
           <div class="flex-grow-1 manual-item-left">
 
             <div class="manual-title-row">
 
-              {# (A) Title column #}
+              <!-- (A) Title / Edit UI -->
               <div class="manual-title-col">
-                <span class="manual-drag-handle d-none" title="드래그로 순서 변경">☰</span>
+                <span class="manual-drag-handle d-none"
+                      title="드래그로 순서 변경">☰</span>
 
-                <span class="fw-semibold manual-title-text">{{ m.title }}</span>
+                <span class="fw-semibold manual-title-text">
+                  {{ m.title }}
+                </span>
 
-                {# Edit mode title input (JS 토글) #}
+                <!-- Edit mode input -->
                 <input type="text"
                        class="form-control form-control-sm manual-title-input d-none"
                        value="{{ m.title|escape }}"
                        maxlength="80">
 
-                {# Badges (view mode only; edit mode에서 숨김 처리) #}
+                <!-- View mode badges -->
                 {% if m.admin_only %}
                   <span class="badge manual-badge-admin">관리자 전용</span>
                 {% endif %}
@@ -101,7 +103,7 @@
                   <span class="badge manual-badge-staff">직원 전용</span>
                 {% endif %}
 
-                {# Edit mode access select (JS 토글) #}
+                <!-- Edit mode access select -->
                 <select class="form-select form-select-sm manual-access-select d-none manual-access-select-w">
                   <option value="normal">일반</option>
                   <option value="admin">관리자 전용</option>
@@ -109,11 +111,14 @@
                 </select>
               </div>
 
-              {# (B) Section chips: 칩 영역 내부에서만 줄바꿈, 소제목 없으면 미렌더 #}
-              <div class="manual-section-chips" aria-label="섹션 소제목 목록">
+              <!-- (B) Section chips -->
+              <div class="manual-section-chips"
+                   aria-label="섹션 소제목 목록">
                 {% for sec in m.sections.all %}
                   {% if sec.title %}
-                    <span class="manual-section-chip">{{ sec.title }}</span>
+                    <span class="manual-section-chip">
+                      {{ sec.title }}
+                    </span>
                   {% endif %}
                 {% endfor %}
               </div>
@@ -121,7 +126,7 @@
             </div>
           </div>
 
-          {# ----- Right: actions (superuser only) ----- #}
+          <!-- Right: Actions -->
           <div class="d-flex align-items-center gap-2 manual-item-actions">
             {% if user.is_authenticated and user.grade == "superuser" %}
               <button type="button"
@@ -134,15 +139,15 @@
         </div>
       </a>
     {% empty %}
-      <div class="p-3 text-muted">등록된 매뉴얼이 없습니다.</div>
+      <div class="p-3 text-muted">
+        등록된 매뉴얼이 없습니다.
+      </div>
     {% endfor %}
   </div>
 
 </div>
 
-<!-----------------------------
-  5) Create Manual Modal + Scripts (superuser only)
------------------------------->
+<!-- 5) Modals & Scripts (superuser only) -->
 {% if user.is_authenticated and user.grade == "superuser" %}
   {% include "manual/_partials/create_manual_modal.html" %}
   {% include "manual/_partials/manual_list_scripts.html" %}

@@ -1630,6 +1630,10 @@ a.manual-item.manual-editing {
   height: 320px;
 }
 
+/* 드래그 중/선택된 카드 표시 (선택) */
+.manual-sort-ghost { opacity: 0.5; }
+.manual-sort-chosen { cursor: grabbing !important; }
+.jsSectionDragHandle { cursor: grab; }
 
 /* ==========================================================
  7) PAGES / COMMISSION
