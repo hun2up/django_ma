@@ -246,8 +246,17 @@ const MAIN_COLUMNS = [
     render: (v) => renderOrFlag(!!v),
   },
 
-  // 8) 비고
-  { data: "memo", defaultContent: "" },
+  // 8) 비고 (고정폭 + 말줄임 + title 툴팁)
+  {
+    data: "memo",
+    defaultContent: "",
+    render: (v) => {
+      const raw = toStr(v);
+      const safe = escapeHtml(raw);
+      const title = escapeAttr(raw);
+      return `<span class="memo-cell" title="${title}">${safe}</span>`;
+    },
+  },
 
   // 9) 요청일자
   { data: "request_date", defaultContent: "" },
@@ -373,7 +382,8 @@ function renderFallback(rows) {
 
       <td class="or-cell">${renderOrFlag(!!r.or_flag)}</td>
 
-      <td>${escapeHtml(r.memo)}</td>
+      <td><span class="memo-cell" title="${escapeAttr(r.memo)}">${escapeHtml(r.memo)}</span></td>
+
       <td class="text-center">${escapeHtml(r.request_date)}</td>
 
       <td class="text-center">

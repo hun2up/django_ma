@@ -46,7 +46,9 @@ REQUIRED_COLS = [
 ]
 
 # ✅ 관리자 보호(권장): 기존 이 등급은 엑셀로 grade 강등/권한 필드 덮어쓰기 방지
-PROTECTED_GRADES = {"superuser", "main_admin", "sub_admin"}
+PROTECTED_GRADES = {"superuser", "head", "leader"}
+
+PROTECTED_FIELDS = {"position", "team_a", "team_b", "team_c"}
 
 # 결과 리포트 엑셀 시트명
 RESULT_SHEET_NAME = "UploadResult"
@@ -378,7 +380,7 @@ def process_users_excel_task(self, task_id: str, file_path: str, batch_size: int
     - division(총괄): 빈 문자열 저장
     - is_staff: 전체 False / is_superuser: 기본 False
     - is_active: 기존 코드 정책 유지 (grade != inactive)
-    - 관리자 보호(권장): 기존 superuser/main_admin/sub_admin은 grade/status/is_staff/is_superuser/is_active 덮어쓰기 금지
+    - 관리자 보호(권장): 기존 superuser/head/leader은 grade/status/is_staff/is_superuser/is_active 덮어쓰기 금지
     - 진행률/상태/오류/결과경로: cache에 기록 (constants 기반 key 단일화)
     - 배치 처리: batch_size 단위 transaction
     - 결과 리포트 엑셀 저장 후 다운로드 가능
@@ -493,23 +495,92 @@ def process_users_excel_task(self, task_id: str, file_path: str, batch_size: int
 
                 try:
                     # ---------------------------------------------------------
-                    # Update path
+                    # Update path (퇴사일 정책 반영)
                     # ---------------------------------------------------------
                     if emp_id in existing_grade_map:
                         user = CustomUser.objects.get(id=emp_id)
 
-                        # 관리자 보호 정책: 특정 필드는 덮어쓰기 금지
-                        if user.grade in PROTECTED_GRADES:
-                            for key in ("grade", "status", "is_staff", "is_superuser", "is_active"):
-                                defaults.pop(key, None)
+                        # ✅ 보호등급(superuser/head/leader) 퇴사일 정책
+                        is_protected = user.grade in PROTECTED_GRADES
+
+                        # "퇴사일이 새로 생긴 경우" 정의: DB에 quit이 없었는데, 이번 엑셀엔 quit이 들어온 경우
+                        quit_newly_added = (user.quit is None and quit_ is not None)
+
+                        # 1) 보호등급 + 퇴사일 신규 생성 아님 → 엑셀로 변경 금지 (grade가 뭐로 와도 유지)
+                        if is_protected and not quit_newly_added:
+                            skipped += 1
+                            results.append([
+                                excel_row_num,
+                                emp_id,
+                                name,
+                                channel,
+                                part,
+                                branch,
+                                getattr(user, "grade", ""),
+                                getattr(user, "status", ""),
+                                "⚠️ 보호등급(superuser/head/leader) - 퇴사일 신규 없음(변경 차단)",
+                            ])
+                            processed += 1
+                            continue
+
+                        # 2) 보호등급 + 퇴사일 신규 생성 → 기존 정책에 따라 resign/inactive로 강제 전환
+                        #    (엑셀의 grade 값이 basic/resign 뭐로 와도, 최종 결정은 기존 정책)
+                        if is_protected and quit_newly_added:
+                            forced_grade = "inactive" if ((not name) or ("*" in name)) else "resign"
+                            forced_status = _infer_status(forced_grade)
+
+                            defaults["grade"] = forced_grade
+                            defaults["status"] = forced_status
+                            defaults["quit"] = quit_
+                            defaults["is_active"] = (forced_grade != "inactive")
+                            defaults["is_staff"] = False
+                            defaults["is_superuser"] = False
+
+                        # (참고) 이제 PROTECTED_GRADES는 superuser/head/leader만 포함이므로
+                        # 예전처럼 pop()으로 보호 필드를 제거하는 방식은 "퇴사일 신규 생성" 케이스를 막을 수 있어
+                        # 여기서는 pop()을 사용하지 않고 위 조건으로 흐름을 제어한다.
 
                         # 반영
-                        for key, value in defaults.items():
-                            setattr(user, key, value)
+                        # ---------------------------------------------------------
+                        # Update path (보호 필드 정책 반영)
+                        # ---------------------------------------------------------
+                        user = CustomUser.objects.get(id=emp_id)
 
-                        update_fields = list(defaults.keys())
+                        is_protected_grade = user.grade in PROTECTED_GRADES
+                        quit_newly_added = (user.quit is None and quit_ is not None)
+
+                        update_fields: List[str] = []
+
+                        for key, value in defaults.items():
+
+                            # 1) 보호 필드 처리
+                            if key in PROTECTED_FIELDS:
+                                if value:
+                                    # 값이 있으면 명시적 변경 허용
+                                    setattr(user, key, value)
+                                    update_fields.append(key)
+                                else:
+                                    # 빈 값인 경우
+                                    if quit_newly_added:
+                                        # 재직 → 퇴사 전환 시에만 초기화 허용
+                                        setattr(user, key, "")
+                                        update_fields.append(key)
+                                    # else: 기존 값 유지 (아무 것도 안 함)
+                                continue
+
+                            # 2) 일반 필드 처리
+                            if value != "":
+                                setattr(user, key, value)
+                                update_fields.append(key)
+
+                        # 보호 등급 + 퇴사일 신규 없는 경우는 위에서 continue 처리됨
                         if update_fields:
                             user.save(update_fields=update_fields)
+
+                        existing_grade_map[emp_id] = user.grade
+
+
+                        existing_grade_map[emp_id] = user.grade
 
                         updated += 1
                         results.append([

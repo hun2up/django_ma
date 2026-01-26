@@ -1,7 +1,7 @@
 // django_ma/static/js/partner/manage_rate/delete.js
 // ======================================================
 // 📘 요율변경 요청 페이지 - 삭제 로직 (dataset 키 통일 + 공통화)
-// - 기능/동작 동일 (sub_admin 삭제 차단, 삭제 후 재조회)
+// - 기능/동작 동일 (leader 삭제 차단, 삭제 후 재조회)
 // ======================================================
 
 import { els } from "./dom_refs.js";
@@ -61,8 +61,8 @@ async function handleDeleteClick(e) {
   if (!btn || !els.root) return;
 
   const grade = getGrade();
-  if (grade === "sub_admin") {
-    alertBox("삭제 권한이 없습니다. (SUB_ADMIN)");
+  if (grade === "leader") {
+    alertBox("삭제 권한이 없습니다. (leader)");
     return;
   }
 

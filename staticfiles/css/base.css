@@ -686,6 +686,54 @@ textarea[name="content"] {
   }
 }
 
+/* ==========================================================
+ 5-1B) RATE: Top Controls (연/월/부문/부서/지점)
+  - STRUCTURE(#manage-structure)와 동일한 규칙으로 통일
+========================================================== */
+
+#manage-rate {
+  /* 컨트롤 폭 토큰(원하면 여기만 조절) */
+  --ctl-w-ym: 90px;     /* 연/월 */
+  --ctl-w-org: 160px;   /* 부문/부서/지점 */
+  --ctl-gap: 12px;      /* 컨트롤 간격 */
+}
+
+/* select 폭 */
+#manage-rate #yearSelect,
+#manage-rate #monthSelect { max-width: var(--ctl-w-ym); }
+
+#manage-rate #channelSelect,
+#manage-rate #partSelect,
+#manage-rate #branchSelect { max-width: var(--ctl-w-org); }
+
+/* ✅ 드랍다운 폰트 통일: form-select-sm 기준 */
+#manage-rate #controlsForm .form-select {
+  font-size: .875rem;  /* bootstrap form-select-sm 기본 수준 */
+}
+
+/* md 이상: grid(col-md-*) 무력화 → 내용폭 기준으로 “붙여 배치” */
+@media (min-width: 768px) {
+  #manage-rate #controlsForm {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--ctl-gap);
+    align-items: flex-end;
+  }
+
+  #manage-rate #controlsForm > div {
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  #manage-rate #controlsForm .form-label { white-space: nowrap; }
+
+  #manage-rate #controlsForm .btn-search {
+    white-space: nowrap;
+    min-width: 88px;
+  }
+}
+
 
 /* ==========================================================
  5-2) PARTNER: Table Base (공통)
@@ -808,6 +856,28 @@ textarea[name="content"] {
 }
 
 #manage-structure :is(#inputTable th, #mainTable th) {
+  font-size: var(--tbl-font-th);
+}
+
+
+/* ==========================================================
+  (추가) RATE: 폰트 한 단계 다운(입력/메인 데이터)
+========================================================== */
+#manage-rate {
+  --tbl-font-td: 13px;   /* 데이터 폰트 */
+  --tbl-font-th: 11.5px; /* 헤더 폰트(선택) */
+}
+
+#manage-rate :is(#inputTable td, #mainTable td) {
+  font-size: var(--tbl-font-td);
+}
+
+#manage-rate #inputTable :is(.form-control, .form-select),
+#manage-rate #mainTable :is(.form-control, .form-select) {
+  font-size: var(--tbl-font-td);
+}
+
+#manage-rate :is(#inputTable th, #mainTable th) {
   font-size: var(--tbl-font-th);
 }
 
@@ -962,6 +1032,29 @@ textarea[name="content"] {
   - 기본: 줄바꿈 금지 + 가로스크롤
   - 예외: 메모(비고)는 데스크탑에서만 wrap 허용
 ========================================================== */
+/* 테이블 레이아웃을 고정해야 col 폭이 흔들리지 않음 */
+#manage-structure #mainTable,
+#manage-structure #mainTable_wrapper .dataTables_scrollHead table,
+#manage-structure #mainTable_wrapper .dataTables_scrollBody table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+/* colgroup의 width가 확실히 먹도록 */
+#manage-structure #mainTable col,
+#manage-structure #mainTable_wrapper .dataTables_scrollHead col,
+#manage-structure #mainTable_wrapper .dataTables_scrollBody col {
+  width: auto;
+}
+
+/* (선택) 셀 기본 줄바꿈 방지 – 필요시 조정 */
+#manage-structure #mainTable th,
+#manage-structure #mainTable td,
+#manage-structure #mainTable_wrapper .dataTables_scrollHead th,
+#manage-structure #mainTable_wrapper .dataTables_scrollBody td {
+  overflow: hidden;
+  white-space: nowrap;
+}
 
 #manage-structure #mainSheet .table-responsive,
 #manage-rate #mainSheet .table-responsive {
@@ -981,6 +1074,13 @@ textarea[name="content"] {
   white-space: nowrap;       /* ✅ 기본은 절대 줄바꿈 금지 */
   word-break: keep-all;
   vertical-align: middle;
+}
+
+#manage-structure .memo-cell{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 /* ---------- STRUCTURE: 비고 컬럼 정책 ----------
@@ -1333,7 +1433,8 @@ textarea[name="content"] {
 
 /* 메인테이블은 fixed 레이아웃/클리핑이 걸리면 말줄임이 생길 수 있어 방어 */
 #manage-structure #mainTable {
-  table-layout: auto !important;
+  table-layout: fixed !important;
+  width: 100% !important;
 }
 
 /* ✅ 요청자(1열): 말줄임 제거 + 줄바꿈 금지 + 폭 확장 허용 */
