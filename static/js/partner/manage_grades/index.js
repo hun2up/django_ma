@@ -487,12 +487,12 @@
     return [
       {
         text: "<i class='bi bi-download'></i> 엑셀 다운로드",
-        className: "btn btn-success btn-sm",
+        className: "btn btn-primary btn-sm",
         action: () => downloadAllUsersExcel(ajaxUrl),
       },
       {
         text: "<i class='bi bi-upload'></i> 엑셀 업로드",
-        className: "btn btn-success btn-sm",
+        className: "btn btn-primary btn-sm",
         action: () => document.getElementById("excelFile")?.click(),
       },
     ];

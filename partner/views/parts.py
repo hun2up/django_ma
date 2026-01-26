@@ -2,6 +2,7 @@
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.db.models.functions import Trim
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
@@ -26,18 +27,30 @@ def ajax_fetch_parts(request):
     """
     ✅ channel 기반 part 목록 (distinct)
     - channel 파라미터가 있으면 해당 channel 안에서만 part 추출
+    - part에 '센터'가 포함된 항목은 제외
+    - part가 NULL/빈 문자열/공백만 있는 값은 제외
     """
     channel = (request.GET.get("channel") or "").strip()
 
     qs = (
-        CustomUser.objects.exclude(part__isnull=True)
+        CustomUser.objects
+        .exclude(part__isnull=True)
         .exclude(part__exact="")
+        .exclude(part__icontains="센터")   # ✅ '센터' 포함 부서 제외
+        .annotate(part_trim=Trim("part"))
+        .exclude(part_trim__exact="")     # ✅ 공백만 있는 값 제거
     )
 
     if channel:
         qs = qs.filter(channel__iexact=channel)
 
-    parts = qs.values_list("part", flat=True).distinct().order_by("part")
+    # ✅ trim 기준으로 distinct + 정렬된 part 리스트
+    parts = (
+        qs.values_list("part_trim", flat=True)
+          .distinct()
+          .order_by("part_trim")
+    )
+
     return JsonResponse({"parts": list(parts)})
 
 

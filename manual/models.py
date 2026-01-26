@@ -25,7 +25,7 @@ class Manual(models.Model):
     ✅ 매뉴얼(문서)
 
     접근 규칙(views/utils.permissions에서 사용):
-    - admin_only=True    : superuser/main_admin만 접근
+    - admin_only=True    : superuser/head만 접근
     - is_published=False : superuser만 접근 (직원전용/비공개 개념)
     """
 
