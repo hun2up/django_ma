@@ -6,15 +6,114 @@
 {% block title %}권한관리{% endblock %}
 
 {% block extra_head %}
+<!-- =========================================================
+     Bootstrap Icons
+========================================================= -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+  /* =========================
+     Mobile UX (Manage Grades)
+     ========================= */
+
+  /* 1) 타이틀/버튼/뱃지 줄바꿈 방지 */
+  #manage-grades h3,
+  #manage-grades h5,
+  #manage-grades .btn,
+  #manage-grades .badge,
+  #manage-grades .form-label,
+  #manage-grades .text-muted.small {
+    white-space: nowrap;
+  }
+
+  /* 2) 카드 헤더(타이틀+버튼+안내문구) 줄바꿈 대신 가로 스크롤 */
+  #manage-grades .mg-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: nowrap;          /* 줄바꿈 X */
+    overflow-x: auto;           /* 넘치면 가로 스크롤 */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #manage-grades .mg-header-left {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: nowrap;          /* 줄바꿈 X */
+    min-width: max-content;     /* 내용 폭 유지 */
+  }
+
+  #manage-grades .mg-header-right {
+    min-width: max-content;     /* 안내문구도 줄바꿈 X */
+  }
+
+  /* 3) 테이블: 가로 스크롤 + 셀 줄바꿈 방지 */
+  #manage-grades .mg-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #manage-grades table {
+    width: 100%;
+    min-width: 980px; /* 모바일에서 가로 스크롤이 생기도록 최소 폭 확보 */
+  }
+
+  #manage-grades table th,
+  #manage-grades table td {
+    white-space: nowrap;        /* 셀 줄바꿈 방지 */
+    word-break: keep-all;
+    vertical-align: middle;
+  }
+
+  /* 4) DataTables 상단 컨트롤 영역도 가로 스크롤 (모바일에서 깨짐 방지) */
+  #manage-grades .dataTables_wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #manage-grades .dataTables_wrapper .dt-buttons .btn,
+  #manage-grades .dataTables_wrapper .dataTables_filter label,
+  #manage-grades .dataTables_wrapper .dataTables_length label {
+    white-space: nowrap;
+  }
+
+  /* 5) 모바일에서 상단 필터(셀렉트 3개)는 세로 스택이 더 자연스러움 */
+  @media (max-width: 576px) {
+    #filterForm {
+      flex-direction: column !important;
+      align-items: stretch !important;
+    }
+    #filterForm > div {
+      flex: 1 1 auto !important;
+      width: 100% !important;
+    }
+    #btnSearch {
+      width: 100%;
+    }
+
+    /* DataTables 검색 input 너무 작아지는 문제 방지 */
+    #manage-grades .dataTables_filter input {
+      width: 12rem;
+      max-width: 100%;
+    }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
 
+<!-- =========================================================
+     권한 체크
+========================================================= -->
 {% if user.grade != 'superuser' and user.grade != 'head' %}
   <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
 {% else %}
 
+<!-- =========================================================
+     Django Message
+========================================================= -->
 {% if messages %}
   <div class="mt-3">
     {% for message in messages %}
@@ -27,6 +126,9 @@
 
 <form id="csrfForm">{% csrf_token %}</form>
 
+<!-- =========================================================
+     Root Container (JS Bootstrapping)
+========================================================= -->
 <div id="manage-grades"
      data-user-grade="{{ user.grade }}"
      data-user-branch="{{ user.branch|default:''|escapejs }}"
@@ -78,7 +180,7 @@
         <button type="submit" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
       </div>
 
-      {# ✅ 초기값: view에서 내려주는 값(JS가 우선 사용) #}
+      <!-- ✅ 초기값: view에서 내려주는 값(JS가 우선 사용) -->
       <input type="hidden" id="selectedChannelInit" value="{{ selected_channel|default:'' }}">
       <input type="hidden" id="selectedPartInit" value="{{ selected_part|default:'' }}">
       <input type="hidden" id="selectedBranchInit" value="{{ selected_branch|default:'' }}">
@@ -102,8 +204,8 @@
      - 모달 통해 추가 가능
      -------------------------------------------------------------->
   <div class="card shadow p-3 border-0 rounded-4 mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div class="d-flex align-items-center gap-2">
+    <div class="mg-header-row mb-3">
+      <div class="mg-header-left">
         <h5 class="fw-bold mb-0" style="color:#003f7d;">중간관리자 명단</h5>
 
         <button type="button"
@@ -113,7 +215,7 @@
         </button>
       </div>
 
-      <span class="text-muted small" style="white-space: nowrap;">
+      <span class="mg-header-right text-muted small">
         ※ 중간관리자 추가/제외는 부서장에게 문의바랍니다.
       </span>
     </div>
@@ -127,7 +229,7 @@
       {% endif %}
     {% endif %}
 
-    <div class="table-responsive">
+    <div class="mg-table-scroll">
       <table class="table table-striped align-middle" id="subAdminTable">
         <thead class="table-light">
           <tr>
@@ -189,7 +291,7 @@
       </div>
     {% endif %}
 
-    <div class="table-responsive">
+    <div class="mg-table-scroll">
       <table id="allUserTable"
              class="table table-striped align-middle"
              data-ajax-base="{% url 'partner:ajax_users_data' %}">

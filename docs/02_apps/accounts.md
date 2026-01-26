@@ -1,3 +1,5 @@
+# django_ma/docs/02_apps/accounts.md
+
 # accounts 앱 상세 문서
 
 ## 1. 앱의 책임 (Responsibility)

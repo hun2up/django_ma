@@ -26,6 +26,8 @@ from .utils import find_part_by_branch
 @login_required
 @grade_required("superuser", "head")
 def manage_grades(request):
+    base_leader_users = CustomUser.objects.filter(grade="leader", status="재직")
+
     user = request.user
     LEVELS = ["-", "A레벨", "B레벨", "C레벨"]
     parts = sorted(list(BRANCH_PARTS.keys()))
@@ -47,6 +49,7 @@ def manage_grades(request):
                 channel=selected_channel,
                 part=selected_part,
                 branch=selected_branch,
+                status="재직",
             )
         else:
             subadmin_qs = SubAdminTemp.objects.none()
@@ -56,7 +59,7 @@ def manage_grades(request):
         selected_part = find_part_by_branch(selected_branch) or (user.part or "").strip()
 
         subadmin_qs = SubAdminTemp.objects.filter(branch=selected_branch, user__in=base_leader_users)
-        users_all = CustomUser.objects.filter(branch=selected_branch)
+        users_all = CustomUser.objects.filter(branch=selected_branch, status="재직")
 
     empty_message_subadmin = "" if subadmin_qs.exists() else "표시할 중간관리자가 없습니다."
 
@@ -96,7 +99,7 @@ def upload_grades_excel(request):
         file = request.FILES["excel_file"]
         try:
             df = pd.read_excel(file, sheet_name="업로드").fillna("")
-            required_cols = ["사번", "팀A", "팀B", "팀C", "직급"]
+            required_cols = ["사번", "팀A", "팀B", "팀C", "직급", "성명"]
             for col in required_cols:
                 if col not in df.columns:
                     messages.error(request, f"엑셀에 '{col}' 컬럼이 없습니다.")
@@ -118,7 +121,7 @@ def upload_grades_excel(request):
                     defaults={
                         "part": cu.part or "-",
                         "branch": cu.branch or "-",
-                        "name": cu.name or "-",
+                        "name": (cu.name or "-"),
                         "team_a": row["팀A"] or "-",
                         "team_b": row["팀B"] or "-",
                         "team_c": row["팀C"] or "-",
@@ -169,12 +172,12 @@ def ajax_users_data(request):
         if user.grade == "superuser":
             if not selected_part or not selected_branch:
                 return JsonResponse({"draw": draw, "data": [], "recordsTotal": 0, "recordsFiltered": 0}, status=200)
-            base_qs = CustomUser.objects.filter(part=selected_part, branch=selected_branch)
+            base_qs = CustomUser.objects.filter(part=selected_part, branch=selected_branch, status="재직")
         else:
             fixed_branch = (user.branch or "").strip()
             if not fixed_branch:
                 return JsonResponse({"draw": draw, "data": [], "recordsTotal": 0, "recordsFiltered": 0}, status=200)
-            base_qs = CustomUser.objects.filter(branch=fixed_branch)
+            base_qs = CustomUser.objects.filter(branch=fixed_branch, status="재직")
             if not selected_part:
                 selected_part = find_part_by_branch(fixed_branch) or (user.part or "").strip()
 
@@ -208,6 +211,7 @@ def ajax_users_data(request):
         page_ids = [u.id for u in page_qs]
         subadmin_map = {
             str(sa.user_id): {
+                "name": (sa.name or "").strip(),
                 "position": sa.position or "-",
                 "team_a": sa.team_a or "-",
                 "team_b": sa.team_b or "-",
@@ -219,11 +223,12 @@ def ajax_users_data(request):
         data = []
         for u in page_qs:
             sa = subadmin_map.get(str(u.id), {})
+            display_name = (u.name or "").strip() or sa.get("name") or "-"
             data.append(
                 {
                     "part": u.part or "-",
                     "branch": u.branch or "-",
-                    "name": u.name or "-",
+                    "name": display_name,
                     "user_id": u.id,
                     "position": sa.get("position", "-"),
                     "team_a": sa.get("team_a", "-"),

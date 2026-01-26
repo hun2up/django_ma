@@ -1,13 +1,19 @@
 // django_ma/static/js/manual/manual_detail_block/index.js
 // -----------------------------------------------------------------------------
-// Manual Detail Blocks (Minimal split - Entry)
-// - 이벤트 위임 + 상태/오케스트레이션
+// Manual Detail Blocks (FINAL)
+// - 이벤트 위임 + 상태 관리 + API 오케스트레이션
 // - Quill/첨부: ./quill.js
 // - 섹션 CRUD + Subnav 반영: ./section_subnav.js
+// - 블록 정렬/이동(Sortable): ./sort_block.js
+//
+// 전제
+// - window.ManualShared 가 선로딩되어 있어야 함 (manual/_shared.js)
+// - superuser 에서만 실행됨(템플릿에서 type="module" 로드 자체를 제한)
 // -----------------------------------------------------------------------------
 
 import { createQuillManager } from "./quill.js";
 import { createSectionSubnavManager } from "./section_subnav.js";
+import { initBlockSortable } from "./sort_block.js";
 
 (() => {
   const S = window.ManualShared;
@@ -30,9 +36,11 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   /* =========================================================================
    * 0) DOM refs
    * ========================================================================= */
-  const modalEl = document.getElementById("manualBlockModal");
+  const rootEl = document.getElementById("manual-detail");
   const sectionsEl = document.getElementById("manualSections");
+  const bootEl = document.getElementById("manualDetailBoot");
 
+  const modalEl = document.getElementById("manualBlockModal");
   const btnSave = document.getElementById("btnManualBlockSave");
   const titleEl = document.getElementById("manualBlockModalTitle");
   const errBox = document.getElementById("manualBlockError");
@@ -52,19 +60,35 @@ import { createSectionSubnavManager } from "./section_subnav.js";
 
   const attachInput = document.getElementById("manualQuillAttachInput");
 
-  const bootEl = document.getElementById("manualDetailBoot");
-  const sectionTitleUpdateUrl = toStr(bootEl?.dataset?.sectionTitleUpdateUrl || "");
-  const sectionDeleteUrl = toStr(bootEl?.dataset?.sectionDeleteUrl || "");
-  const blockDeleteUrl = toStr(bootEl?.dataset?.blockDeleteUrl || "");
-
-  if (!modalEl || !sectionsEl || !btnSave || !titleEl || !errBox || !csrfForm) return;
+  // 필수 요소 체크 (깨지면 조용히 종료)
+  if (!sectionsEl || !bootEl || !modalEl || !btnSave || !titleEl || !errBox || !csrfForm) {
+    console.warn("[manual_detail_block/index] Required elements missing.");
+    return;
+  }
 
   /* =========================================================================
-   * 0.1) Bind guard
+   * 0.1) Bind guard (BFCache / 중복 로드 방지)
    * ========================================================================= */
   if (document.documentElement.dataset.manualDetailBound === "true") return;
   document.documentElement.dataset.manualDetailBound = "true";
 
+  /* =========================================================================
+   * 0.2) URLs from Boot
+   * ========================================================================= */
+  const urls = {
+    // Section
+    sectionTitleUpdate: toStr(bootEl.dataset.sectionTitleUpdateUrl || ""),
+    sectionDelete: toStr(bootEl.dataset.sectionDeleteUrl || ""),
+
+    // Block
+    blockDelete: toStr(bootEl.dataset.blockDeleteUrl || ""),
+    blockReorder: toStr(bootEl.dataset.blockReorderUrl || ""),
+    blockMove: toStr(bootEl.dataset.blockMoveUrl || ""),
+  };
+
+  /* =========================================================================
+   * 0.3) API helpers
+   * ========================================================================= */
   const csrfToken = getCSRFTokenFromForm(csrfForm);
 
   const api = {
@@ -81,17 +105,60 @@ import { createSectionSubnavManager } from "./section_subnav.js";
    * 1) State
    * ========================================================================= */
   const state = {
-    mode: "add",              // add | edit
-    editingBlockId: null,     // number|null
-    currentSectionId: null,   // number|null
+    mode: "add",            // "add" | "edit"
+    editingBlockId: null,   // number|null
+    currentSectionId: null, // number|null
+    // 이미지 미리보기 blob url 해제용
+    _previewBlobUrl: null,
   };
 
   /* =========================================================================
-   * 2) Image UI
+   * 2) Small utils
+   * ========================================================================= */
+  function isEmptyQuillHtml(html) {
+    const s = toStr(html).trim();
+    if (!s) return true;
+
+    // 공백 제거 기준으로 Quill의 빈 문단 패턴 방어
+    const normalized = s.replace(/\s+/g, "").toLowerCase();
+    return normalized === "<p><br></p>" || normalized === "<p></p>";
+  }
+
+  function safeBootstrapModalShow(modalDom) {
+    try {
+      if (!modalDom || typeof bootstrap === "undefined") return false;
+      const m = new bootstrap.Modal(modalDom);
+      m.show();
+      return true;
+    } catch (e) {
+      console.warn("[manual_detail_block/index] bootstrap modal show failed:", e);
+      return false;
+    }
+  }
+
+  function safeBootstrapModalHide(modalDom) {
+    try {
+      if (!modalDom || typeof bootstrap === "undefined") return false;
+      bootstrap.Modal.getInstance(modalDom)?.hide();
+      return true;
+    } catch (e) {
+      console.warn("[manual_detail_block/index] bootstrap modal hide failed:", e);
+      return false;
+    }
+  }
+
+  /* =========================================================================
+   * 3) Image UI
    * ========================================================================= */
   function resetImageUI() {
+    // blob url revoke
+    if (state._previewBlobUrl) {
+      try { URL.revokeObjectURL(state._previewBlobUrl); } catch (_) {}
+      state._previewBlobUrl = null;
+    }
+
     if (imgInput) imgInput.value = "";
-    if (imgPreviewWrap) imgPreviewWrap.style.display = "none";
+    if (imgPreviewWrap) imgPreviewWrap.classList.add("d-none");
     if (imgPreview) imgPreview.src = "";
     if (removeWrap) removeWrap.classList.add("d-none");
     if (removeChk) removeChk.checked = false;
@@ -99,31 +166,45 @@ import { createSectionSubnavManager } from "./section_subnav.js";
 
   function showPreviewFromUrl(url) {
     if (!imgPreviewWrap || !imgPreview) return;
-    if (!url) {
-      imgPreviewWrap.style.display = "none";
+
+    const u = toStr(url);
+    if (!u) {
+      imgPreviewWrap.classList.add("d-none");
       imgPreview.src = "";
       return;
     }
-    imgPreview.src = url;
-    imgPreviewWrap.style.display = "";
+
+    imgPreview.src = u;
+    imgPreviewWrap.classList.remove("d-none");
   }
 
   imgInput?.addEventListener("change", () => {
     const file = imgInput?.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    showPreviewFromUrl(url);
+
+    // 기존 blob url 정리 후 새로 생성
+    if (state._previewBlobUrl) {
+      try { URL.revokeObjectURL(state._previewBlobUrl); } catch (_) {}
+      state._previewBlobUrl = null;
+    }
+
+    const blobUrl = URL.createObjectURL(file);
+    state._previewBlobUrl = blobUrl;
+    showPreviewFromUrl(blobUrl);
   });
 
   function openViewer(url) {
     if (!viewerModalEl || !viewerImg) return;
-    viewerImg.src = url;
-    const m = new bootstrap.Modal(viewerModalEl);
-    m.show();
+    const u = toStr(url);
+    if (!u) return;
+
+    viewerImg.src = u;
+    // bootstrap이 없으면 새 탭으로라도 열기
+    if (!safeBootstrapModalShow(viewerModalEl)) window.open(u, "_blank");
   }
 
   /* =========================================================================
-   * 3) Quill manager (attach 포함)
+   * 4) Quill manager (attach 포함)
    * ========================================================================= */
   const quillMgr = createQuillManager({
     S,
@@ -138,19 +219,19 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   modalEl.addEventListener("shown.bs.modal", () => quillMgr.onModalShown());
 
   /* =========================================================================
-   * 4) Section + Subnav manager
+   * 5) Section + Subnav manager
    * ========================================================================= */
   const secMgr = createSectionSubnavManager({
     S,
     api,
     sectionsEl,
     btnAddSection,
-    sectionTitleUpdateUrl,
-    sectionDeleteUrl,
+    sectionTitleUpdateUrl: urls.sectionTitleUpdate,
+    sectionDeleteUrl: urls.sectionDelete,
   });
 
   /* =========================================================================
-   * 5) Builders
+   * 6) Builders
    * ========================================================================= */
   function buildBlockElement(b) {
     const wrapper = document.createElement("div");
@@ -170,9 +251,15 @@ import { createSectionSubnavManager } from "./section_subnav.js";
 
       <div class="manual-block-actions">
         <button type="button"
+                class="btn btn-sm btn-outline-secondary jsBlockDragHandle"
+                title="드래그로 순서 변경"
+                aria-label="블록 순서 변경">↕ 이동</button>
+
+        <button type="button"
                 class="btn btn-sm btn-outline-secondary btn-edit-block"
                 data-bs-toggle="modal"
                 data-bs-target="#manualBlockModal">수정</button>
+
         <button type="button"
                 class="btn btn-sm btn-outline-danger btn-delete-block"
                 data-block-id="${b.id}">삭제</button>
@@ -187,7 +274,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   }
 
   /* =========================================================================
-   * 6) Modal open helpers
+   * 7) Modal open helpers
    * ========================================================================= */
   function openForAdd(sectionId) {
     state.mode = "add";
@@ -198,6 +285,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
     ui.clearErr();
     resetImageUI();
 
+    // Quill 초기화 타이밍 이슈 방지
     setTimeout(() => quillMgr.setHtml(""), 0);
   }
 
@@ -224,15 +312,15 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   }
 
   /* =========================================================================
-   * 7) Delete helpers
+   * 8) Delete helpers
    * ========================================================================= */
   async function deleteBlockById(blockId, blockEl) {
-    if (!blockDeleteUrl) return alert("블록 삭제 URL이 없습니다. (manualDetailBoot 확인)");
+    if (!urls.blockDelete) return alert("블록 삭제 URL이 없습니다. (manualDetailBoot 확인)");
     if (!isDigits(blockId)) return alert("block_id가 올바르지 않습니다.");
     if (!confirm("이 블록을 삭제할까요?")) return;
 
     try {
-      await api.json(blockDeleteUrl, { block_id: Number(blockId) });
+      await api.json(urls.blockDelete, { block_id: Number(blockId) });
       blockEl?.remove();
     } catch (e) {
       console.error(e);
@@ -241,12 +329,12 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   }
 
   /* =========================================================================
-   * 8) Events (delegation)
+   * 9) Events (delegation)
    * ========================================================================= */
   sectionsEl.addEventListener("click", (e) => {
     const t = e.target;
 
-    // 이미지 클릭 -> viewer
+    // 9-1) 이미지 클릭 -> viewer
     const imgEl = t?.closest?.(".jsManualImg");
     if (imgEl) {
       const blockEl = imgEl.closest(".manual-block");
@@ -255,7 +343,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return;
     }
 
-    // 섹션 소제목 수정
+    // 9-2) 섹션 소제목 수정
     const editTitleBtn = t?.closest?.(".btnEditSectionTitle");
     if (editTitleBtn) {
       const sectionEl = editTitleBtn.closest(".manual-section");
@@ -263,7 +351,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return;
     }
 
-    // 섹션 삭제
+    // 9-3) 섹션 삭제
     const delSectionBtn = t?.closest?.(".btnDeleteSection");
     if (delSectionBtn) {
       const sectionId =
@@ -274,7 +362,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return;
     }
 
-    // 블록 추가 모달 open
+    // 9-4) 블록 추가 모달 open
     const addBtn = t?.closest?.(".btn-add-block");
     if (addBtn) {
       const sid = addBtn.getAttribute("data-section-id");
@@ -282,7 +370,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return;
     }
 
-    // 블록 수정 모달 open
+    // 9-5) 블록 수정 모달 open
     const editBtn = t?.closest?.(".btn-edit-block");
     if (editBtn) {
       const blockEl = editBtn.closest(".manual-block");
@@ -290,7 +378,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return;
     }
 
-    // 블록 삭제
+    // 9-6) 블록 삭제
     const delBlockBtn = t?.closest?.(".btn-delete-block");
     if (delBlockBtn) {
       const blockId =
@@ -306,7 +394,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   btnGoTop?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
   /* =========================================================================
-   * 9) Save (add/edit) - FormData
+   * 10) Save (add/edit) - FormData
    * ========================================================================= */
   btnSave.addEventListener("click", async () => {
     ui.clearErr();
@@ -322,10 +410,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
       return ui.err(e?.message || "편집기 초기화에 실패했습니다.");
     }
 
-    const normalized = html.replace(/\s+/g, "").toLowerCase();
-    if (!html || normalized === "<p><br></p>" || normalized === "<p></p>") {
-      return ui.err("텍스트 내용을 입력해주세요.");
-    }
+    if (isEmptyQuillHtml(html)) return ui.err("텍스트 내용을 입력해주세요.");
 
     btnSave.disabled = true;
     const oldText = btnSave.textContent;
@@ -341,10 +426,11 @@ import { createSectionSubnavManager } from "./section_subnav.js";
         fd.append("manual_id", String(manualId));
         fd.append("section_id", String(state.currentSectionId));
         fd.append("content", html);
+
         if (imgInput?.files?.[0]) fd.append("image", imgInput.files[0]);
 
         const data = await api.form(addUrl, fd);
-        const b = data.block;
+        const b = data?.block;
         const sid = toStr(b?.section_id);
 
         const container = document.getElementById(`manualBlocks-${sid}`);
@@ -358,11 +444,12 @@ import { createSectionSubnavManager } from "./section_subnav.js";
 
         fd.append("block_id", String(state.editingBlockId));
         fd.append("content", html);
+
         if (removeChk?.checked) fd.append("remove_image", "1");
         if (imgInput?.files?.[0]) fd.append("image", imgInput.files[0]);
 
         const data = await api.form(updateUrl, fd);
-        const b = data.block;
+        const b = data?.block;
 
         const target = sectionsEl.querySelector(`.manual-block[data-block-id="${b.id}"]`);
         if (target) {
@@ -380,7 +467,8 @@ import { createSectionSubnavManager } from "./section_subnav.js";
         }
       }
 
-      bootstrap.Modal.getInstance(modalEl)?.hide();
+      // 저장 성공 후 모달 닫기
+      safeBootstrapModalHide(modalEl);
     } catch (errObj) {
       console.error(errObj);
       ui.err(errObj?.message || "저장 중 오류가 발생했습니다.");
@@ -391,7 +479,7 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   });
 
   /* =========================================================================
-   * 10) modal reset
+   * 11) modal reset
    * ========================================================================= */
   modalEl.addEventListener("hidden.bs.modal", () => {
     state.mode = "add";
@@ -405,9 +493,18 @@ import { createSectionSubnavManager } from "./section_subnav.js";
   });
 
   /* =========================================================================
-   * 11) Section add (버튼은 secMgr가 책임)
+   * 12) Section add (버튼은 secMgr가 책임)
    * ========================================================================= */
-  secMgr.bindAddSectionButton({
-    buildSectionElement,
+  secMgr.bindAddSectionButton({ buildSectionElement });
+
+  /* =========================================================================
+   * 13) Block Sortable (reorder / move)
+   * - SortableJS가 로드되어 있고, reorder URL이 있을 때만 동작
+   * ========================================================================= */
+  initBlockSortable({
+    S,
+    rootEl: sectionsEl, // .manualBlocks 들을 sectionsEl 아래에서 찾음
+    bootEl,             // data-block-reorder-url / data-block-move-url 읽음
+    csrfToken,
   });
 })();

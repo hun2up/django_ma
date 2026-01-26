@@ -1222,6 +1222,57 @@ textarea[name="content"] {
 }
 
 /* ==========================================================
+  DataTables Buttons → 프로젝트 버튼 스타일 통일
+========================================================== */
+.dt-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dt-buttons .dt-button,
+.dt-buttons button.dt-button,
+.dt-buttons a.dt-button {
+  /* ✅ bootstrap 버튼/프로젝트 버튼 룩으로 */
+  background: linear-gradient(135deg, var(--inka-blue), var(--inka-blue2)) !important;
+  border: none !important;
+  border-radius: var(--radius-soft) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+
+  /* 크기(= btn-sm 느낌) */
+  padding: 6px 12px !important;
+  font-size: 0.875rem !important;
+  line-height: 1.2 !important;
+
+  /* DataTables 기본 효과 제거 */
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.dt-buttons .dt-button:hover,
+.dt-buttons button.dt-button:hover,
+.dt-buttons a.dt-button:hover {
+  background: linear-gradient(135deg, var(--inka-blue-dark), #0069C2) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 91, 172, 0.4) !important;
+}
+
+.dt-buttons .dt-button:active,
+.dt-buttons button.dt-button:active,
+.dt-buttons a.dt-button:active {
+  transform: translateY(0);
+}
+
+.dt-buttons .dt-button:focus,
+.dt-buttons button.dt-button:focus,
+.dt-buttons a.dt-button:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 0.2rem rgba(0, 91, 172, 0.25) !important;
+}
+
+
+/* ==========================================================
  6) PAGES / MANUAL
 ========================================================== */
 .manual-badge-admin{
