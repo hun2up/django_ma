@@ -9,26 +9,6 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-<!-- ✅ 요율변경 페이지 테이블 폰트 한 단계 축소 (편제변경 느낌으로) -->
-<style>
-  /* input/main table 폰트 축소 */
-  #manage-rate #inputTable,
-  #manage-rate #mainTable {
-    font-size: 0.9rem;
-  }
-  #manage-rate #inputTable th,
-  #manage-rate #mainTable th {
-    font-size: 0.9rem;
-  }
-
-  /* 테이블 내부 input/select도 한 단계 축소 */
-  #manage-rate #inputTable input,
-  #manage-rate #inputTable select,
-  #manage-rate #mainTable input,
-  #manage-rate #mainTable select {
-    font-size: 0.9rem;
-  }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -58,7 +38,7 @@
 
   <!-- ✅ 상단 컨트롤 -->
   <div class="card shadow p-3 border-0 rounded-4 mb-3">
-    <form class="row g-2 align-items-end">
+    <form id="controlsForm" class="row g-2 align-items-end">
       {% csrf_token %}
 
       <div class="col-6 col-md-1">
@@ -96,9 +76,6 @@
         <button type="button" id="btnSearchPeriod" class="btn btn-primary">검색</button>
       </div>
     </form>
-    <div class="small text-muted mt-2">
-      ※ ※ 과거 시점은 데이터가 존재하는 월도만 선택 가능 (미래 시점은 현재월 기준 +1개월까지만 가능)
-    </div>
   </div>
 
   {% if user.grade in 'superuser head' %}
@@ -129,10 +106,8 @@
       <table class="table align-middle" id="inputTable">
         <colgroup class="input-cols-structure">
           <col class="c-search">
-          <col class="c-rq-name">
-          <col class="c-rq-id">
-          <col class="c-tg-name">
-          <col class="c-tg-id">
+          <col class="c-rq">
+          <col class="c-tg">
           <col class="c-before-ftable">
           <col class="c-before-frate">
           <col class="c-after-ftable">
@@ -147,10 +122,8 @@
         <thead class="table-light">
           <tr>
             <th>검색</th>
-            <th>성명<br>(요청자)</th>
-            <th>사번<br>(요청자)</th>
-            <th>성명<br>(대상자)</th>
-            <th>사번<br>(대상자)</th>
+            <th>요청자</th>
+            <th>대상자</th>
             <th>손보테이블<br>(변경전)</th>
             <th>손보요율<br>(변경전)</th>
             <th>손보테이블<br>(변경후)<span class="text-danger">*</span></th>
@@ -168,10 +141,16 @@
             <td class="text-center">
               <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
             </td>
-            <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="tg_name" readonly></td>
-            <td><input type="text" class="form-control readonly-field" name="tg_id" readonly></td>
+            <td>
+              <input type="text" class="form-control form-control-sm rq_display" readonly>
+              <input type="hidden" class="form-control readonly-field" name="rq_name" readonly>
+              <input type="hidden" class="form-control readonly-field" name="rq_id" readonly>
+            </td>
+            <td>
+              <input type="text" class="form-control form-control-sm tg_display" readonly>
+              <input type="hidden" class="form-control readonly-field" name="tg_name" readonly>
+              <input type="hidden" class="form-control readonly-field" name="tg_id" readonly>
+            </td>            
             <td><input type="text" class="form-control readonly-field" name="before_ftable" readonly></td>
             <td><input type="text" class="form-control readonly-field text-center" name="before_frate" readonly></td>
             <td><input type="text" class="form-control" name="after_ftable" placeholder="선택 또는 입력"></td>
@@ -202,10 +181,31 @@
 
     <div class="table-responsive">
       <table class="table table-striped align-middle w-100" id="mainTable">
+        <colgroup>
+          <col style="width: 120px"> <!-- 요청자 -->
+          <col style="width: 120px"> <!-- 대상자 -->
+          <col style="width: 200px"> <!-- 소속 -->
+
+          <col style="width: 110px"> <!-- 손보테이블(변경전) -->
+          <col style="width: 60px">  <!-- 손보요율(변경전) -->
+          <col style="width: 110px"> <!-- 손보테이블(변경후) -->
+          <col style="width: 60px">  <!-- 손보요율(변경후) -->
+
+          <col style="width: 110px"> <!-- 생보테이블(변경전) -->
+          <col style="width: 60px">  <!-- 생보요율(변경전) -->
+          <col style="width: 110px"> <!-- 생보테이블(변경후) -->
+          <col style="width: 60px">  <!-- 생보요율(변경후) -->
+
+          <col style="width: 160px"> <!-- 비고 -->
+          <col style="width: 120px"> <!-- 요청일자 -->
+          <col style="width: 120px"> <!-- 처리일자 -->
+          <col style="width: 60px">  <!-- 삭제 -->
+        </colgroup>
         <thead class="table-light">
           <tr>
             <th>요청자</th>
             <th>대상자</th>
+            <th>소속</th>
 
             <th>손보테이블<br>(변경전)</th>
             <th>손보요율<br>(변경전)</th>
@@ -218,6 +218,7 @@
             <th>생보요율<br>(변경후)</th>
 
             <th>비고</th>
+            <th>요청일자</th> 
             <th>처리일자</th>
             <th>삭제</th>
           </tr>
@@ -257,6 +258,12 @@
 </div>
 
 {% now "U" as cache_bust %}
+
+<script>
+  // ✅ 동적 import(fetch.js 등) 캐시 버스터
+  window.STATIC_VERSION = "{{ cache_bust }}";
+</script>
+
 <script src="{% static 'js/common/part_branch_selector.js' %}?v={{ cache_bust }}"></script>
 <script type="module" src="{% static 'js/common/manage_boot.js' %}?v={{ cache_bust }}"></script>
 <script type="module" src="{% static 'js/partner/manage_rate/index.js' %}?v={{ cache_bust }}"></script>

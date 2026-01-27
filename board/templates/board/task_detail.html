@@ -1,4 +1,4 @@
-{# django_ma/board/templates/board/task_detail.html #}
+<!-- django_ma/board/templates/board/task_detail.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
@@ -7,18 +7,17 @@
 
 {% block content %}
 
-{% if user.grade != 'superuser' %}
-  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
-{% endif %}
-
+<!-- Boot: inline update endpoint -->
 <div id="taskDetailBoot"
-     data-update-url="{% url 'ajax_update_task_field_detail' task.pk %}"
+     data-update-url="{% url 'board:ajax_update_task_field_detail' task.pk %}"
      class="d-none"></div>
 
 <div class="container mt-5">
+
+  <!-- Inline update alerts (JS) -->
   <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
-  {# ✅ messages #}
+  <!-- Messages -->
   {% if messages %}
     <div class="mb-3">
       {% for message in messages %}
@@ -33,39 +32,25 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      {# ✅ 헤더 #}
+      <!-- Header -->
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
         <div class="flex-grow-1">
-          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">
-            {{ task.title }}
-          </h4>
-
+          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">{{ task.title }}</h4>
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="text-muted small">
-              {{ task.category }} | {{ task.created_at|date:"Y-m-d H:i" }}
-            </span>
-
-            {% if not is_superuser %}
-              <span class="status-badge fw-semibold px-2 py-1 rounded-pill"
-                    data-status="{{ task.status|default:'' }}">
-                {{ task.status|default:"-" }}
-              </span>
-            {% endif %}
+            <span class="text-muted small">{{ task.category }} | {{ task.created_at|date:"Y-m-d H:i" }}</span>
           </div>
         </div>
       </div>
 
-      {# ✅ 본문 #}
+      <!-- Content -->
       <div class="my-3 p-3 bg-light rounded-3">
-        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">
-          {{ task.content }}
-        </p>
+        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ task.content }}</p>
       </div>
 
-      {# ✅ 댓글 CSRF 토큰(동적 수정폼용) - 페이지에 1개만 유지 #}
+      <!-- CSRF Token for dynamic comment edit form (JS) -->
       <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
 
-      {# ✅ 댓글 #}
+      <!-- Comments -->
       <div class="mt-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h6 class="fw-bold mb-0">댓글</h6>
@@ -75,10 +60,10 @@
         {% include "board/includes/_comment_form.html" with form=form action_url=detail_url submit_label="등록" %}
       </div>
 
-      <br><br>
+      <hr class="my-4">
 
-      {# ✅ 기본정보 #}
-      <div class="my-3">
+      <!-- Task Info -->
+      <div class="my-2">
         <div class="row gy-2 gx-3">
           {% for label, value in task_info.items %}
             <div class="col-md-4">
@@ -89,53 +74,48 @@
         </div>
       </div>
 
-      {# ✅ 담당자/상태 #}
-      <div class="my-3">
+      <hr class="my-4">
+
+      <!-- Handler / Status / UpdatedAt (superuser only) -->
+      <div class="my-2">
         <div class="row align-items-center">
 
+          <!-- Handler -->
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
 
-            {% if is_superuser %}
-              <form class="d-inline-block inline-update-form">
-                {% csrf_token %}
-                <input type="hidden" name="action_type" value="handler">
+            <form class="d-inline-block inline-update-form">
+              {% csrf_token %}
+              <input type="hidden" name="action_type" value="handler">
 
-                <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
-                  <option value="">선택</option>
-                  {% for h in handlers %}
-                    <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
-                  {% endfor %}
-                </select>
-              </form>
-            {% else %}
-              {{ task.handler|default:"-" }}
-            {% endif %}
+              <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
+                <option value="">선택</option>
+                {% for h in handlers %}
+                  <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
+                {% endfor %}
+              </select>
+            </form>
           </div>
 
+          <!-- Status -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
 
-            {% if is_superuser %}
-              <form class="d-inline-block inline-update-form">
-                {% csrf_token %}
-                <input type="hidden" name="action_type" value="status">
+            <form class="d-inline-block inline-update-form">
+              {% csrf_token %}
+              <input type="hidden" name="action_type" value="status">
 
-                <select name="status"
-                        class="form-select form-select-sm status-select d-inline-block w-auto"
-                        data-status="{{ task.status|default:'' }}">
-                  {% for s in status_choices %}
-                    <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
-                  {% endfor %}
-                </select>
-              </form>
-            {% else %}
-              <span class="status-badge" data-status="{{ task.status|default:'' }}">
-                {{ task.status|default:"-" }}
-              </span>
-            {% endif %}
+              <select name="status"
+                      class="form-select form-select-sm status-select d-inline-block w-auto"
+                      data-status="{{ task.status|default:'' }}">
+                {% for s in status_choices %}
+                  <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </form>
           </div>
 
+          <!-- Status Updated At -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태변경</span>
             <span id="statusUpdatedAtText" class="small-text">
@@ -146,11 +126,11 @@
         </div>
       </div>
 
-      <br><br>
+      <hr class="my-4">
 
-      {# ✅ 첨부파일 #}
+      <!-- Attachments -->
       {% if attachments and attachments.exists %}
-        <div class="my-3">
+        <div class="my-2">
           <span class="info-value">첨부파일</span>
 
           <ul class="list-group mt-2">
@@ -169,8 +149,9 @@
         </div>
       {% endif %}
 
-      {# ✅ 하단 버튼 #}
+      <!-- Actions -->
       <div class="board-detail-actions mt-4">
+
         <div class="board-detail-actions-left">
           <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
@@ -190,6 +171,7 @@
         <div class="board-detail-actions-right">
           <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
         </div>
+
       </div>
 
     </div>
@@ -199,7 +181,9 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
-  <script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
-  <script src="{% static 'js/board/task_detail.js' %}?v=20260104"></script>
+<!-- Comment edit + inline update -->
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
+<script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/task_detail.js' %}?v=20260104"></script>
 {% endblock %}

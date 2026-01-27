@@ -609,16 +609,6 @@ textarea[name="content"] {
  5) PAGES: PARTNER / DASH (Wide Layout)
   - 목적: 넓은 화면에서 카드/테이블 작업공간 확보
 ========================================================== */
-
-/* ---------- Wide container: Partner (Structure/Rate/Efficiency) ---------- */
-#manage-structure,
-#manage-rate,
-#manage-efficiency {
-  width: 86vw;
-  max-width: none;
-  margin-left: calc(-43vw + 50%);
-}
-
 /* ---------- Wide container: Dash (Sales) ---------- */
 #dash-sales {
   width: 86vw;
@@ -637,6 +627,10 @@ textarea[name="content"] {
   }
 }
 
+/* 중간관리자 추가 모달 전용 */
+.modal-subadmin-sm {
+  max-width: 35%;   /* 기존 대비 약 30% 감소 */
+}
 
 /* ==========================================================
  5-1) STRUCTURE: Top Controls (연/월/부문/부서/지점)
@@ -739,6 +733,13 @@ textarea[name="content"] {
  5-2) PARTNER: Table Base (공통)
   - 목적: 기본 테이블 레이아웃/헤더 타이포 통일
 ========================================================== */
+#manage-structure,
+#manage-rate,
+#manage-efficiency {
+  width: 86vw;
+  max-width: none;
+  margin-left: calc(-43vw + 50%);
+}
 
 #manage-structure table,
 #manage-rate table,
@@ -813,7 +814,7 @@ textarea[name="content"] {
 
 #manage-structure #inputTable,
 #manage-rate #inputTable {
-  table-layout: fixed;
+  table-layout: fixed !important;
   width: max-content;
   min-width: 1200px;
 }
@@ -859,26 +860,39 @@ textarea[name="content"] {
   font-size: var(--tbl-font-th);
 }
 
+/* ==========================================================
+ * RATE mainTable: 전체 가운데 정렬
+ * ========================================================== */
+#manage-rate #mainTable :is(th, td) {
+  text-align: center !important;
+}
+
+/* date input도 가운데 */
+#manage-rate #mainTable .processDateInput {
+  text-align: center;
+}
 
 /* ==========================================================
-  (추가) RATE: 폰트 한 단계 다운(입력/메인 데이터)
+ * RATE: 헤더/데이터 폰트 통일 (inputTable == mainTable)
 ========================================================== */
 #manage-rate {
-  --tbl-font-td: 13px;   /* 데이터 폰트 */
-  --tbl-font-th: 11.5px; /* 헤더 폰트(선택) */
+  --tbl-font-td: 13px;
+  --tbl-font-th: 11.5px; /* mainTable 헤더 기준 */
 }
 
 #manage-rate :is(#inputTable td, #mainTable td) {
   font-size: var(--tbl-font-td);
 }
 
-#manage-rate #inputTable :is(.form-control, .form-select),
-#manage-rate #mainTable :is(.form-control, .form-select) {
-  font-size: var(--tbl-font-td);
-}
-
 #manage-rate :is(#inputTable th, #mainTable th) {
   font-size: var(--tbl-font-th);
+  font-weight: 600;
+  text-align: center;
+}
+
+#manage-rate :is(#inputTable .form-control, #inputTable .form-select,
+                 #mainTable  .form-control, #mainTable  .form-select) {
+  font-size: var(--tbl-font-td);
 }
 
 
@@ -893,8 +907,8 @@ textarea[name="content"] {
 ------------------------ */
 #manage-structure{
   /* 기본 버튼/삭제 */
-  --c-search: 74px;
-  --c-del: 74px;
+  --c-search: 75px;
+  --c-del: 75px;
 
   /* 요청자(통합) */
   --c-rq: 130px;
@@ -929,6 +943,54 @@ textarea[name="content"] {
 #manage-structure #inputTable col.c-or            { width: var(--c-or); }
 #manage-structure #inputTable col.c-memo          { width: var(--c-memo); }
 #manage-structure #inputTable col.c-del           { width: var(--c-del); }
+
+/* ==========================================================
+ * RATE: InputTable Column Widths (vars + colgroup)
+ * - manage_rate.html col class와 1:1 매칭
+ * - 여기 숫자만 바꾸면 “직접 편집” 끝
+========================================================== */
+#manage-rate {
+  --c-search: 75px;
+  --c-rq: 130px;            /* 요청자 표시(rq_display) */
+  --c-tg: 130px;            /* 대상자 표시(tg_display) */
+
+  --c-before-ftable: 150px;
+  --c-before-frate: 90px;
+  --c-after-ftable: 150px;
+  --c-after-frate: 90px;
+
+  --c-before-ltable: 150px;
+  --c-before-lrate: 90px;
+  --c-after-ltable: 150px;
+  --c-after-lrate: 90px;
+
+  --c-memo: 200px;
+  --c-del: 75px;
+}
+
+/* colgroup 바인딩 */
+#manage-rate #inputTable col.c-search        { width: var(--c-search); }
+#manage-rate #inputTable col.c-rq            { width: var(--c-rq); }
+#manage-rate #inputTable col.c-tg            { width: var(--c-tg); }
+
+#manage-rate #inputTable col.c-before-ftable { width: var(--c-before-ftable); }
+#manage-rate #inputTable col.c-before-frate  { width: var(--c-before-frate); }
+#manage-rate #inputTable col.c-after-ftable  { width: var(--c-after-ftable); }
+#manage-rate #inputTable col.c-after-frate   { width: var(--c-after-frate); }
+
+#manage-rate #inputTable col.c-before-ltable { width: var(--c-before-ltable); }
+#manage-rate #inputTable col.c-before-lrate  { width: var(--c-before-lrate); }
+#manage-rate #inputTable col.c-after-ltable  { width: var(--c-after-ltable); }
+#manage-rate #inputTable col.c-after-lrate   { width: var(--c-after-lrate); }
+
+#manage-rate #inputTable col.c-memo          { width: var(--c-memo); }
+#manage-rate #inputTable col.c-del           { width: var(--c-del); }
+
+/* rq_display / tg_display 폭이 안 줄어드는 케이스 방지 */
+#manage-rate #inputTable :is(.rq_display, .tg_display) {
+  min-width: 0 !important;
+}
+
 
 /* -----------------------
   2) "요청자" 컬럼 폭이 안 줄어드는 문제 대응
@@ -1037,28 +1099,6 @@ textarea[name="content"] {
   -webkit-overflow-scrolling: touch;
 }
 
-/* DataTables가 생성하는 wrapper 구조 폭 동기화 */
-#manage-structure #mainTable_wrapper .dataTables_scrollHeadInner,
-#manage-structure #mainTable_wrapper .dataTables_scrollBody{
-  width: max-content !important;
-  min-width: 100% !important;
-}
-
-/* head/body 테이블을 같은 레이아웃 정책으로 */
-#manage-structure #mainTable_wrapper .dataTables_scrollHead table,
-#manage-structure #mainTable_wrapper .dataTables_scrollBody table{
-  table-layout: fixed !important;
-  width: max-content !important;
-  min-width: 100% !important;
-}
-
-/* ✅ colgroup 폭을 무시시키는 기존 규칙 방어(있으면 반드시 덮어씀) */
-#manage-structure #mainTable col,
-#manage-structure #mainTable_wrapper .dataTables_scrollHead col,
-#manage-structure #mainTable_wrapper .dataTables_scrollBody col{
-  width: initial !important; /* inline style width를 살림 */
-}
-
 #manage-structure #mainTable,
 #manage-rate #mainTable {
   table-layout: auto !important;
@@ -1104,7 +1144,9 @@ textarea[name="content"] {
 /* 데스크탑에서만 비고 wrap 허용 */
 @media (min-width: 769px) {
   #manage-structure #mainTable th:nth-child(var(--structure-memo-col)),
-  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)) {
+  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)), 
+  #manage-rate #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable td:nth-child(var(--structure-memo-col)) {
     white-space: normal;
     word-break: break-word;
     line-height: 1.4;
@@ -1114,7 +1156,9 @@ textarea[name="content"] {
 /* 모바일/좁은 화면: 비고 줄바꿈 금지 + ellipsis */
 @media (max-width: 768px) {
   #manage-structure #mainTable th:nth-child(var(--structure-memo-col)),
-  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)) {
+  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)), 
+  #manage-rate #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable td:nth-child(var(--structure-memo-col)) {
     white-space: nowrap !important;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1130,6 +1174,14 @@ textarea[name="content"] {
 ) {
   white-space: nowrap !important;
 }
+
+#manage-rate #mainTable :is(
+  th:nth-child(13), td:nth-child(13),
+  th:nth-child(14), td:nth-child(14)
+) {
+  white-space: nowrap !important;
+}
+
 
 /* ---------- RATE: 메모 컬럼 정책(기존 13번째 유지) ---------- */
 #manage-rate {
@@ -1438,37 +1490,59 @@ textarea[name="content"] {
  * Structure 메인시트: 요청자 컬럼(1열) 말줄임/줄바꿈 금지 + 전체표시
  * - 화면이 좁으면 컬럼이 늘어나며 가로 스크롤로 확인
 ========================================================== */
-
-/* 메인테이블은 fixed 레이아웃/클리핑이 걸리면 말줄임이 생길 수 있어 방어 */
-#manage-structure #mainTable {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-/* ✅ 요청자(1열): 말줄임 제거 + 줄바꿈 금지 + 폭 확장 허용 */
-#manage-structure #mainTable th:nth-child(1),
-#manage-structure #mainTable td:nth-child(1) {
-  white-space: nowrap !important;
-  overflow: visible !important;        /* hidden 금지 */
-  text-overflow: clip !important;      /* ellipsis 금지 */
-  max-width: none !important;          /* 폭 제한 제거 */
-  min-width: 150px;                    /* 필요 시 130~200 조절 */
-}
-
-/* (선택) 대상자(2열)도 동일 정책 원하면 같이 적용 */
-#manage-structure #mainTable th:nth-child(2),
-#manage-structure #mainTable td:nth-child(2) {
-  white-space: nowrap !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  max-width: none !important;
-  min-width: 170px;
-}
-
 #manage-structure #mainSheet .table-responsive {
   overflow-x: auto !important;
 }
 
+/* ==========================================================
+ * STRUCTURE mainTable: 카드 폭 고정 + 말줄임 + hover 전체보기
+ * ========================================================== */
+
+/* 카드/컨테이너 폭 안에서만 렌더 */
+#manage-structure #mainSheet .table-responsive,
+#manage-rate #mainSheet .table-responsive {
+  overflow-x: auto;               /* 필요 시 가로 스크롤만 */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ✅ 핵심: 테이블이 내용으로 커지지 못하게 고정 */
+#manage-structure #mainTable,
+#manage-rate #mainTable{
+  width: 100% !important;
+  table-layout: fixed !important; /* ✅ 말줄임의 전제 조건 */
+}
+
+/* th/td는 줄바꿈 금지 + 넘치면 숨김 */
+#manage-structure #mainTable :is(th, td),
+#manage-rate #mainTable :is(th, td) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: middle;
+}
+
+/* DataTables가 만든 스크롤 래퍼가 폭을 늘리지 못하게 */
+#manage-structure #mainTable_wrapper,
+#manage-structure #mainTable_wrapper .dataTables_scroll,
+#manage-structure #mainTable_wrapper .dataTables_scrollHead,
+#manage-structure #mainTable_wrapper .dataTables_scrollBody,
+#manage-rate #mainTable_wrapper,
+#manage-rate #mainTable_wrapper .dataTables_scroll,
+#manage-rate #mainTable_wrapper .dataTables_scrollHead,
+#manage-rate #mainTable_wrapper .dataTables_scrollBody {
+  width: 100% !important;
+}
+
+/* ✅ 셀 내부 span: 말줄임 + title(hover) 영역 안정화 */
+#manage-structure .dt-ellipsis,
+#manage-rate .dt-ellipsis {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ==========================================================
  6) PAGES / MANUAL

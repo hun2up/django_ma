@@ -1,4 +1,13 @@
 // django_ma/static/js/partner/manage_structure/fetch.js
+// =========================================================
+// ✅ Structure - Fetch/Render (Final Refactor)
+// - DataTables 우선 + fallback 렌더
+// - 말줄임 + Bootstrap Tooltip(hover/클릭=focus)로 전체 텍스트 확인
+// - DataTables draw/재조회 후 tooltip 자동 재초기화
+// - 처리일자 저장 / 행 삭제 delegation 1회 바인딩
+// - dataset URL 키 안전화 + 서버 키 normalize
+// =========================================================
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
 
@@ -107,6 +116,29 @@ function escapeAttr(v) {
 }
 
 /* =========================================================
+   Tooltip (Bootstrap 5) - DT redraw 대응
+========================================================= */
+function initTooltipsInMainTable() {
+  if (!window.bootstrap?.Tooltip) return;
+
+  // mainTable 범위에서만 탐색 (성능/범위 안정)
+  const root = els.mainTable?.closest?.("#mainSheet") || els.root || document;
+  const nodes = root.querySelectorAll('[data-bs-toggle="tooltip"]');
+
+  nodes.forEach((el) => {
+    // 중복 생성 방지
+    const inst = window.bootstrap.Tooltip.getInstance(el);
+    if (inst) inst.dispose();
+
+    new window.bootstrap.Tooltip(el, {
+      trigger: "hover focus", // hover + 클릭(포커스)
+      container: "body",      // overflow:hidden 영향 회피(중요)
+      boundary: "viewport",
+    });
+  });
+}
+
+/* =========================================================
    Render helpers
 ========================================================= */
 function fmtPerson(name, id) {
@@ -117,20 +149,40 @@ function fmtPerson(name, id) {
 }
 
 /**
- * ✅ 말줄임 + hover(title) 공통
+ * ✅ 말줄임 + tooltip(hover/focus)
  * - base.css: .dt-ellipsis { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
  */
 function renderEllipsisCell(val) {
   const raw = toStr(val);
   if (!raw) return "";
-  return `<span class="dt-ellipsis" title="${escapeAttr(raw)}">${escapeHtml(raw)}</span>`;
+  const esc = escapeAttr(raw);
+
+  return `
+    <span class="dt-ellipsis"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          data-bs-title="${esc}"
+          tabindex="0">
+      ${escapeHtml(raw)}
+    </span>
+  `;
 }
 
-/** 변경후 값(파란색 강조 유지 + 말줄임 + title) */
+/** 변경후 값(파란색 강조 유지 + 말줄임 + tooltip) */
 function renderAfterEllipsis(val) {
   const raw = toStr(val);
   if (!raw) return "";
-  return `<span class="cell-after dt-ellipsis" title="${escapeAttr(raw)}">${escapeHtml(raw)}</span>`;
+  const esc = escapeAttr(raw);
+
+  return `
+    <span class="cell-after dt-ellipsis"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          data-bs-title="${esc}"
+          tabindex="0">
+      ${escapeHtml(raw)}
+    </span>
+  `;
 }
 
 /**
@@ -220,7 +272,6 @@ async function deleteStructureRow(id) {
 
 /* =========================================================
    DataTables columns
-   - ✅ 말줄임 + hover(title) 적용
 ========================================================= */
 const MAIN_COLUMNS = [
   // 1) 요청자
@@ -340,8 +391,8 @@ function ensureMainDT() {
     autoWidth: false,
     destroy: true,
 
-    scrollX: true,
-    scrollCollapse: true,
+    scrollX: false,
+    scrollCollapse: false,
 
     language: {
       emptyTable: "데이터가 없습니다.",
@@ -353,6 +404,12 @@ function ensureMainDT() {
     },
 
     columns: MAIN_COLUMNS,
+
+    // ✅ DT가 매번 그린 뒤 tooltip 재초기화
+    drawCallback: () => {
+      initTooltipsInMainTable();
+      adjustDT();
+    },
   });
 
   bindResizeOnce();
@@ -411,17 +468,23 @@ function renderFallback(rows) {
     `;
     tbody.appendChild(tr);
   });
+
+  // ✅ fallback 렌더 후 tooltip 초기화
+  initTooltipsInMainTable();
 }
 
+/* =========================================================
+   Render main
+========================================================= */
 function renderMain(rows) {
   const dt = ensureMainDT();
   if (dt) {
     dt.clear();
     if (rows?.length) dt.rows.add(rows);
-    dt.draw();
-    adjustDT();
+    dt.draw(); // drawCallback에서 tooltip/adjust 실행
     return;
   }
+
   renderFallback(rows);
 }
 
@@ -480,7 +543,6 @@ function bindDelegationOnce() {
         toStr(window.currentUser?.branch || "") ||
         "";
 
-      // fetchData는 모듈 내 export이므로 아래에서 참조 가능(hoist)
       await fetchData(ym, branch);
     } catch (err) {
       console.error(err);

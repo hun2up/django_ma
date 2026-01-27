@@ -1,401 +1,398 @@
 <!-- django_ma/board/templates/board/task_list.html -->
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block title %}직원업무 게시판{% endblock %}
 
 {% block content %}
-  {% if user.grade != 'superuser' %}
-    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
-  {% endif %}
 
-  <div id="taskListBoot" data-update-url="{% url 'ajax_update_task_field' %}" class="d-none"></div>
+<!-- Boot: list inline update endpoint -->
+<div id="taskListBoot" data-update-url="{% url 'board:ajax_update_task_field' %}" class="d-none"></div>
 
-  <h3 class="mb-4 text-center fw-bold" style="color:#d40000;">
-    직원업무 게시판
-  </h3>
+<!-- Page Title -->
+<h3 class="mb-4 text-center fw-bold" style="color:#d40000;">직원업무 게시판</h3>
 
-  <div class="container-fluid mt-4 board-font">
-    <div class="board-container-wide">
+<div class="container-fluid mt-4 board-font">
+  <div class="board-container-wide">
 
-      <div id="inlineUpdateAlertHost" class="mb-3"></div>
+    <!-- Inline update alerts (JS) -->
+    <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
-      {% if messages %}
-        <div class="mb-3">
-          {% for message in messages %}
-            <div class="alert alert-success alert-dismissible fade show text-center" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- Messages -->
+    {% if messages %}
+      <div class="mb-3">
+        {% for message in messages %}
+          <div class="alert alert-success alert-dismissible fade show text-center" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Primary Action -->
+    <div class="d-flex justify-content-end mb-3">
+      <a href="{% url 'board:task_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
+    </div>
+
+    <!-- =====================================================
+         Mobile View (sm 이하): 카드 리스트 + 접기 필터
+    ====================================================== -->
+    <div class="d-block d-md-none">
+
+      <!-- Mobile List -->
+      <div class="list-group board-mobile-list">
+        {% for task in tasks %}
+          <div class="list-group-item board-mobile-item">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+
+              <!-- Left: title/meta -->
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="board-mobile-title">
+                  <a href="{% url 'board:task_detail' task.pk %}" class="text-decoration-none text-dark">
+                    {{ task.title }}
+                  </a>
+                  <span class="text-muted fw-semibold">({{ task.comment_count|default:0 }})</span>
+                </div>
+                <div class="board-mobile-meta text-muted">
+                  {{ task.created_at|date:"m-d H:i" }} · {{ task.user_name|default:"-" }}
+                </div>
+              </div>
+
+              <!-- Right: handler/status -->
+              <div class="text-end board-mobile-right">
+
+                <!-- Handler -->
+                <div class="board-mobile-handler">
+                  <form class="d-inline-block inline-update-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action_type" value="handler">
+                    <input type="hidden" name="task_id" value="{{ task.id }}">
+
+                    <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                      <option value="">선택</option>
+                      {% for h in handlers %}
+                        <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
+                      {% endfor %}
+                    </select>
+                  </form>
+                </div>
+
+                <!-- Status -->
+                <div class="board-mobile-status mt-1">
+                  <form class="d-inline-block inline-update-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action_type" value="status">
+                    <input type="hidden" name="task_id" value="{{ task.id }}">
+
+                    <select name="status"
+                            class="form-select form-select-sm d-inline-block status-select"
+                            style="width:auto;"
+                            data-status="{{ task.status|default:'' }}">
+                      {% for s in status_choices %}
+                        <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
+                      {% endfor %}
+                    </select>
+                  </form>
+                </div>
+
+              </div>
             </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      <div class="d-flex justify-content-end mb-3">
-        <a href="{% url 'task_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
+          </div>
+        {% empty %}
+          <div class="text-center text-muted py-4">게시글이 없습니다.</div>
+        {% endfor %}
       </div>
 
-      {# ✅ 모바일(sm 이하) 카드형 리스트 #}
-      <div class="d-block d-md-none">
+      <!-- Pagination -->
+      {% include "board/includes/pagination.html" with page_obj=tasks query_string=query_string %}
 
-        <div class="list-group board-mobile-list">
-          {% for task in tasks %}
-            <div class="list-group-item board-mobile-item">
+      <!-- Mobile Filter (collapse) -->
+      <div class="mt-3">
+        <div class="card board-mobile-filter shadow-sm">
 
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <div class="flex-grow-1" style="min-width:0;">
-                  <div class="board-mobile-title">
-                    <a href="{% url 'task_detail' task.pk %}"
-                      class="text-decoration-none text-dark">
+          <button class="btn w-100 text-start board-filter-toggle"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#mobileTaskFilter"
+                  aria-expanded="false"
+                  aria-controls="mobileTaskFilter">
+            <span class="fw-bold">검색/필터</span>
+            <span class="text-muted ms-2 small">탭해서 열기</span>
+          </button>
+
+          <div class="collapse" id="mobileTaskFilter">
+            <div class="p-3 pt-2">
+              <form method="get" action="{% url 'board:task_list' %}">
+                <div class="row g-2">
+
+                  <!-- Search -->
+                  <div class="col-5">
+                    <select name="search_type" class="form-select form-select-sm">
+                      <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
+                      <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
+                      <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
+                      <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
+                    </select>
+                  </div>
+
+                  <div class="col-7">
+                    <input type="text" name="keyword" value="{{ keyword }}"
+                           class="form-control form-control-sm" placeholder="검색어">
+                  </div>
+
+                  <!-- Filters -->
+                  <div class="col-6">
+                    <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                      <option value="전체" {% if selected_category == "전체" %}selected{% endif %}>구분(전체)</option>
+                      {% for c in category_choices %}
+                        <option value="{{ c }}" {% if selected_category == c %}selected{% endif %}>{{ c }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="col-6">
+                    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                      <option value="전체" {% if selected_status == "전체" %}selected{% endif %}>상태(전체)</option>
+                      {% for s in status_choices %}
+                        <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="col-6">
+                    <select name="handler" class="form-select form-select-sm" onchange="this.form.submit()">
+                      <option value="전체" {% if selected_handler == "전체" %}selected{% endif %}>담당자(전체)</option>
+                      {% for h in handlers %}
+                        <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="col-6">
+                    <select name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
+                      {% for n in per_page_choices %}
+                        <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}개씩</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <!-- Date Range -->
+                  <div class="col-6">
+                    <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-6">
+                    <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control form-control-sm">
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="col-12 d-flex gap-2 mt-1">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">검색</button>
+                    <a href="{% url 'board:task_list' %}" class="btn btn-outline-secondary btn-sm flex-fill">초기화</a>
+                  </div>
+
+                </div>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- =====================================================
+         Desktop View (md 이상): 테이블 + 하단 필터
+    ====================================================== -->
+    <div class="d-none d-md-block">
+
+      <!-- Table -->
+      <div class="card p-4 shadow-sm rounded-4">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle text-center mb-0">
+            <colgroup>
+              <col style="width: 8%">
+              <col style="width: 8%">
+              <col style="width: 10%">
+              <col style="width: 38%">
+              <col style="width: 8%">
+              <col style="width: 10%">
+              <col style="width: 8%">
+              <col style="width: 18%">
+            </colgroup>
+
+            <thead class="table-light">
+              <tr>
+                <th>접수번호</th>
+                <th>접수일자</th>
+                <th>구분</th>
+                <th class="text-center">제목</th>
+                <th>작성자</th>
+                <th>담당자</th>
+                <th>상태</th>
+                <th>상태변경일</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for task in tasks %}
+                <tr>
+                  <td>{{ task.receipt_number }}</td>
+                  <td>{{ task.created_at|date:"Y-m-d" }}</td>
+                  <td>{{ task.category|default:"-" }}</td>
+
+                  <td class="text-start">
+                    <a href="{% url 'board:task_detail' task.pk %}" class="text-decoration-none text-primary">
                       {{ task.title }}
                     </a>
-                    <span class="text-muted fw-semibold">
-                      ({{ task.comment_count|default:0 }})
-                    </span>
-                  </div>
+                    <span class="text-muted fw-semibold">({{ task.comment_count|default:0 }})</span>
+                  </td>
 
-                  <div class="board-mobile-meta text-muted">
-                    {{ task.created_at|date:"m-d H:i" }} · {{ task.user_name|default:"-" }}
-                  </div>
-                </div>
+                  <td>{{ task.user_name|default:"-" }}</td>
 
-                <div class="text-end board-mobile-right">
-                  <div class="board-mobile-handler">
-                    {% if is_superuser %}
-                      <form class="d-inline-block inline-update-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="action_type" value="handler">
-                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <!-- Handler -->
+                  <td>
+                    <form class="d-inline-block inline-update-form">
+                      {% csrf_token %}
+                      <input type="hidden" name="action_type" value="handler">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
 
-                        <select name="handler"
-                                class="form-select form-select-sm d-inline-block"
-                                style="width:auto;">
-                          <option value="">선택</option>
-                          {% for h in handlers %}
-                            <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
-                          {% endfor %}
-                        </select>
-                      </form>
-                    {% else %}
-                      <span class="fw-semibold">{{ task.handler|default:"-" }}</span>
-                    {% endif %}
-                  </div>
-
-                  <div class="board-mobile-status mt-1">
-                    {% if is_superuser %}
-                      <form class="d-inline-block inline-update-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="action_type" value="status">
-                        <input type="hidden" name="task_id" value="{{ task.id }}">
-
-                        <select name="status"
-                                class="form-select form-select-sm d-inline-block status-select"
-                                style="width:auto;"
-                                data-status="{{ task.status|default:'' }}">
-                          {% for s in status_choices %}
-                            <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
-                          {% endfor %}
-                        </select>
-                      </form>
-                    {% else %}
-                      <span class="fw-semibold status-badge" data-status="{{ task.status|default:'' }}">
-                        {{ task.status|default:"-" }}
-                      </span>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          {% empty %}
-            <div class="text-center text-muted py-4">게시글이 없습니다.</div>
-          {% endfor %}
-        </div>
-
-        {% include "board/includes/pagination.html" with page_obj=tasks query_string=query_string %}
-
-        {# ✅ 모바일: 검색/필터 (접기 UI) #}
-        <div class="d-block d-md-none mt-3">
-          <div class="card board-mobile-filter shadow-sm">
-            <button class="btn w-100 text-start board-filter-toggle"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#mobilePostFilter"
-                    aria-expanded="false"
-                    aria-controls="mobilePostFilter">
-              <span class="fw-bold">검색/필터</span>
-              <span class="text-muted ms-2 small">탭해서 열기</span>
-            </button>
-
-            <div class="collapse" id="mobilePostFilter">
-              <div class="p-3 pt-2">
-                <form method="get" action="{% url 'task_list' %}">
-                  <div class="row g-2">
-
-                    <div class="col-5">
-                      <select name="search_type" class="form-select form-select-sm">
-                        <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
-                        <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
-                        <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
-                        <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
-                      </select>
-                    </div>
-
-                    <div class="col-7">
-                      <input type="text"
-                            name="keyword"
-                            value="{{ keyword }}"
-                            class="form-control form-control-sm"
-                            placeholder="검색어">
-                    </div>
-
-                    <div class="col-6">
-                      <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
-                        <option value="전체" {% if selected_category == "전체" %}selected{% endif %}>구분(전체)</option>
-                        {% for c in category_choices %}
-                          <option value="{{ c }}" {% if selected_category == c %}selected{% endif %}>{{ c }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-
-                    <div class="col-6">
-                      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                        <option value="전체" {% if selected_status == "전체" %}selected{% endif %}>상태(전체)</option>
-                        {% for s in status_choices %}
-                          <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-
-                    <div class="col-6">
-                      <select name="handler" class="form-select form-select-sm" onchange="this.form.submit()">
-                        <option value="전체" {% if selected_handler == "전체" %}selected{% endif %}>담당자(전체)</option>
+                      <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                        <option value="">선택</option>
                         {% for h in handlers %}
-                          <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
+                          <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
                         {% endfor %}
                       </select>
-                    </div>
+                    </form>
+                  </td>
 
-                    <div class="col-6">
-                      <select name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
-                        {% for n in per_page_choices %}
-                          <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}개씩</option>
+                  <!-- Status -->
+                  <td>
+                    <form class="d-inline-block inline-update-form">
+                      {% csrf_token %}
+                      <input type="hidden" name="action_type" value="status">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
+
+                      <select name="status"
+                              class="form-select form-select-sm d-inline-block status-select"
+                              style="width:auto;"
+                              data-status="{{ task.status|default:'' }}">
+                        {% for s in status_choices %}
+                          <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
                         {% endfor %}
                       </select>
-                    </div>
+                    </form>
+                  </td>
 
-                    <div class="col-6">
-                      <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control form-control-sm">
-                    </div>
-
-                    <div class="col-6">
-                      <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control form-control-sm">
-                    </div>
-
-                    <div class="col-12 d-flex gap-2 mt-1">
-                      <button type="submit" class="btn btn-primary btn-sm flex-fill">검색</button>
-                      <a href="{% url 'task_list' %}" class="btn btn-outline-secondary btn-sm flex-fill">초기화</a>
-                    </div>
-
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="d-none d-md-block">
-        <div class="card p-4 shadow-sm rounded-4">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle text-center mb-0">
-              <colgroup>
-                <col style="width: 8%">
-                <col style="width: 8%">
-                <col style="width: 10%">
-                <col style="width: 38%">
-                <col style="width: 8%">
-                <col style="width: 10%">
-                <col style="width: 8%">
-                <col style="width: 18%">
-              </colgroup>
-
-              <thead class="table-light">
-                <tr>
-                  <th>접수번호</th>
-                  <th>접수일자</th>
-                  <th>구분</th>
-                  <th class="text-center">제목</th>
-                  <th>작성자</th>
-                  <th>담당자</th>
-                  <th>상태</th>
-                  <th>상태변경일</th>
+                  <td class="status-updated-at">
+                    {{ task.status_updated_at|date:"Y-m-d H:i" }}
+                  </td>
                 </tr>
-              </thead>
-
-              <tbody>
-                {% for task in tasks %}
-                  <tr>
-                    <td>{{ task.receipt_number }}</td>
-                    <td>{{ task.created_at|date:"Y-m-d" }}</td>
-                    <td>{{ task.category|default:"-" }}</td>
-
-                    <td class="text-start">
-                      <a href="{% url 'task_detail' task.pk %}" class="text-decoration-none text-primary">
-                        {{ task.title }}
-                      </a>
-                      <span class="text-muted fw-semibold">
-                        ({{ task.comment_count|default:0 }})
-                      </span>
-                    </td>
-
-                    <td>{{ task.user_name|default:"-" }}</td>
-
-                    <td>
-                      {% if is_superuser %}
-                        <form class="d-inline-block inline-update-form">
-                          {% csrf_token %}
-                          <input type="hidden" name="action_type" value="handler">
-                          <input type="hidden" name="task_id" value="{{ task.id }}">
-
-                          <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
-                            <option value="">선택</option>
-                            {% for h in handlers %}
-                              <option value="{{ h }}" {% if task.handler == h %}selected{% endif %}>{{ h }}</option>
-                            {% endfor %}
-                          </select>
-                        </form>
-                      {% else %}
-                        {{ task.handler|default:"-" }}
-                      {% endif %}
-                    </td>
-
-                    <td>
-                      {% if is_superuser %}
-                        <form class="d-inline-block inline-update-form">
-                          {% csrf_token %}
-                          <input type="hidden" name="action_type" value="status">
-                          <input type="hidden" name="task_id" value="{{ task.id }}">
-
-                          <select name="status"
-                                  class="form-select form-select-sm d-inline-block status-select"
-                                  style="width:auto;"
-                                  data-status="{{ task.status|default:'' }}">
-                            {% for s in status_choices %}
-                              <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
-                            {% endfor %}
-                          </select>
-                        </form>
-                      {% else %}
-                        <span class="fw-semibold status-badge" data-status="{{ task.status|default:'' }}">
-                          {{ task.status|default:"-" }}
-                        </span>
-                      {% endif %}
-                    </td>
-
-                    <td class="status-updated-at">
-                      {{ task.status_updated_at|date:"Y-m-d H:i" }}
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-
-          {% include "board/includes/pagination.html" with page_obj=tasks query_string=query_string %}
+              {% empty %}
+                <tr>
+                  <td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
 
-        {# 검색/필터 #}
-        <form method="get" action="{% url 'task_list' %}" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
-          <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
-            <div class="d-flex align-items-center gap-2">
-              <label class="filter-label mb-0">표시</label>
-              <select name="per_page" class="form-select form-select-sm" style="width:110px;" onchange="this.form.submit()">
-                {% for n in per_page_choices %}
-                  <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}개</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <select name="search_type" class="form-select form-select-sm select-filter">
-                <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
-                <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
-                <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
-                <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
-              </select>
-
-              <input type="text"
-                    name="keyword"
-                    value="{{ keyword }}"
-                    class="form-control form-control-sm"
-                    placeholder="검색어 입력"
-                    style="width:180px;">
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <label class="filter-label mb-0">구분</label>
-              <select name="category" class="form-select form-select-sm" style="width:140px;" onchange="this.form.submit()">
-                <option value="전체" {% if selected_category == "전체" %}selected{% endif %}>전체</option>
-                {% for c in category_choices %}
-                  <option value="{{ c }}" {% if selected_category == c %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <label class="filter-label mb-0">담당자</label>
-              <select name="handler" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
-                <option value="전체" {% if selected_handler == "전체" %}selected{% endif %}>전체</option>
-                {% for h in handlers %}
-                  <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <label class="filter-label mb-0">상태</label>
-              <select name="status" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
-                <option value="전체" {% if selected_status == "전체" %}selected{% endif %}>전체</option>
-                {% for s in status_choices %}
-                  <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
-              <a href="{% url 'task_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
-            </div>
-          </div>
-
-          {# ✅ 접수일자 필터 #}
-          <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3">
-            <div class="d-flex align-items-center gap-2">
-              <label class="filter-label mb-0">접수일자</label>
-              <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control form-control-sm" style="width:150px;">
-              <span class="text-muted">~</span>
-              <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control form-control-sm" style="width:150px;">
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-              <button type="submit" class="btn btn-sm btn-primary px-3">기간적용</button>
-              <a href="{% url 'task_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
-            </div>
-          </div>
-        </form>
-
+        <!-- Pagination -->
+        {% include "board/includes/pagination.html" with page_obj=tasks query_string=query_string %}
       </div>
+
+      <!-- Filters -->
+      <form method="get" action="{% url 'board:task_list' %}" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
+
+        <!-- Top Row Filters -->
+        <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <label class="filter-label mb-0">표시</label>
+            <select name="per_page" class="form-select form-select-sm" style="width:110px;" onchange="this.form.submit()">
+              {% for n in per_page_choices %}
+                <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}개</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <select name="search_type" class="form-select form-select-sm select-filter">
+              <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
+              <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
+              <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
+              <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
+            </select>
+
+            <input type="text" name="keyword" value="{{ keyword }}"
+                   class="form-control form-control-sm"
+                   placeholder="검색어 입력"
+                   style="width:180px;">
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <label class="filter-label mb-0">구분</label>
+            <select name="category" class="form-select form-select-sm" style="width:140px;" onchange="this.form.submit()">
+              <option value="전체" {% if selected_category == "전체" %}selected{% endif %}>전체</option>
+              {% for c in category_choices %}
+                <option value="{{ c }}" {% if selected_category == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <label class="filter-label mb-0">담당자</label>
+            <select name="handler" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
+              <option value="전체" {% if selected_handler == "전체" %}selected{% endif %}>전체</option>
+              {% for h in handlers %}
+                <option value="{{ h }}" {% if selected_handler == h %}selected{% endif %}>{{ h }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <label class="filter-label mb-0">상태</label>
+            <select name="status" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
+              <option value="전체" {% if selected_status == "전체" %}selected{% endif %}>전체</option>
+              {% for s in status_choices %}
+                <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <button type="submit" class="btn btn-sm btn-primary px-3">검색</button>
+            <a href="{% url 'board:task_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
+          </div>
+        </div>
+
+        <!-- Date Range -->
+        <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3">
+          <div class="d-flex align-items-center gap-2">
+            <label class="filter-label mb-0">접수일자</label>
+            <input type="date" name="date_from" value="{{ date_from|default:'' }}"
+                   class="form-control form-control-sm" style="width:150px;">
+            <span class="text-muted">~</span>
+            <input type="date" name="date_to" value="{{ date_to|default:'' }}"
+                   class="form-control form-control-sm" style="width:150px;">
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <button type="submit" class="btn btn-sm btn-primary px-3">기간적용</button>
+            <a href="{% url 'board:task_list' %}" class="btn btn-sm btn-outline-secondary px-3">초기화</a>
+          </div>
+        </div>
+
+      </form>
+
     </div>
+
   </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/board/common/inline_update.js' %}?v=20260104"></script>
-  <script src="{% static 'js/board/task_list.js' %}?v=20260104"></script>
+<!-- Inline update + list page logic -->
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
+<script src="{% static 'js/board/common/inline_update.js' %}?v=20260104"></script>
+<script src="{% static 'js/board/task_list.js' %}?v=20260104"></script>
 {% endblock %}

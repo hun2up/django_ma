@@ -1,10 +1,9 @@
-# partner/views/subadmin.py
+# django_ma/partner/views/subadmin.py
 # ------------------------------------------------------------
-# ✅ sub-admin(leader) 추가/삭제 API (원본 하단 스냅샷 기반)
-# - 원본 파일은 중간이 잘렸으므로, 'branch 권한 체크' 부분은 TODO로 남김
-# - 기존 안전정책 유지:
-#   1) CustomUser.grade 변경은 update()로(시그널/후처리 우회)
-#   2) SubAdminTemp는 삭제 금지 (팀A/B/C 보존), level만 초기화
+# ✅ 중간관리자(leader) 추가/삭제 API (FINAL - FIXED)
+# - 핵심:
+#   1) leader 승격 시 SubAdminTemp의 team/position 절대 초기화/덮어쓰기 금지
+#   2) 삭제(강등) 시에도 SubAdminTemp row 삭제 금지, level만 초기화(팀/직급 보존)
 # ------------------------------------------------------------
 
 from django.contrib.auth.decorators import login_required
@@ -18,8 +17,12 @@ from accounts.models import CustomUser
 from partner.models import SubAdminTemp
 
 
-def _to_str(v):
+def _to_str(v) -> str:
     return ("" if v is None else str(v)).strip()
+
+
+def _same_branch(a: str, b: str) -> bool:
+    return _to_str(a) and _to_str(b) and _to_str(a) == _to_str(b)
 
 
 @require_POST
@@ -27,6 +30,11 @@ def _to_str(v):
 @grade_required("superuser", "head")
 @transaction.atomic
 def ajax_add_sub_admin(request):
+    """
+    ✅ 중간관리자 추가(= grade를 leader로 승격)
+    - SubAdminTemp가 없으면 최소필드만 생성 (team/position은 절대 건드리지 않음)
+    - SubAdminTemp가 있으면 name/part/branch/grade/level만 최소 최신화 (team/position touch 금지)
+    """
     user_id = _to_str(request.POST.get("user_id") or request.POST.get("id"))
     if not user_id:
         return JsonResponse({"ok": False, "error": "user_id가 없습니다."}, status=400)
@@ -36,11 +44,9 @@ def ajax_add_sub_admin(request):
     except CustomUser.DoesNotExist:
         return JsonResponse({"ok": False, "error": "사용자를 찾을 수 없습니다."}, status=404)
 
-    # TODO: branch 권한 체크 (원본에서 "... (branch 권한 체크 동일)" 로 주석 처리되어 있었음)
-    # - head는 자기 지점만 승격 가능
-    # - superuser는 제한 없음
+    # head는 본인 지점만 승격 가능
     if request.user.grade == "head":
-        if (u.branch or "").strip() and (request.user.branch or "").strip() and (u.branch != request.user.branch):
+        if _to_str(u.branch) and _to_str(request.user.branch) and not _same_branch(u.branch, request.user.branch):
             return JsonResponse({"ok": False, "error": "다른 지점 사용자는 추가할 수 없습니다."}, status=403)
 
     if u.grade in ("resign", "inactive"):
@@ -50,31 +56,35 @@ def ajax_add_sub_admin(request):
     u.grade = "leader"
     u.save(update_fields=["grade"])
 
+    # ✅ SubAdminTemp 생성/유지: team/position defaults 금지 (초기화 방지)
     sa, created = SubAdminTemp.objects.get_or_create(
         user=u,
         defaults={
-            "name": _to_str(u.name) or "-",
-            "branch": _to_str(u.branch) or "-",
-            "part": _to_str(u.part) or "-",
+            "name": (_to_str(u.name) or "-"),
+            "branch": (_to_str(u.branch) or "-"),
+            "part": (_to_str(u.part) or "-"),
             "grade": "leader",
-            "position": "-",
-            "team_a": "-",
-            "team_b": "-",
-            "team_c": "-",
             "level": "-",
+            # ⚠️ team_a/b/c, position은 절대 넣지 않음 (NULL 유지)
         },
     )
 
-    # ✅ 이미 존재하면 팀A/B/C는 그대로 두고, 기본 메타만 최신화
+    # ✅ 이미 존재하면 team/position 건드리지 말고 메타만 최신화
     updates = {}
-    if (sa.name or "").strip() != (u.name or "-"):
-        updates["name"] = u.name or "-"
-    if (sa.branch or "").strip() != (u.branch or "-"):
-        updates["branch"] = u.branch or "-"
-    if (sa.part or "").strip() != (u.part or "-"):
-        updates["part"] = u.part or "-"
-    if (sa.grade or "").strip() != "leader":
+
+    if _to_str(sa.name) != (_to_str(u.name) or "-"):
+        updates["name"] = _to_str(u.name) or "-"
+    if _to_str(sa.branch) != (_to_str(u.branch) or "-"):
+        updates["branch"] = _to_str(u.branch) or "-"
+    if _to_str(sa.part) != (_to_str(u.part) or "-"):
+        updates["part"] = _to_str(u.part) or "-"
+    if _to_str(sa.grade) != "leader":
         updates["grade"] = "leader"
+
+    # level이 비어있을 때만 최소 보정
+    if not _to_str(getattr(sa, "level", "")):
+        updates["level"] = "-"
+
     if updates:
         SubAdminTemp.objects.filter(pk=sa.pk).update(**updates)
 
@@ -82,37 +92,53 @@ def ajax_add_sub_admin(request):
         {
             "ok": True,
             "changed": changed,
-            "user": {"id": u.id, "name": u.name, "branch": _to_str(u.branch), "part": _to_str(u.part), "grade": u.grade},
+            "created_subadmin_temp": created,
+            "user": {
+                "id": u.id,
+                "name": u.name,
+                "branch": _to_str(u.branch),
+                "part": _to_str(u.part),
+                "grade": u.grade,
+            },
         }
     )
 
 
 @require_POST
+@login_required
+@grade_required("superuser", "head")
 @transaction.atomic
 def ajax_delete_subadmin(request):
-    user = request.user
-    if user.grade not in ("superuser", "head"):
-        return JsonResponse({"ok": False, "error": "권한이 없습니다."}, status=403)
-
-    user_id = (request.POST.get("user_id") or "").strip()
+    """
+    ✅ 중간관리자 삭제(= grade를 basic으로 강등)
+    - CustomUser.grade만 basic으로 변경
+    - SubAdminTemp는 삭제하지 않음 (팀/직급 보존)
+    - level만 초기화 + 메타만 최소 동기화
+    """
+    user_id = _to_str(request.POST.get("user_id") or request.POST.get("id"))
     if not user_id:
         return JsonResponse({"ok": False, "error": "user_id가 필요합니다."}, status=400)
 
     target = get_object_or_404(CustomUser, pk=user_id)
 
-    # ✅ 1) CustomUser.grade 변경: save() 금지 (signals / 후처리 우회)
-    CustomUser.objects.filter(pk=target.pk).update(grade="basic")
+    # head는 본인 지점만 강등 가능
+    if request.user.grade == "head":
+        if _to_str(target.branch) and _to_str(request.user.branch) and not _same_branch(target.branch, request.user.branch):
+            return JsonResponse({"ok": False, "error": "다른 지점 사용자는 삭제할 수 없습니다."}, status=403)
 
-    # ✅ 2) SubAdminTemp는 삭제 금지, team_a/b/c 건드리지 않기
+    # ✅ 1) grade 변경
+    target.grade = "basic"
+    target.save(update_fields=["grade"])
+
+    # ✅ 2) SubAdminTemp는 유지(팀/직급 보존), level만 초기화
     sa_qs = SubAdminTemp.objects.select_for_update().filter(user=target)
     if sa_qs.exists():
         sa_qs.update(
             grade="basic",
-            level="-",  # ✅ 핵심: level만 초기화
-            name=(target.name or "-"),
-            part=(target.part or "-"),
-            branch=(target.branch or "-"),
-            # team_a/team_b/team_c 는 update에 포함하지 않음 -> 그대로 유지
+            level="-",
+            name=_to_str(target.name) or "-",
+            part=_to_str(target.part) or "-",
+            branch=_to_str(target.branch) or "-",
         )
 
     return JsonResponse({"ok": True})

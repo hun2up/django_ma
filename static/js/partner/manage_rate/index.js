@@ -4,8 +4,9 @@
 // - dataset/key 안전화
 // - requester autofill 안정화
 // - superuser parts/branches loader 대기
-// - table check modal 안전화 (bootstrap 유무 대응)
+// - table check modal 안전화 (bootstrap 유무 대응: fallback overlay 제공)
 // - ✅ autoload 중복 방지 강화 (manage_boot vs index 전역 가드)
+// - ✅ 검색 버튼 id 혼재(btnSearchPeriod/btnSearch) 대응
 // =========================================================
 
 import { els } from "./dom_refs.js";
@@ -18,13 +19,11 @@ import { initInputRowEvents } from "./input_rows.js";
 ========================================================= */
 const AUTOLOAD_GRADES = new Set(["head", "leader"]);
 
-// 페이지 중복 init 방지 (BFCache/partial reload 대비)
-const INIT_FLAG = "__manageRateIndexInited";
+// dataset에 억지로 "__xxx" 같은 키를 쓰면 브라우저별로 애매할 수 있어
+// 안전한 키로 고정
+const INIT_DATAKEY = "manageRateIndexInited";
+const ELLIPSIS_DATAKEY = "ellipsisTitleBound";
 
-/**
- * 전역 1회 autoload 가드:
- * - manage_boot 또는 index 중 “누군가”가 이미 autoload를 수행하면, 다시는 실행하지 않음.
- */
 const AUTOLOAD_FLAG = "__manageRateAutoLoaded";
 
 /* =========================================================
@@ -144,12 +143,23 @@ async function runSearch({ ym, branch } = {}) {
   }
 }
 
-function initSearchButton() {
-  if (!els.btnSearch) return;
-  if (els.btnSearch.dataset.bound === "1") return;
-  els.btnSearch.dataset.bound = "1";
+function resolveSearchButton() {
+  // ✅ 템플릿에서 btnSearchPeriod 사용, 혹시 구버전 btnSearch도 있을 수 있어 둘 다 지원
+  return (
+    els.btnSearch ||
+    els.btnSearchPeriod ||
+    document.getElementById("btnSearchPeriod") ||
+    document.getElementById("btnSearch")
+  );
+}
 
-  els.btnSearch.addEventListener("click", () => runSearch());
+function initSearchButton() {
+  const btn = resolveSearchButton();
+  if (!btn) return;
+  if (btn.dataset.bound === "1") return;
+  btn.dataset.bound = "1";
+
+  btn.addEventListener("click", () => runSearch());
 }
 
 /* =========================================================
@@ -170,9 +180,10 @@ function initSuperuserPartsBranchesWait() {
 }
 
 /* =========================================================
-   table check modal
+   table check modal (bootstrap 유무 대응)
 ========================================================= */
 function getTableFetchUrl(branch) {
+  // root dataset: data-table-fetch-url → dataset key: tableFetchUrl
   const base = ds("tableFetchUrl");
   if (!base) return "";
 
@@ -182,7 +193,11 @@ function getTableFetchUrl(branch) {
 }
 
 function escapeAttr(v) {
-  return String(v ?? "").replaceAll('"', "&quot;");
+  return String(v ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function renderTableCheckHTML(rows) {
@@ -192,8 +207,8 @@ function renderTableCheckHTML(rows) {
       const rate = r.rate ?? "-";
       return `
         <tr>
-          <td class="text-truncate" title="${escapeAttr(t)}">${t}</td>
-          <td class="text-center">${rate}</td>
+          <td class="text-truncate" title="${escapeAttr(t)}">${escapeAttr(t)}</td>
+          <td class="text-center">${escapeAttr(rate)}</td>
         </tr>`;
     })
     .join("");
@@ -218,19 +233,75 @@ function renderTableCheckHTML(rows) {
 }
 
 function showBootstrapModal(modalEl) {
-  // bootstrap이 없을 수도 있는 환경(스크립트 로드 실패 등) 대비
   const bs = window.bootstrap;
-  if (!bs?.Modal) return;
-
+  if (!bs?.Modal) return false;
   const inst = bs.Modal.getInstance(modalEl) || new bs.Modal(modalEl);
   inst.show();
+  return true;
+}
+
+// ✅ bootstrap 없을 때도 “확인” 가능하도록 아주 단순한 오버레이 fallback
+let __rateTableOverlayEl = null;
+
+function ensureFallbackOverlay() {
+  if (__rateTableOverlayEl) return __rateTableOverlayEl;
+
+  const wrap = document.createElement("div");
+  wrap.id = "rateTableCheckOverlay";
+  wrap.style.cssText = `
+    position: fixed; inset: 0; z-index: 9999;
+    display: none;
+    background: rgba(0,0,0,.35);
+    padding: 24px;
+  `;
+
+  wrap.innerHTML = `
+    <div style="
+      max-width: 720px; margin: 40px auto; background: #fff;
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    ">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 16px; border-bottom: 1px solid #eee;">
+        <div style="font-weight: 700;">테이블 확인</div>
+        <button type="button" id="rateTableOverlayClose" style="
+          border: 0; background: transparent; font-size: 18px; line-height: 1;
+          cursor: pointer;
+        " aria-label="close">✕</button>
+      </div>
+      <div id="rateTableOverlayBody" style="padding: 14px 16px;"></div>
+    </div>
+  `;
+
+  wrap.addEventListener("click", (e) => {
+    if (e.target === wrap) hideFallbackOverlay();
+  });
+
+  document.body.appendChild(wrap);
+
+  const btnClose = wrap.querySelector("#rateTableOverlayClose");
+  btnClose?.addEventListener("click", hideFallbackOverlay);
+
+  __rateTableOverlayEl = wrap;
+  return wrap;
+}
+
+function showFallbackOverlay(html) {
+  const wrap = ensureFallbackOverlay();
+  const body = wrap.querySelector("#rateTableOverlayBody");
+  if (body) body.innerHTML = html;
+  wrap.style.display = "block";
+}
+
+function hideFallbackOverlay() {
+  if (!__rateTableOverlayEl) return;
+  __rateTableOverlayEl.style.display = "none";
 }
 
 function initTableCheckModal() {
   const btnCheck = document.getElementById("btnCheckTable");
   const modalBody = document.getElementById("tableCheckBody");
   const modalEl = document.getElementById("tableCheckModal");
-  if (!btnCheck || !modalBody || !modalEl) return;
+  if (!btnCheck) return;
 
   if (btnCheck.dataset.bound === "1") return;
   btnCheck.dataset.bound = "1";
@@ -242,8 +313,17 @@ function initTableCheckModal() {
     const url = getTableFetchUrl(branch);
     if (!url) return alertBox("테이블 조회 URL이 없습니다. (data-table-fetch-url 확인)");
 
-    modalBody.innerHTML = `<div class="py-4 text-muted">불러오는 중...</div>`;
-    showBootstrapModal(modalEl);
+    const loadingHTML = `<div class="py-4 text-muted">불러오는 중...</div>`;
+
+    // bootstrap modal이 있으면 그걸 우선 사용
+    let useBootstrap = false;
+    if (modalBody && modalEl) {
+      modalBody.innerHTML = loadingHTML;
+      useBootstrap = showBootstrapModal(modalEl);
+    }
+
+    // bootstrap 없거나 modal 요소가 없으면 fallback overlay
+    if (!useBootstrap) showFallbackOverlay(loadingHTML);
 
     try {
       const res = await fetch(url, {
@@ -256,20 +336,23 @@ function initTableCheckModal() {
       if (data.status !== "success") throw new Error(data.message || "조회 실패");
 
       const rows = Array.isArray(data.rows) ? data.rows : [];
-      modalBody.innerHTML = rows.length
+      const html = rows.length
         ? renderTableCheckHTML(rows)
         : `<div class="py-4 text-muted">등록된 테이블이 없습니다.</div>`;
+
+      if (useBootstrap && modalBody) modalBody.innerHTML = html;
+      else showFallbackOverlay(html);
     } catch (err) {
       console.error("❌ [rate/index] 테이블 확인 실패:", err);
-      modalBody.innerHTML = `<div class="py-4 text-danger">테이블 정보를 불러오지 못했습니다.</div>`;
+      const errHTML = `<div class="py-4 text-danger">테이블 정보를 불러오지 못했습니다.</div>`;
+      if (useBootstrap && modalBody) modalBody.innerHTML = errHTML;
+      else showFallbackOverlay(errHTML);
     }
   });
 }
 
 /* =========================================================
    autoload (중복 방지 강화)
-   - manage_boot가 autoLoad를 수행했으면 index는 절대 재실행 X
-   - manage_boot 미실행/실패 케이스에서만 “보조”로 1회 실행
 ========================================================= */
 function markAutoLoaded() {
   window[AUTOLOAD_FLAG] = true;
@@ -282,11 +365,9 @@ function shouldAutoLoadByBootOrGrade() {
   const boot = window.ManageRateBoot || {};
   const grade = getGrade();
 
-  // boot.autoLoad가 명시되면 최우선
   if (boot.autoLoad === true) return true;
   if (boot.autoLoad === false) return false;
 
-  // autoLoad 미설정이면 head/leader는 자동
   return AUTOLOAD_GRADES.has(grade);
 }
 
@@ -296,15 +377,13 @@ function buildFallbackYM() {
 }
 
 function initAutoLoadAssist() {
-  // ✅ 전역 autoload 1회만
   if (isAutoLoaded()) return;
 
-  // ✅ manage_boot가 rate init을 했으면, 여기선 절대 실행하지 않음(충돌 방지)
+  // ✅ manage_boot가 이미 rate autoload 수행했으면 index는 절대 재실행 X
   if (window.__manageBootInited?.rate) return;
 
   const grade = getGrade();
   if (!(grade === "superuser" || AUTOLOAD_GRADES.has(grade))) return;
-
   if (!shouldAutoLoadByBootOrGrade()) return;
 
   const branch = getEffectiveBranch();
@@ -312,11 +391,58 @@ function initAutoLoadAssist() {
 
   const ym = getYMFromSelectors() || buildFallbackYM();
 
-  // 여기서부터 “autoload 실행 확정” — 즉시 가드 올림(중복 클릭/경합 방지)
   markAutoLoaded();
-
-  // UI 초기화/로드 순서 고려하여 약간의 지연
   setTimeout(() => runSearch({ ym, branch }), 250);
+}
+
+/* =========================================================
+   ellipsis title behavior
+========================================================= */
+function attachEllipsisTitleBehavior() {
+  const root = els.root;
+  if (!root) return;
+
+  if (root.dataset[ELLIPSIS_DATAKEY] === "1") return;
+  root.dataset[ELLIPSIS_DATAKEY] = "1";
+
+  const setTitle = (el) => {
+    if (!el) return;
+
+    // select는 선택된 텍스트를 title로
+    if (el.tagName === "SELECT") {
+      const opt = el.selectedOptions?.[0];
+      el.title = opt ? String(opt.textContent || "").trim() : "";
+      return;
+    }
+
+    // input/textarea
+    if ("value" in el) el.title = String(el.value || "").trim();
+  };
+
+  // 초기 1회 세팅
+  root
+    .querySelectorAll(
+      "#inputTable input, #inputTable select, #mainTable input, #mainTable select"
+    )
+    .forEach(setTitle);
+
+  // 이벤트 위임으로 계속 갱신
+  const handler = (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    if (
+      !t.matches(
+        "#inputTable input, #inputTable select, #mainTable input, #mainTable select"
+      )
+    )
+      return;
+    setTitle(t);
+  };
+
+  root.addEventListener("input", handler, true);
+  root.addEventListener("change", handler, true);
+  root.addEventListener("focusin", handler, true);
+  root.addEventListener("mouseover", handler, true);
 }
 
 /* =========================================================
@@ -326,19 +452,21 @@ function init() {
   if (!els.root) return;
 
   // 페이지 단위 중복 init 방지
-  if (els.root.dataset[INIT_FLAG] === "1") return;
-  els.root.dataset[INIT_FLAG] = "1";
+  if (els.root.dataset[INIT_DATAKEY] === "1") return;
+  els.root.dataset[INIT_DATAKEY] = "1";
 
-  initPeriodDropdowns();     // 단독 실행 대비
-  initInputRowEvents();      // 입력 이벤트
-  fillRequesterAllRows();    // 요청자 자동입력
+  initPeriodDropdowns(); // 단독 실행 대비
+  initInputRowEvents(); // 입력 이벤트
+  fillRequesterAllRows(); // 요청자 자동입력
 
   initSuperuserPartsBranchesWait();
   initSearchButton();
   initTableCheckModal();
 
-  // ✅ autoload는 보조로만(중복 방지 강화)
+  // ✅ autoload는 보조로만
   initAutoLoadAssist();
+
+  attachEllipsisTitleBehavior();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

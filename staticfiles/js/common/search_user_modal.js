@@ -1,16 +1,25 @@
 /**
- * django_ma/static/js/common/search_user_modal.js (FINAL - READY STATE SAFE)
- * -------------------------------------------------------------------------
- * 공통 대상자 검색 모달
- * - DOMContentLoaded 타이밍 이슈(늦게 로드) 방지: readyState 기반 즉시 init
+ * django_ma/static/js/common/search_user_modal.js
+ * ============================================================================
+ * ✅ 공통 대상자 검색 모달 (FINAL REFACTOR - affiliation_display 지원)
+ *
+ * 핵심 개선
+ * - readyState 기반 즉시 init (늦게 로드되어도 안전)
  * - root(dataset) 우선으로 search URL 결정: data-search-user-url
- * - /api/accounts/search-user/ 가 404면 자동 fallback URL로 재시도
+ * - /api/accounts/search-user/ 404면 fallback URL로 자동 재시도
  * - 결과 클릭 시:
- *    1) activeRow(또는 fallback row)에 대상자 필드 자동입력
+ *    1) activeRow(또는 fallback row)에 대상자 필드 자동 입력
  *    2) tg_display가 있으면 "성명(사번)" 형태로 동기화
- *    3) userSelected 이벤트(document/window) 발행
+ *    3) ✅ 소속(변경전) tg_branch는 affiliation_display 우선 적용
+ *    4) userSelected 이벤트(document/window) 발행
  * - 동적 행 대응(active row tracking)
- * -------------------------------------------------------------------------
+ *
+ * 서버(Search API) 응답에 아래가 포함되면 자동 사용:
+ * - affiliation_display: "지점 > 팀" 형태 (권한관리 기반)
+ *
+ * (참고) 서버 패치 후:
+ * - accounts/search_api.py 응답에 affiliation_display 추가 권장
+ * ============================================================================
  */
 
 (() => {
@@ -221,6 +230,19 @@
     return true;
   }
 
+  function buildTeamLabel(selected) {
+    const teamLabel = [selected?.team_a, selected?.team_b, selected?.team_c]
+      .map(toStr)
+      .filter(Boolean)
+      .join(" ");
+    return teamLabel;
+  }
+
+  /**
+   * ✅ 선택된 유저를 input row에 반영
+   * - tg_branch(소속 변경전)는 affiliation_display 우선
+   * - 없으면 branch > (teamLabel) 순으로 fallback
+   */
   function autofillSelectedUser(row, selected) {
     if (!row) return;
 
@@ -229,16 +251,21 @@
     const branch = toStr(selected?.branch || "");
     const rank = toStr(selected?.rank || "");
     const part = toStr(selected?.part || "");
+    const affiliation = toStr(selected?.affiliation_display || selected?.affiliationDisplay || "");
 
-    const teamLabel = [selected?.team_a, selected?.team_b, selected?.team_c]
-      .map(toStr)
-      .filter(Boolean)
-      .join(" ");
+    // fallback: branch + teamLabel
+    const teamLabel = buildTeamLabel(selected);
+    const fallbackAff = [branch, teamLabel].filter(Boolean).join(" > ");
+    const tgBranchValue = affiliation || fallbackAff || branch || teamLabel || "-";
 
     // ✅ hidden 필드 채우기
     setValueIfExists(row, "tg_name", name) || setValueIfExists(row, "target_name", name);
     setValueIfExists(row, "tg_id", id) || setValueIfExists(row, "target_id", id);
-    setValueIfExists(row, "tg_branch", teamLabel || "-") || setValueIfExists(row, "target_branch", teamLabel || "-");
+
+    // ✅ 소속(변경전)
+    setValueIfExists(row, "tg_branch", tgBranchValue) ||
+      setValueIfExists(row, "target_branch", tgBranchValue);
+
     setValueIfExists(row, "tg_rank", rank) || setValueIfExists(row, "rank", rank);
     setValueIfExists(row, "tg_part", part) || setValueIfExists(row, "target_part", part);
 
@@ -268,7 +295,7 @@
 
         if (params.q) {
           u.searchParams.set("q", params.q);
-          u.searchParams.set("keyword", params.q);
+          u.searchParams.set("keyword", params.q); // legacy 호환
         }
         if (params.scope) u.searchParams.set("scope", params.scope);
         if (params.branch) u.searchParams.set("branch", params.branch);
@@ -316,16 +343,22 @@
   function renderError(resultsBox) {
     resultsBox.innerHTML = `<div class="text-center text-danger py-3">검색 실패</div>`;
   }
+
   function renderResults(resultsBox, list) {
     resultsBox.innerHTML = list
       .map((u0) => {
         const u = u0 || {};
+
         const name = escapeHtml(u.name || "");
         const id = escapeHtml(u.id || "");
-        const branchV = escapeHtml(u.branch || "");
         const regist = escapeHtml(u.regist || "");
         const enter = escapeHtml(u.enter || "-");
         const quit = escapeHtml(u.quit || "재직중");
+
+        // ✅ 소속 표시: affiliation_display 우선, 없으면 branch
+        const affiliation = escapeHtml(u.affiliation_display || u.affiliationDisplay || "");
+        const branchV = escapeHtml(u.branch || "");
+        const rightLabel = affiliation || branchV || "-";
 
         return `
           <button type="button"
@@ -333,6 +366,7 @@
             data-id="${escapeHtml(u.id)}"
             data-name="${escapeHtml(u.name)}"
             data-branch="${escapeHtml(u.branch || "")}"
+            data-affiliation-display="${escapeHtml(u.affiliation_display || u.affiliationDisplay || "")}"
             data-rank="${escapeHtml(u.rank || "")}"
             data-part="${escapeHtml(u.part || "")}"
             data-team-a="${escapeHtml(u.team_a || "")}"
@@ -343,7 +377,7 @@
             data-quit="${escapeHtml(u.quit || "재직중")}">
             <div class="d-flex justify-content-between">
               <span><strong>${name}</strong> (${id}) ${regist ? `(${regist})` : ""}</span>
-              <small class="text-muted">${branchV}</small>
+              <small class="text-muted">${rightLabel}</small>
             </div>
             <small class="text-muted">입사일: ${enter} / 퇴사일: ${quit}</small>
           </button>
@@ -409,6 +443,7 @@
       const params = {
         q: keyword,
         scope: scope === "branch" ? "branch" : "",
+        // ✅ 현재 정책 유지: superuser만 branch 파라미터 전달(서버 scope 정책과 호환)
         branch: scope === "branch" && grade === "superuser" ? branch : "",
       };
 
@@ -436,6 +471,7 @@
         id: toStr(item.dataset.id),
         name: toStr(item.dataset.name),
         branch: toStr(item.dataset.branch),
+        affiliation_display: toStr(item.dataset.affiliationDisplay),
         rank: toStr(item.dataset.rank),
         part: toStr(item.dataset.part),
         team_a: toStr(item.dataset.teamA),
@@ -474,7 +510,7 @@
     log("bound ok");
   }
 
-  // ✅ 핵심: DOMContentLoaded 이전/이후 로드 모두 대응
+  // ✅ DOMContentLoaded 이전/이후 로드 모두 대응
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {

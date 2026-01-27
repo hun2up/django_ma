@@ -1,76 +1,110 @@
 // django_ma/static/js/board/form_submit_lock.js
-/**
- * Board Form Common JS (FINAL)
- * - post/task create/edit 공용
- * - submit 중복 방지(잠금 + 스피너)
- * - file_upload_utils.js initFileUpload 자동 초기화까지 흡수
- *
- * 전제:
- * - 폼 id: #postForm 또는 #taskForm (둘 중 하나)
- * - submit 버튼 id: #submitBtn (권장)
- * - 파일 업로드 DOM(권장):
- *   - input[type=file]#fileInput name="attachments" multiple
- *   - 기존 파일 삭제 버튼: .remove-existing (data-id)
- *   - 삭제 hidden container: #deleteContainer
- */
+// =========================================================
+// Board Form Common JS (post/task create/edit 공용)
+//
+// ✅ 주요 기능
+// - submit 중복 방지(잠금 + 스피너 + 버튼 비활성화)
+// - file_upload_utils.js의 initFileUpload가 있으면 자동 초기화
+//
+// ✅ 권한 전제
+// - board 접근은 서버에서(superuser/head/leader) 제한
+// - task(create/edit)는 서버에서(superuser)만 접근 가능
+// - JS에서는 권한을 막지 않고, DOM이 없으면 조용히 종료
+//
+// ✅ 전제(권장)
+// - 폼 id: #postForm 또는 #taskForm
+// - submit 버튼 id: #submitBtn (없으면 form 내 submit 버튼 첫 번째로 fallback)
+// - 파일 업로드 UI(있을 때만 initFileUpload 실행)
+//   - input[type=file]#fileInput 또는 name="attachments"
+//   - 삭제 hidden container: #deleteContainer
+// =========================================================
 
 (function () {
-  function qs(sel, root) {
-    return (root || document).querySelector(sel);
+  "use strict";
+
+  const INIT_FLAG = "__boardFormSubmitLockInited";
+
+  function qs(sel, root = document) {
+    return root.querySelector(sel);
+  }
+
+  function findForm() {
+    return qs("#postForm") || qs("#taskForm");
+  }
+
+  function findSubmitBtn(form) {
+    return qs("#submitBtn", form) || qs('button[type="submit"]', form);
+  }
+
+  function lockSubmitButton(btn) {
+    if (!btn) return;
+
+    btn.disabled = true;
+
+    // 원본 HTML 1회만 저장
+    if (!btn.dataset.prevHtml) btn.dataset.prevHtml = btn.innerHTML;
+
+    btn.innerHTML =
+      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> 처리 중...';
+
+    btn.style.opacity = "0.7";
+    btn.style.cursor = "not-allowed";
   }
 
   function initSubmitLock(form) {
-    const submitBtn =
-      qs("#submitBtn", form) || qs('button[type="submit"]', form);
+    const submitBtn = findSubmitBtn(form);
 
-    form.addEventListener("submit", function (e) {
+    form.addEventListener("submit", (e) => {
       if (form.dataset.submitting === "1") {
         e.preventDefault();
         alert("처리 중입니다.\n잠시만 기다려주세요.");
         return;
       }
-      form.dataset.submitting = "1";
 
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        if (!submitBtn.dataset.prevHtml) {
-          submitBtn.dataset.prevHtml = submitBtn.innerHTML;
-        }
-        submitBtn.innerHTML =
-          '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> 처리 중...';
-        submitBtn.style.opacity = "0.7";
-        submitBtn.style.cursor = "not-allowed";
-      }
+      form.dataset.submitting = "1";
+      lockSubmitButton(submitBtn);
     });
   }
 
   function initFileUploadIfPossible(form) {
-    // file_upload_utils.js의 initFileUpload가 로드된 경우에만 실행
+    // file_upload_utils.js에서 initFileUpload 제공 시에만 실행
     if (typeof window.initFileUpload !== "function") return;
 
     const hasFileInput =
       !!qs('#fileInput[type="file"]', form) ||
       !!qs('input[type="file"][name="attachments"]', form);
-    const deleteContainer = qs("#deleteContainer", form);
-    const existingRemoveBtn = qs(".remove-existing", form);
 
-    // 파일 UI가 없는 폼에서는 아무 것도 하지 않음(안전)
+    const deleteContainer = qs("#deleteContainer", form);
+
+    // 파일 UI가 없는 폼은 그대로 종료
     if (!hasFileInput || !deleteContainer) return;
 
+    const formSelector = form.id ? `#${form.id}` : null;
+    if (!formSelector) return;
+
     window.initFileUpload({
-      // formSelector는 selector 문자열을 기대하므로 id 기반으로 결정
-      formSelector: form.id ? `#${form.id}` : null,
+      formSelector,
       existingFileSelector: ".remove-existing",
       deleteContainerSelector: "#deleteContainer",
       maxFileSize: 10 * 1024 * 1024, // 10MB
     });
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const form = qs("#postForm") || qs("#taskForm");
+  function boot() {
+    // 중복 초기화 방지(BFCache/중복 include 대비)
+    if (document.body.dataset[INIT_FLAG] === "1") return;
+    document.body.dataset[INIT_FLAG] = "1";
+
+    const form = findForm();
     if (!form) return;
 
     initSubmitLock(form);
     initFileUploadIfPossible(form);
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
+  }
 })();

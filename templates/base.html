@@ -75,21 +75,23 @@
             </li>
           {% endif %}
 
-          <!-- ✅ Board -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}"
-               href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
-            <ul class="dropdown-menu" aria-labelledby="boardMenu">
-              <li><a class="dropdown-item" href="{% url 'board:post_list' %}">요청게시판</a></li>
-              {% if user.grade != 'resign' %}
-                <li><a class="dropdown-item" href="{% url 'board:support_form' %}">업무요청서</a></li>
-                <li><a class="dropdown-item" href="{% url 'board:states_form' %}">FA소명서</a></li>
-              {% endif %}
-              {% if user.grade == 'superuser' %}
-                <li><a class="dropdown-item" href="{% url 'board:task_list' %}">직원업무</a></li>
-              {% endif %}
-            </ul>
-          </li>
+          {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
+            <!-- ✅ Board -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}"
+                href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
+              <ul class="dropdown-menu" aria-labelledby="boardMenu">
+                <li><a class="dropdown-item" href="{% url 'board:post_list' %}">요청게시판</a></li>
+                {% if user.grade != 'resign' %}
+                  <li><a class="dropdown-item" href="{% url 'board:support_form' %}">업무요청서</a></li>
+                  <li><a class="dropdown-item" href="{% url 'board:states_form' %}">FA소명서</a></li>
+                {% endif %}
+                {% if user.grade == 'superuser' %}
+                  <li><a class="dropdown-item" href="{% url 'board:task_list' %}">직원업무</a></li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
 
           <!-- ✅ Partner -->
           {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
@@ -210,29 +212,31 @@
             </div>
           </div>
         {% endif %}
-        
-        <!-- 업무요청 -->
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="mBoardHead">
-            <button class="accordion-button collapsed" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#mBoard"
-                    aria-expanded="false" aria-controls="mBoard">
-              업무요청
-            </button>
-          </h2>
-          <div id="mBoard" class="accordion-collapse collapse" aria-labelledby="mBoardHead" data-bs-parent="#mobileMenuAccordion">
-            <div class="accordion-body pt-0">
-              <a class="d-block py-2" href="{% url 'board:post_list' %}">요청게시판</a>
-              {% if user.grade != 'resign' %}
-                <a class="d-block py-2" href="{% url 'board:support_form' %}">업무요청서</a>
-                <a class="d-block py-2" href="{% url 'board:states_form' %}">FA소명서</a>
-              {% endif %}
-              {% if user.grade == 'superuser' %}
-                <a class="d-block py-2" href="{% url 'board:task_list' %}">직원업무</a>
-              {% endif %}
+
+        {% if user.grade == 'superuser' or user.grade == 'head' or  user.grade == 'leader' %}        
+          <!-- 업무요청 -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="mBoardHead">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mBoard"
+                      aria-expanded="false" aria-controls="mBoard">
+                업무요청
+              </button>
+            </h2>
+            <div id="mBoard" class="accordion-collapse collapse" aria-labelledby="mBoardHead" data-bs-parent="#mobileMenuAccordion">
+              <div class="accordion-body pt-0">
+                <a class="d-block py-2" href="{% url 'board:post_list' %}">요청게시판</a>
+                {% if user.grade != 'resign' %}
+                  <a class="d-block py-2" href="{% url 'board:support_form' %}">업무요청서</a>
+                  <a class="d-block py-2" href="{% url 'board:states_form' %}">FA소명서</a>
+                {% endif %}
+                {% if user.grade == 'superuser' %}
+                  <a class="d-block py-2" href="{% url 'board:task_list' %}">직원업무</a>
+                {% endif %}
+              </div>
             </div>
           </div>
-        </div>
+        {% endif %}
 
         <!-- 조직관리 -->
         <div class="accordion-item">

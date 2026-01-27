@@ -7,14 +7,17 @@
 
 {% block content %}
 
+<!-- Boot: inline update endpoint -->
 <div id="postDetailBoot"
      data-update-url="{% url 'board:ajax_update_post_field_detail' post.pk %}"
      class="d-none"></div>
 
 <div class="container mt-5">
+
+  <!-- Inline update alerts (JS) -->
   <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
-  {# ✅ messages #}
+  <!-- Messages -->
   {% if messages %}
     <div class="mb-3">
       {% for message in messages %}
@@ -29,7 +32,7 @@
   <div class="mx-auto" style="max-width: 700px;">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      {# ✅ 헤더 #}
+      <!-- Header -->
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
         <div class="flex-grow-1">
           <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">{{ post.title }}</h4>
@@ -37,7 +40,7 @@
           <div class="d-flex flex-wrap align-items-center gap-2">
             <span class="text-muted small">{{ post.category }} | {{ post.created_at|date:"Y-m-d H:i" }}</span>
 
-            <!-- non-superuser일 때 상태 뱃지(읽기용) -->
+            <!-- Read-only status badge for non-superuser -->
             {% if not is_superuser %}
               <span class="status-badge fw-semibold px-2 py-1 rounded-pill"
                     data-status="{{ post.status|default:'' }}">
@@ -48,15 +51,15 @@
         </div>
       </div>
 
-      {# ✅ 본문 #}
+      <!-- Content -->
       <div class="my-3 p-3 bg-light rounded-3">
         <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ post.content }}</p>
       </div>
 
-      {# ✅ 댓글 CSRF 토큰(동적 수정폼용) - 페이지에 1개만 유지 #}
+      <!-- CSRF Token for dynamic comment edit form (JS) -->
       <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
 
-      {# ✅ 댓글 #}
+      <!-- Comments -->
       <div class="mt-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h6 class="fw-bold mb-0">댓글</h6>
@@ -66,10 +69,10 @@
         {% include "board/includes/_comment_form.html" with form=form action_url=detail_url submit_label="등록" %}
       </div>
 
-      <br><br>
+      <hr class="my-4">
 
-      {# ✅ 게시글 기본정보 #}
-      <div class="my-3">
+      <!-- Post Info -->
+      <div class="my-2">
         <div class="row gy-2 gx-3">
           {% for label, value in post_info.items %}
             <div class="col-md-4">
@@ -80,16 +83,21 @@
         </div>
       </div>
 
-      {# ✅ 담당자/상태 #}
-      <div class="my-3">
+      <hr class="my-4">
+
+      <!-- Handler / Status / UpdatedAt -->
+      <div class="my-2">
         <div class="row align-items-center">
 
+          <!-- Handler -->
           <div class="col-md-4 mb-2">
             <span class="info-label">담당자</span>
+
             {% if is_superuser %}
               <form class="d-inline-block inline-update-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="handler">
+
                 <select name="handler" class="form-select form-select-sm d-inline-block w-auto">
                   <option value="">선택</option>
                   {% for h in handlers %}
@@ -98,10 +106,11 @@
                 </select>
               </form>
             {% else %}
-              {{ post.handler|default:"-" }}
+              <span class="info-value">{{ post.handler|default:"-" }}</span>
             {% endif %}
           </div>
 
+          <!-- Status -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태</span>
 
@@ -110,7 +119,6 @@
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="status">
 
-                {# ✅ JS에서 초기색 적용을 위해 data-status 유지 #}
                 <select name="status"
                         class="form-select form-select-sm status-select d-inline-block w-auto"
                         data-status="{{ post.status|default:'' }}">
@@ -120,13 +128,13 @@
                 </select>
               </form>
             {% else %}
-              {# ✅ inline style 제거: badge + data-status 통일 #}
               <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
                 {{ post.status|default:"-" }}
               </span>
             {% endif %}
           </div>
 
+          <!-- Status Updated At -->
           <div class="col-md-4 mb-2">
             <span class="info-label">상태변경</span>
             <span id="statusUpdatedAtText" class="small-text">
@@ -137,11 +145,11 @@
         </div>
       </div>
 
-      <br><br>
+      <hr class="my-4">
 
-      {# ✅ 첨부파일 #}
+      <!-- Attachments -->
       {% if attachments and attachments.exists %}
-        <div class="my-3">
+        <div class="my-2">
           <span class="info-value">첨부파일</span>
           <ul class="list-group mt-2">
             {% for att in attachments %}
@@ -159,18 +167,20 @@
         </div>
       {% endif %}
 
-      {# ✅ 하단 버튼 #}
+      <!-- Actions -->
       <div class="board-detail-actions mt-4">
+
         <div class="board-detail-actions-left">
           <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
           {% if can_edit %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary">수정하기</a>
 
-            <form method="post" class="board-detail-actions-form"
+            <form method="post"
+                  class="board-detail-actions-form"
                   onsubmit="return confirm('정말로 이 게시글을 삭제하시겠습니까?');">
               {% csrf_token %}
-              <input type="hidden" name="action_type" value="{% if post %}delete_post{% else %}delete_task{% endif %}">
+              <input type="hidden" name="action_type" value="delete_post">
               <button type="submit" class="btn btn-outline-danger w-100">삭제하기</button>
             </form>
           {% endif %}
@@ -179,6 +189,7 @@
         <div class="board-detail-actions-right">
           <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
         </div>
+
       </div>
 
     </div>
@@ -188,6 +199,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Comment edit + inline update -->
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
 <script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>
 <script src="{% static 'js/board/post_detail.js' %}?v=20260104"></script>

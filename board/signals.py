@@ -1,31 +1,38 @@
-# django_ma/board/signals.py
-# ===========================================
-# 📂 board/signals.py — 첨부파일 삭제 시 실제 파일도 삭제
-# ===========================================
-
 import os
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
+from .models import Attachment, TaskAttachment
 
-@receiver(post_delete, sender="board.Attachment")
-def delete_attachment_file(sender, instance, **kwargs):
+
+def _safe_delete_file(file_field):
     """
-    Attachment 객체 삭제 시 실제 파일도 함께 삭제
-    (DB 삭제 → 파일 삭제 동기화)
+    FileField 실제 파일 삭제 공용 유틸
     """
-    # FileField가 비어있을 수도 있으니 안전 처리
-    f = getattr(instance, "file", None)
-    if not f:
+    if not file_field:
         return
-
-    file_path = getattr(f, "path", None)
+    file_path = getattr(file_field, "path", None)
     if not file_path:
         return
-
     if os.path.isfile(file_path):
         try:
             os.remove(file_path)
-            print(f"🗑️ 첨부파일 삭제 완료: {file_path}")
-        except Exception as e:
-            print(f"⚠️ 첨부파일 삭제 실패: {file_path} ({e})")
+        except Exception:
+            # signals에서는 조용히 실패(운영 환경에서 파일락/권한 이슈 가능)
+            pass
+
+
+@receiver(post_delete, sender=Attachment)
+def delete_post_attachment_file(sender, instance, **kwargs):
+    """
+    Post Attachment 삭제 시 실제 파일도 삭제
+    """
+    _safe_delete_file(getattr(instance, "file", None))
+
+
+@receiver(post_delete, sender=TaskAttachment)
+def delete_task_attachment_file(sender, instance, **kwargs):
+    """
+    Task Attachment 삭제 시 실제 파일도 삭제
+    """
+    _safe_delete_file(getattr(instance, "file", None))

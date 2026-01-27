@@ -4,84 +4,130 @@
 {% block title %}소명서{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-  <div class="mx-auto" style="max-width: 700px;">
-    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">FA 소명서</h3>
+<!--
+  ==========================================
+  소명서 (States Form)
+  Policy: superuser / head / leader only
+  - 실제 접근 제어는 view(grade_required 등)에서 처리
+  - 템플릿에서는 안내/방어적 표기만 제공
+  ==========================================
+-->
+<div id="states-form"
+     data-user-grade="{{ user.grade|default:'' }}"
+     data-pdf-url="{% url 'board:generate_request_states' %}">
 
-    <div class="card shadow p-4 border-0 rounded-4">
-      <form id="requestForm" method="POST" novalidate>
-        {% csrf_token %}
+  <div class="container mt-5">
+    <div class="mx-auto" style="max-width: 700px;">
 
-        <!-- ✅ 계약사항 -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0 text-primary">계약사항</h5>
-          <div>
-            <button type="button" id="addContractBtn" class="btn btn-outline-primary btn-sm me-2">추가</button>
-            <button type="button" id="resetContractBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
+      <!-- Page Title -->
+      <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">FA 소명서</h3>
+
+      <!-- Optional: Permission Notice (UI only) -->
+      {% if user.grade not in "superuser head leader" %}
+      <div class="alert alert-danger">
+        <strong>접근 권한이 없습니다.</strong>
+        이 페이지는 superuser / head / leader 권한에서만 사용 가능합니다.
+      </div>
+      {% endif %}
+
+      <div class="card shadow p-4 border-0 rounded-4">
+
+        <!-- Main Form -->
+        <form id="requestForm" method="POST" novalidate>
+          {% csrf_token %}
+
+          <!-- ==========================================
+               1) 계약사항 (Contracts)
+               - 최대 5건
+               ========================================== -->
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0 text-primary">계약사항</h5>
+            <div class="d-flex gap-2">
+              <button type="button" id="addContractBtn" class="btn btn-outline-primary btn-sm">추가</button>
+              <button type="button" id="resetContractBtn" class="btn btn-outline-secondary btn-sm">초기화</button>
+            </div>
           </div>
-        </div>
 
-        <div id="contractContainer">
-          {% for i in "12345" %}
-          <div class="row mb-2 contract-row" data-index="{{ i }}" {% if i != "1" %}style="display:none;"{% endif %}>
-            {% for label, name, col in contracts %}
+          <div id="contractContainer">
+
+            <!-- Contract Row Template (1~5) -->
+            {% for i in "12345" %}
+            <div class="row mb-2 contract-row"
+                 data-index="{{ i }}"
+                 {% if i != "1" %}style="display:none;"{% endif %}>
+
+              {% for label, name, col in contracts %}
               <div class="col-md-{{ col }} mb-2">
                 <label class="form-label">{{ label }}</label>
                 <input type="text" name="{{ name }}{{ i }}" class="form-control">
               </div>
+              {% endfor %}
+
+              <!-- Remove Button (except first row) -->
+              <div class="col-md-1 text-center">
+                {% if i != "1" %}
+                  <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
+                {% else %}
+                  <div style="height:32px;"></div>
+                {% endif %}
+              </div>
+            </div>
             {% endfor %}
-            <div class="col-md-1 text-center">
-              {% if i != "1" %}
-                <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
-              {% else %}
-                <div style="height:32px;"></div>
-              {% endif %}
+
+          </div>
+
+          <hr>
+
+          <!-- ==========================================
+               2) 요청내용 (Content)
+               ========================================== -->
+          <h5 class="fw-bold mb-3 text-primary">요청내용</h5>
+
+          <div class="mb-3">
+            <label class="form-label">제목</label>
+            <input type="text" name="title" class="form-control" placeholder="제목 입력">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">발생경위</label>
+            <textarea name="reason" class="form-control" rows="5" placeholder="발생경위를 입력해주세요"></textarea>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">개선방안</label>
+            <textarea name="solution" class="form-control" rows="5" placeholder="개선방안을 입력해주세요"></textarea>
+          </div>
+
+          <!-- ==========================================
+               3) Action Buttons
+               ========================================== -->
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">뒤로가기</a>
+
+            <button type="button"
+                    id="generatePdfBtn"
+                    class="btn btn-primary px-5 fw-bold">
+              제작하기
+            </button>
+          </div>
+
+          <!-- ==========================================
+               4) Loading Overlay
+               ========================================== -->
+          <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+            <div class="loading-box">
+              <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;"></div>
+              <h5 class="mt-3 fw-bold text-primary">제작 중입니다... 잠시만 기다려주세요.</h5>
             </div>
           </div>
-          {% endfor %}
-        </div>
 
-        <hr>
-
-        <!-- ✅ 요청내용 -->
-        <h5 class="fw-bold mb-3 text-primary">요청내용</h5>
-        <div class="mb-3">
-          <label class="form-label">제목</label>
-          <input type="text" name="title" class="form-control" placeholder="제목 입력">
-        </div>
-        <div class="mb-4">
-          <label class="form-label">발생경위</label>
-          <textarea name="reason" class="form-control" rows="5" placeholder="요청 상세 내용을 입력해주세요"></textarea>
-        </div>
-        <div class="mb-4">
-          <label class="form-label">개선방안</label>
-          <textarea name="solution" class="form-control" rows="5" placeholder="요청 상세 내용을 입력해주세요"></textarea>
-        </div>
-
-        <!-- ✅ 버튼 & 로딩 -->
-        <div class="d-flex justify-content-between mt-4">
-          <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">뒤로가기</a>
-          <button type="button"
-                  id="generatePdfBtn"
-                  class="btn btn-primary px-5 fw-bold"
-                  data-pdf-url="{% url 'generate_request_states' %}">
-            제작하기
-          </button>
-        </div>
-
-        <!-- 로딩 오버레이 -->
-        <div id="loadingOverlay" class="loading-overlay" style="display:none;">
-          <div class="loading-box">
-            <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;"></div>
-            <h5 class="mt-3 fw-bold text-primary">제작 중입니다... 잠시만 기다려주세요.</h5>
-          </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ✅ 외부 JS 파일 연결 -->
+<!-- Page JS -->
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/states_form.js' %}"></script>
-
 {% endblock %}
