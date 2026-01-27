@@ -1,10 +1,18 @@
 // django_ma/static/js/board/common/detail_inline_update.js
-//
-// Board Common Inline Update (DETAIL)
+// =========================================================
+// Board Common Inline Update (DETAIL) - FINAL
 // - post_detail / task_detail 공용
 // - superuser 담당자/상태 select 변경 AJAX
 // - detail 화면의 #statusUpdatedAtText 갱신
-// - status select 옵션 data-color 기반 스타일 적용
+// - ✅ onSuccess 공식 지원: onSuccess(data, ctx)
+//
+// ✅ ctx 제공:
+// { fieldName, actionType, value, selectEl, form, updateUrl, bootId }
+//
+// 전제(템플릿):
+// - boot div: #postDetailBoot or #taskDetailBoot with data-update-url
+// - form.inline-update-form 내부에 hidden action_type
+// =========================================================
 
 (function () {
   "use strict";
@@ -35,13 +43,8 @@
 
   function setBusy(selectEl, busy) {
     if (!selectEl) return;
-    if (busy) {
-      selectEl.style.pointerEvents = "none";
-      selectEl.style.opacity = "0.7";
-    } else {
-      selectEl.style.pointerEvents = "";
-      selectEl.style.opacity = "";
-    }
+    selectEl.style.pointerEvents = busy ? "none" : "";
+    selectEl.style.opacity = busy ? "0.7" : "";
   }
 
   function showAlert(alertHost, message, type = "success") {
@@ -61,15 +64,6 @@
         el.remove();
       }
     }, 2500);
-  }
-
-  function applyStatusColor(selectEl) {
-    if (!(selectEl instanceof HTMLSelectElement)) return;
-    const opt = selectEl.options[selectEl.selectedIndex];
-    const color = opt?.getAttribute("data-color");
-    if (!color) return;
-    selectEl.style.color = color;
-    selectEl.style.fontWeight = "600";
   }
 
   async function sendUpdate({ updateUrl, form, actionType, value }) {
@@ -102,9 +96,11 @@
    * initDetailInlineUpdate
    * @param {Object} opts
    * @param {string} opts.bootId - "postDetailBoot" | "taskDetailBoot"
+   * @param {(data:Object, ctx:Object)=>void} [opts.onSuccess]
    */
   Board.Common.initDetailInlineUpdate = function initDetailInlineUpdate(opts) {
     const bootId = opts?.bootId;
+    const onSuccess = typeof opts?.onSuccess === "function" ? opts.onSuccess : null;
     if (!bootId) return;
 
     const bind = () => {
@@ -115,15 +111,15 @@
       const alertHost = document.getElementById("inlineUpdateAlertHost");
       const statusUpdatedAtText = document.getElementById("statusUpdatedAtText");
 
-      // 초기: status 색상
-      document.querySelectorAll("select.status-select").forEach(applyStatusColor);
-
       // 초기 prevValue
       document
         .querySelectorAll(
           "form.inline-update-form select[name='handler'], form.inline-update-form select[name='status']"
         )
-        .forEach((s) => (s.dataset.prevValue = s.value));
+        .forEach((s) => {
+          s.dataset.prevValue = s.value;
+          s.dataset.status = s.value; // status_ui에서 사용
+        });
 
       // 이벤트 위임
       document.addEventListener("change", async (e) => {
@@ -133,8 +129,8 @@
         const form = sel.closest("form.inline-update-form");
         if (!form) return;
 
-        const name = sel.getAttribute("name");
-        if (name !== "handler" && name !== "status") return;
+        const fieldName = sel.getAttribute("name");
+        if (fieldName !== "handler" && fieldName !== "status") return;
 
         const actionType = qs('input[name="action_type"]', form)?.value || "";
         if (!actionType) {
@@ -151,18 +147,45 @@
         setBusy(sel, true);
 
         try {
-          const data = await sendUpdate({ updateUrl, form, actionType, value: sel.value });
+          const data = await sendUpdate({
+            updateUrl,
+            form,
+            actionType,
+            value: sel.value,
+          });
 
-          if (actionType === "status") applyStatusColor(sel);
-
+          // 상태변경일 갱신
           if (data.status_updated_at && statusUpdatedAtText) {
             statusUpdatedAtText.textContent = data.status_updated_at;
           }
 
+          // status 확정 동기화
+          if (fieldName === "status") {
+            const confirmed = data.status || sel.value;
+            sel.value = confirmed;
+            sel.dataset.prevValue = confirmed;
+            sel.dataset.status = confirmed; // status_ui에서 사용
+          }
+
           showAlert(alertHost, data.message || "변경되었습니다.", "success");
+
+          // ✅ 공식 onSuccess
+          if (onSuccess) {
+            onSuccess(data, {
+              bootId,
+              fieldName,
+              actionType,
+              value: sel.value,
+              selectEl: sel,
+              form,
+              updateUrl,
+            });
+          }
         } catch (err) {
           sel.value = prev;
-          if (actionType === "status") applyStatusColor(sel);
+          sel.dataset.prevValue = prev;
+          if (fieldName === "status") sel.dataset.status = prev;
+
           showAlert(alertHost, err?.message || "변경 실패", "danger");
         } finally {
           setBusy(sel, false);
@@ -171,7 +194,6 @@
       });
     };
 
-    // ✅ 언제 로드되든 안전하게 바인딩
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", bind, { once: true });
     } else {

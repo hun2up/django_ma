@@ -1,4 +1,5 @@
 // django_ma/static/js/partner/manage_rate/fetch.js
+
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
 import { resetInputSection } from "./input_rows.js";
@@ -73,9 +74,15 @@ function escapeHtml(v) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-
 function escapeAttr(v) {
   return escapeHtml(v);
+}
+
+function squeezeSpaces(s) {
+  return String(s || "")
+    .replaceAll(">", " ") // 혹시 들어오면 제거
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* =========================================================
@@ -144,8 +151,7 @@ function renderAfterCell(val) {
 }
 
 function buildActionButtons(row) {
-  // ✅ 삭제는 delete.js(attachDeleteHandlers)가 담당
-  // 여기서는 버튼만 렌더 (권한 체크는 delete.js에서도 진행)
+  // ✅ 삭제는 delete.js(attachDeleteHandlers)가 담당, 여기서는 버튼만 렌더
   const id = String(row.id || "").trim();
   if (!id) return "";
   return `
@@ -161,6 +167,7 @@ function renderProcessDateCell(_value, _type, row) {
   const grade = getUserGrade();
   const val = (row.process_date || "").trim();
 
+  // leader는 보기만
   if (grade === "leader") {
     return `<span>${escapeHtml(val || "")}</span>`;
   }
@@ -176,12 +183,13 @@ function renderProcessDateCell(_value, _type, row) {
 }
 
 /* =========================================================
-   DataTables (메인시트 컬럼: 요청자/대상자 통합)
+   DataTables columns
+   ✅ "대상자" 다음에 "소속" 컬럼 추가
 ========================================================= */
 const MAIN_COLUMNS = [
-  // ✅ 통합 컬럼
-  { data: "rq_display", defaultContent: "", width: "140px" }, // 요청자성명(사번)
-  { data: "tg_display", defaultContent: "", width: "140px" }, // 대상자성명(사번)
+  { data: "rq_display", defaultContent: "", width: "140px" }, // 요청자
+  { data: "tg_display", defaultContent: "", width: "140px" }, // 대상자
+  { data: "tg_affiliation", defaultContent: "-", width: "220px" }, // 소속
 
   { data: "before_ftable", defaultContent: "", width: "70px" },
   { data: "before_frate", defaultContent: "", width: "70px" },
@@ -196,6 +204,8 @@ const MAIN_COLUMNS = [
   { data: "after_lrate", defaultContent: "", width: "70px" },
 
   { data: "memo", defaultContent: "", width: "150px" },
+
+  { data: "request_date", defaultContent: "", width: "120px" },
 
   {
     data: "process_date",
@@ -235,10 +245,27 @@ function destroyIfExists() {
       window.jQuery(els.mainTable).DataTable().clear().destroy();
     }
   } catch (_) {}
+  mainDT = null;
+}
+
+/**
+ * ✅ thead <th> 개수와 columns 개수가 다르면 DataTables가 헤더를 망가뜨릴 수 있음.
+ * 컬럼 구조 변경/캐시/부분갱신 등에도 안전하게 “강제 재생성” 하도록 체크.
+ */
+function needRebuildDT() {
+  if (!els.mainTable) return false;
+  const thCount = els.mainTable.querySelectorAll("thead th").length;
+  return thCount && thCount !== MAIN_COLUMNS.length;
 }
 
 function ensureMainDT() {
   if (!canUseDataTables()) return null;
+
+  // ✅ 컬럼 mismatch면 무조건 재생성
+  if (needRebuildDT()) {
+    destroyIfExists();
+  }
+
   if (mainDT) return mainDT;
 
   destroyIfExists();
@@ -252,9 +279,9 @@ function ensureMainDT() {
     lengthChange: true,
 
     autoWidth: false,
-    scrollX: true,
+    scrollX: false,
+    destroy: false,
 
-    destroy: true,
     language: {
       emptyTable: "데이터가 없습니다.",
       search: "검색:",
@@ -295,6 +322,7 @@ function renderMainSheetFallback(rows) {
     tr.innerHTML = `
       <td>${escapeHtml(r.rq_display || "")}</td>
       <td>${escapeHtml(r.tg_display || "")}</td>
+      <td>${escapeHtml(r.tg_affiliation || "-")}</td>
 
       <td>${escapeHtml(r.before_ftable || "")}</td>
       <td class="text-center">${escapeHtml(r.before_frate || "")}</td>
@@ -309,6 +337,8 @@ function renderMainSheetFallback(rows) {
       <td class="text-center">${escapeHtml(r.after_lrate || "")}</td>
 
       <td>${escapeHtml(r.memo || "")}</td>
+
+      <td class="text-center">${escapeHtml(r.request_date || "")}</td>
 
       <td class="text-center">
         ${
@@ -342,8 +372,6 @@ function renderMainSheet(rows) {
 
 /* =========================================================
    Delegation + Resize (once)
-   - 처리일자 저장만 fetch.js에서 담당
-   - 삭제는 delete.js에서 담당(중복 제거)
 ========================================================= */
 function bindDelegationOnce() {
   if (delegationBound) return;
@@ -383,7 +411,7 @@ function bindResizeOnce() {
 }
 
 /* =========================================================
-   Normalize row (✅ 요청자/대상자 표시값 통합 생성)
+   Normalize row
 ========================================================= */
 function formatNameId(name, id) {
   const n = String(name || "").trim();
@@ -394,6 +422,14 @@ function formatNameId(name, id) {
   return `${n}(${i})`;
 }
 
+function joinTeams(a, b, c) {
+  const arr = [a, b, c]
+    .map((x) => String(x ?? "").trim())
+    .filter((x) => x && x !== "-");
+  // ✅ 요청사항: "팀A 팀B 팀C" (구분자 공백)
+  return arr.length ? arr.join(" ") : "-";
+}
+
 function normalizeRateRow(row = {}) {
   const requester_name = row.requester_name || row.rq_name || "";
   const requester_id = row.requester_id || row.rq_id || "";
@@ -401,12 +437,20 @@ function normalizeRateRow(row = {}) {
   const target_name = row.target_name || row.tg_name || "";
   const target_id = row.target_id || row.tg_id || "";
 
+  // ✅ 서버 호환 키: tg_affiliation / target_affiliation / (팀A/B/C)
+  const rawAff =
+    String(row.tg_affiliation || row.target_affiliation || "").trim() ||
+    joinTeams(row.tg_team_a, row.tg_team_b, row.tg_team_c);
+
+  const tgAff = squeezeSpaces(rawAff) || "-";
+
   return {
     id: row.id || "",
 
-    // ✅ 통합 표시 필드 (메인시트용)
     rq_display: formatNameId(requester_name, requester_id),
     tg_display: formatNameId(target_name, target_id),
+
+    tg_affiliation: tgAff,
 
     before_ftable: row.before_ftable || "",
     before_frate: row.before_frate || "",
@@ -421,6 +465,8 @@ function normalizeRateRow(row = {}) {
     after_lrate: row.after_lrate || "",
 
     memo: row.memo || "",
+
+    request_date: row.request_date || row.created_date || row.created_at || "",
     process_date: row.process_date || "",
   };
 }
@@ -431,6 +477,7 @@ function normalizeRateRow(row = {}) {
 export async function fetchData(payload = {}) {
   if (!els.root) return;
 
+  // ✅ 삭제 후 재조회 등에 사용 (delete.js에서 활용)
   window.__lastRateFetchPayload = payload;
 
   bindDelegationOnce();

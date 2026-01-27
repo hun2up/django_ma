@@ -7,26 +7,44 @@
 {% block content %}
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
+
+    <!-- Page Title -->
     <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 글 수정</h3>
 
     <div class="card shadow p-4 border-0 rounded-4">
+
+      <!-- Form Errors -->
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
+      <!-- URLs -->
       {% url "board:post_list" as list_url %}
-      {% url "board:post_detail" task.pk as cancel_url %}
-      {% include "board/includes/_edit_form.html" with mode="edit" form=form attachments=attachments list_url=list_url cancel_url=cancel_url form_id="taskForm" %}
+      {% url "board:post_detail" post.pk as cancel_url %}
+
+      <!-- Main Form (shared partial) -->
+      {% include "board/includes/_edit_form.html" with
+        mode="edit"
+        form=form
+        attachments=attachments
+        list_url=list_url
+        cancel_url=cancel_url
+        form_id="postForm"
+      %}
     </div>
 
+    <!-- Back to Home -->
     <div class="text-center mt-4">
       <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">메인으로 돌아가기</a>
     </div>
+
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Upload UI + Submit Lock -->
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/board/form_submit_lock.js' %}?v=20260104_2"></script>
 {% endblock %}

@@ -212,20 +212,20 @@ def parse_date(value) -> Optional[date]:
 def _infer_channel(part_text: str) -> str:
     """
     규칙 1. 부문 설정
+      - 소속부서에 'GA' 포함 -> 'MA부문'
       - 소속부서에 'MA' 포함 -> 'MA부문'
-      - 'CA' 포함 -> 'CA부문'
-      - 'PA' 포함 -> 'PA부문'
-      - else -> '전략부문'
+      - 소속부서에 'CA' 포함 -> 'CA부문'
+      - 소속부서에 'PA' 포함 -> 'PA부문'
+      - 그 외 -> '전략부문'
     """
     t = _to_str(part_text).upper()
-    if "MA" in t:
+    # ✅ GA/MA 우선 (요청하신 정책)
+    if "GA" in t or "MA" in t:
         return "MA부문"
     if "CA" in t:
         return "CA부문"
     if "PA" in t:
         return "PA부문"
-    if "1인GA사업부" in t:
-        return "MA부문"
     return "전략부문"
 
 

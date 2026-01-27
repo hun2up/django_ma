@@ -85,7 +85,7 @@ INSTALLED_APPS = [
     "home",
     "join",
     "board",
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "commission",
     "dash",
     "manual",

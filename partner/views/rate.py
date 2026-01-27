@@ -3,6 +3,8 @@
 # ✅ RateChange(요율변경 요청) API
 # ------------------------------------------------------------
 
+from __future__ import annotations
+
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q
@@ -11,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
-from partner.models import RateChange, RateTable
+from partner.models import RateChange, RateTable, SubAdminTemp  # ✅ SubAdminTemp 추가
 
 from .responses import json_err, json_ok, parse_json_body
 from .utils import (
@@ -24,6 +26,16 @@ from .utils import (
 )
 
 
+def _to_str(v) -> str:
+    return ("" if v is None else str(v)).strip()
+
+
+def _team_affiliation(a: str, b: str, c: str) -> str:
+    parts = [_to_str(a), _to_str(b), _to_str(c)]
+    parts = [p for p in parts if p and p != "-"]
+    return " ".join(parts) if parts else "-"
+
+
 @require_GET
 @login_required
 @grade_required("superuser", "head", "leader")
@@ -31,7 +43,7 @@ def rate_fetch(request):
     """✅ RateChange 조회"""
     user = request.user
     month = normalize_month(request.GET.get("month") or "")
-    branch_param = (request.GET.get("branch") or "").strip()
+    branch_param = _to_str(request.GET.get("branch") or "")
     branch = resolve_branch_for_query(user, branch_param)
 
     qs = RateChange.objects.filter(month=month).select_related("requester", "target")
@@ -49,8 +61,27 @@ def rate_fetch(request):
 
     qs = qs.order_by("-id")
 
+    # =========================================================
+    # ✅ 대상자 팀 정보(SubAdminTemp) bulk load (기존 영향 X: rows에 키만 "추가")
+    # =========================================================
+    target_ids = list(qs.values_list("target_id", flat=True))
+    sub_map = {
+        str(sa.user_id): sa
+        for sa in SubAdminTemp.objects.filter(user_id__in=target_ids).only(
+            "user_id", "team_a", "team_b", "team_c"
+        )
+    }
+
     rows = []
     for rc in qs:
+        tid = str(rc.target_id)
+        sa = sub_map.get(tid)
+
+        tg_team_a = _to_str(getattr(sa, "team_a", "")) or "-"
+        tg_team_b = _to_str(getattr(sa, "team_b", "")) or "-"
+        tg_team_c = _to_str(getattr(sa, "team_c", "")) or "-"
+        tg_affiliation = _team_affiliation(tg_team_a, tg_team_b, tg_team_c)
+
         rows.append(
             {
                 "id": rc.id,
@@ -58,6 +89,13 @@ def rate_fetch(request):
                 "requester_id": rc.requester.id,
                 "target_name": rc.target.name,
                 "target_id": rc.target.id,
+
+                # ✅ 추가(호환 키): 소속/팀 (프론트에서 사용)
+                "tg_team_a": tg_team_a,
+                "tg_team_b": tg_team_b,
+                "tg_team_c": tg_team_c,
+                "tg_affiliation": tg_affiliation,
+
                 "before_ftable": rc.before_ftable,
                 "before_frate": rc.before_frate,
                 "after_ftable": rc.after_ftable,
@@ -91,7 +129,7 @@ def rate_save(request):
 
     saved = 0
     for r in rows:
-        target_id = str(r.get("target_id") or "").strip()
+        target_id = _to_str(r.get("target_id") or "")
         if not target_id:
             continue
 
@@ -106,13 +144,13 @@ def rate_save(request):
         before_frate = find_table_rate(target.branch, before_ftable)
         before_lrate = find_table_rate(target.branch, before_ltable)
 
-        after_ftable = (r.get("after_ftable") or "").strip()
-        after_ltable = (r.get("after_ltable") or "").strip()
+        after_ftable = _to_str(r.get("after_ftable") or "")
+        after_ltable = _to_str(r.get("after_ltable") or "")
 
         after_frate = find_table_rate(target.branch, after_ftable)
         after_lrate = find_table_rate(target.branch, after_ltable)
 
-        memo = (r.get("memo") or "").strip()
+        memo = _to_str(r.get("memo") or "")
 
         RateChange.objects.create(
             requester=user,

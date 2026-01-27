@@ -2,59 +2,34 @@
 (function () {
   "use strict";
 
-  const STATUS_CLASSES = ["status-start", "status-progress", "status-fix", "status-done"];
+  const INIT_FLAG = "__boardTaskListEntryInited";
 
-  function normalize(status) {
-    return String(status || "").trim();
-  }
+  function boot() {
+    if (document.body.dataset[INIT_FLAG] === "1") return;
+    document.body.dataset[INIT_FLAG] = "1";
 
-  function map(status) {
-    switch (normalize(status)) {
-      case "시작전":
-        return "status-start";
-      case "진행중":
-        return "status-progress";
-      case "보완필요":
-      case "보완요청":   // ✅ 둘 다 커버
-        return "status-fix";
-      case "완료":
-        return "status-done";
-      default:
-        return "";
+    // superuser only 페이지여야 함. boot 없으면 조용히 종료
+    if (!document.getElementById("taskListBoot")) return;
+
+    const statusUI = window.Board?.Common?.initStatusUI
+      ? window.Board.Common.initStatusUI({
+          preset: "task",
+          badgeSelectors: [".status-badge"],
+        })
+      : null;
+
+    if (window.Board?.Common?.initListInlineUpdate) {
+      window.Board.Common.initListInlineUpdate({
+        bootId: "taskListBoot",
+        idKey: "task_id",
+        onSuccess: () => statusUI?.applyAll?.(),
+      });
     }
   }
 
-  function apply(el) {
-    if (!el) return;
-
-    // select => value, badge => dataset.status
-    const status = el.value || el.dataset.status || "";
-    STATUS_CLASSES.forEach((c) => el.classList.remove(c));
-
-    const cls = map(status);
-    if (cls) el.classList.add(cls);
-  }
-
-  function applyAll() {
-    document.querySelectorAll(".status-select").forEach(apply);
-    document.querySelectorAll(".status-badge").forEach(apply);
-  }
-
-  document.addEventListener("DOMContentLoaded", applyAll);
-
-  // select 변경 시 즉시 반영
-  document.addEventListener("change", (e) => {
-    const el = e.target;
-    if (!el || !el.classList.contains("status-select")) return;
-    apply(el);
-  });
-
-  // 인라인 업데이트 성공 후에도 재적용
-  if (window.Board?.Common?.initListInlineUpdate) {
-    window.Board.Common.initListInlineUpdate({
-      bootId: "taskListBoot",
-      idKey: "task_id",
-      onSuccess: applyAll,
-    });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
   }
 })();

@@ -5,31 +5,45 @@
 {% block title %}직원업무 작성{% endblock %}
 
 {% block content %}
-{% if user.grade != 'superuser' %}
-  <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
-{% endif %}
-
 <div class="container mt-5">
   <div class="mx-auto" style="max-width: 700px;">
+
+    <!-- Page Title -->
     <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">직원업무 작성</h3>
 
     <div class="card shadow p-4 border-0 rounded-4">
+
+      <!-- Form Errors -->
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      {% url "task_list" as list_url %}
-      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="taskForm" %}
+      <!-- URLs -->
+      {% url "board:task_list" as list_url %}
+
+      <!-- Main Form (shared partial) -->
+      {% include "board/includes/_edit_form.html" with
+        mode="create"
+        form=form
+        attachments=None
+        list_url=list_url
+        cancel_url=list_url
+        form_id="taskForm"
+      %}
     </div>
 
+    <!-- Back to Home -->
     <div class="text-center mt-4">
       <a href="{% url 'home' %}" class="btn btn-outline-dark px-4 py-2 fw-semibold">메인으로 돌아가기</a>
     </div>
+
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Upload UI + Submit Lock -->
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/board/form_submit_lock.js' %}?v=20260104_2"></script>
 {% endblock %}
