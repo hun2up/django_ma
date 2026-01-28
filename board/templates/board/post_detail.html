@@ -1,15 +1,28 @@
 <!-- django_ma/board/templates/board/post_detail.html -->
-{% extends "base.html" %}
+{% extends "board/base_board.html" %}
 {% load static %}
-{% load widget_tweaks %}
 
 {% block title %}업무요청 상세보기{% endblock %}
 
 {% block content %}
+<!-- ================================
+     URLs
+     - 템플릿 내부에서 as로 고정
+     ================================ -->
+{% url "board:post_list" as list_url %}
+{% url "board:post_detail" post.pk as detail_url %}
+{% url "board:post_edit" post.pk as edit_url %}
+{% url "board:ajax_update_post_field_detail" post.pk as update_url %}
+{% url "home" as home_url %}
 
-<!-- Boot: inline update endpoint -->
+
+{% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
+  <div class="alert alert-danger">접근 권한이 없습니다.</div>
+{% endif %}
+
+<!-- Boot: inline update endpoint (superuser only; JS에서 updateUrl 없으면 자동 종료) -->
 <div id="postDetailBoot"
-     data-update-url="{% url 'board:ajax_update_post_field_detail' post.pk %}"
+     data-update-url="{{ update_url }}"
      class="d-none"></div>
 
 <div class="container mt-5">
@@ -17,7 +30,7 @@
   <!-- Inline update alerts (JS) -->
   <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
-  <!-- Messages -->
+  <!-- Django Messages -->
   {% if messages %}
     <div class="mb-3">
       {% for message in messages %}
@@ -29,16 +42,22 @@
     </div>
   {% endif %}
 
-  <div class="mx-auto" style="max-width: 700px;">
+  <div class="mx-auto board-narrow">
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <!-- Header -->
+      <!-- ================================
+           Header
+           ================================ -->
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
         <div class="flex-grow-1">
-          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">{{ post.title }}</h4>
+          <h4 class="fw-bold mb-1 text-primary" style="letter-spacing:-0.2px;">
+            {{ post.title }}
+          </h4>
 
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="text-muted small">{{ post.category }} | {{ post.created_at|date:"Y-m-d H:i" }}</span>
+            <span class="text-muted small">
+              {{ post.category }} | {{ post.created_at|date:"Y-m-d H:i" }}
+            </span>
 
             <!-- Read-only status badge for non-superuser -->
             {% if not is_superuser %}
@@ -51,15 +70,19 @@
         </div>
       </div>
 
-      <!-- Content -->
+      <!-- ================================
+           Content
+           ================================ -->
       <div class="my-3 p-3 bg-light rounded-3">
-        <p class="fs-6 mb-0" style="white-space: pre-wrap; line-height: 1.7;">{{ post.content }}</p>
+        <p class="fs-6 mb-0 board-detail-content">{{ post.content }}</p>
       </div>
 
       <!-- CSRF Token for dynamic comment edit form (JS) -->
       <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
 
-      <!-- Comments -->
+      <!-- ================================
+           Comments
+           ================================ -->
       <div class="mt-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h6 class="fw-bold mb-0">댓글</h6>
@@ -71,13 +94,18 @@
 
       <hr class="my-4">
 
-      <!-- Post Info -->
+      <!-- ================================
+           Post Info
+           ================================ -->
       <div class="my-2">
         <div class="row gy-2 gx-3">
           {% for label, value in post_info.items %}
             <div class="col-md-4">
               <span class="info-label">{{ label }}</span>
-              <span class="info-value">{{ value|default:"-" }}</span>
+
+              <span class="info-value {% if label in '소속(요청자),성명(요청자),사번(요청자)' %}board-req-meta-sm{% endif %}">
+                {{ value|default:"-" }}
+              </span>
             </div>
           {% endfor %}
         </div>
@@ -85,7 +113,9 @@
 
       <hr class="my-4">
 
-      <!-- Handler / Status / UpdatedAt -->
+      <!-- ================================
+           Handler / Status / UpdatedAt
+           ================================ -->
       <div class="my-2">
         <div class="row align-items-center">
 
@@ -121,7 +151,8 @@
 
                 <select name="status"
                         class="form-select form-select-sm status-select d-inline-block w-auto"
-                        data-status="{{ post.status|default:'' }}">
+                        data-status="{{ post.status|default:'' }}"
+                        data-status-ui="1">
                   {% for s in status_choices %}
                     <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
                   {% endfor %}
@@ -147,16 +178,20 @@
 
       <hr class="my-4">
 
-      <!-- Attachments -->
+      <!-- ================================
+           Attachments
+           ================================ -->
       {% if attachments and attachments.exists %}
         <div class="my-2">
           <span class="info-value">첨부파일</span>
+
           <ul class="list-group mt-2">
             {% for att in attachments %}
               <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div class="text-truncate" style="max-width: 80%;">
+                <div class="text-truncate board-file-link">
                   <i class="bi bi-paperclip"></i>
-                  <a href="{{ att.file.url }}" download="{{ att.original_name|default:att.file.name }}">
+                  {% url "board:post_attachment_download" att.id as file_url %}
+                  <a href="{{ file_url }}">
                     {{ att.original_name|default:att.file.name }}
                   </a>
                 </div>
@@ -167,9 +202,10 @@
         </div>
       {% endif %}
 
-      <!-- Actions -->
+      <!-- ================================
+           Actions
+           ================================ -->
       <div class="board-detail-actions mt-4">
-
         <div class="board-detail-actions-left">
           <a href="{{ list_url }}" class="btn btn-outline-secondary">목록으로</a>
 
@@ -187,19 +223,17 @@
         </div>
 
         <div class="board-detail-actions-right">
-          <a href="{% url 'home' %}" class="btn btn-dark">메인으로</a>
+          <a href="{{ home_url }}" class="btn btn-dark">메인으로</a>
         </div>
-
       </div>
 
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
-<!-- Comment edit + inline update -->
+<!-- Comment edit + inline update + status ui -->
 <script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/board/common/comment_edit.js' %}?v=20260104"></script>
 <script src="{% static 'js/board/common/detail_inline_update.js' %}?v=20260104"></script>

@@ -1,0 +1,1 @@
+# django_ma/board/templatetags/__init__.py

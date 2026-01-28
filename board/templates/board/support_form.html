@@ -1,6 +1,7 @@
 <!-- django_ma/board/templates/board/support_form.html -->
-{% extends "base.html" %}
+{% extends "board/base_board.html" %}
 {% load static %}
+
 {% block title %}업무요청서{% endblock %}
 
 {% block content %}
@@ -18,17 +19,21 @@
      data-pdf-url="{% url 'board:generate_request_support' %}">
 
   <div class="container mt-5">
-    <div class="mx-auto" style="max-width: 700px;">
+    <div class="mx-auto board-narrow">
+
+      {% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
+        <div class="alert alert-danger">접근 권한이 없습니다.</div>
+      {% endif %}
 
       <!-- Page Title -->
-      <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청서</h3>
+      <h3 class="mb-4 text-center fw-bold board-page-title">업무요청서</h3>
 
       <!-- Optional: Permission Notice (UI only) -->
-      {% if user.grade not in "superuser head leader" %}
-      <div class="alert alert-danger">
-        <strong>접근 권한이 없습니다.</strong>
-        이 페이지는 superuser / head / leader 권한에서만 사용 가능합니다.
-      </div>
+      {% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
+        <div class="alert alert-danger">
+          <strong>접근 권한이 없습니다.</strong>
+          이 페이지는 superuser / head / leader 권한에서만 사용 가능합니다.
+        </div>
       {% endif %}
 
       <div class="card shadow p-4 border-0 rounded-4">
@@ -37,11 +42,7 @@
         <form id="requestForm" method="POST" novalidate>
           {% csrf_token %}
 
-          <!-- ==========================================
-               1) 요청대상 (Targets)
-               - 최대 5명
-               - 검색 모달 연동 (공통 search_user_modal.js / components/search_user_modal.html)
-               ========================================== -->
+          <!-- 1) 요청대상 (Targets) - 최대 5명 / 검색 모달 연동 -->
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="fw-bold mb-0 text-primary">요청대상</h5>
             <div class="d-flex gap-2">
@@ -55,41 +56,42 @@
 
               <!-- Target Row Template (1~5) -->
               {% for i in "12345" %}
-              <div class="row mb-2 align-items-center user-row"
-                   data-index="{{ i }}"
-                   {% if i != "1" %}style="display:none;"{% endif %}>
+                <div class="row mb-2 align-items-center user-row"
+                     data-index="{{ i }}"
+                     {% if i != "1" %}style="display:none;"{% endif %}>
 
-                <!-- Search Button -->
-                <div class="col-auto text-center">
-                  <button type="button"
-                          class="btn btn-primary btn-open-search"
-                          data-row="{{ i }}"
-                          data-bs-toggle="modal"
-                          data-bs-target="#searchUserModal">
-                    검색
-                  </button>
-                </div>
+                  <!-- Search Button -->
+                  <div class="col-auto text-center">
+                    <button type="button"
+                            class="btn btn-primary btn-open-search"
+                            data-row="{{ i }}"
+                            data-bs-toggle="modal"
+                            data-bs-target="#searchUserModal">
+                      검색
+                    </button>
+                  </div>
 
-                <!-- Readonly Fields (name/code/join/leave 등) -->
-                {% for label, field in fields %}
-                <div class="col equal-field mb-2">
-                  <label class="form-label">{{ label }}</label>
-                  <input type="text"
-                         name="{{ field }}{{ i }}"
-                         class="form-control readonly-field"
-                         readonly>
-                </div>
-                {% endfor %}
+                  <!-- Readonly Fields -->
+                  {% for label, field in fields %}
+                    <div class="col equal-field mb-2">
+                      <label class="form-label">{{ label }}</label>
+                      <input type="text"
+                             name="{{ field }}{{ i }}"
+                             class="form-control readonly-field"
+                             readonly>
+                    </div>
+                  {% endfor %}
 
-                <!-- Remove Button (except first row) -->
-                <div class="col-md-1 text-center">
-                  {% if i != "1" %}
-                    <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
-                  {% else %}
-                    <div style="height:32px;"></div>
-                  {% endif %}
+                  <!-- Remove Button -->
+                  <div class="col-md-1 text-center">
+                    {% if i != "1" %}
+                      <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
+                    {% else %}
+                      <div style="height:32px;"></div>
+                    {% endif %}
+                  </div>
+
                 </div>
-              </div>
               {% endfor %}
 
             </div>
@@ -97,10 +99,7 @@
 
           <hr>
 
-          <!-- ==========================================
-               2) 계약사항 (Contracts)
-               - 최대 5건
-               ========================================== -->
+          <!-- 2) 계약사항 (Contracts) - 최대 5건 -->
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="fw-bold mb-0 text-primary">계약사항</h5>
             <div class="d-flex gap-2">
@@ -110,38 +109,35 @@
           </div>
 
           <div id="contractContainer">
-
             <!-- Contract Row Template (1~5) -->
             {% for i in "12345" %}
-            <div class="row mb-2 contract-row"
-                 data-index="{{ i }}"
-                 {% if i != "1" %}style="display:none;"{% endif %}>
+              <div class="row mb-2 contract-row"
+                   data-index="{{ i }}"
+                   {% if i != "1" %}style="display:none;"{% endif %}>
 
-              {% for label, name, col in contracts %}
-              <div class="col-md-{{ col }} mb-2">
-                <label class="form-label">{{ label }}</label>
-                <input type="text" name="{{ name }}{{ i }}" class="form-control">
-              </div>
-              {% endfor %}
+                {% for label, name, col in contracts %}
+                  <div class="col-md-{{ col }} mb-2">
+                    <label class="form-label">{{ label }}</label>
+                    <input type="text" name="{{ name }}{{ i }}" class="form-control">
+                  </div>
+                {% endfor %}
 
-              <!-- Remove Button (except first row) -->
-              <div class="col-md-1 text-center">
-                {% if i != "1" %}
-                  <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
-                {% else %}
-                  <div style="height:32px;"></div>
-                {% endif %}
+                <!-- Remove Button -->
+                <div class="col-md-1 text-center">
+                  {% if i != "1" %}
+                    <button type="button" class="btn btn-danger btn-remove" data-index="{{ i }}">제거</button>
+                  {% else %}
+                    <div style="height:32px;"></div>
+                  {% endif %}
+                </div>
+
               </div>
-            </div>
             {% endfor %}
-
           </div>
 
           <hr>
 
-          <!-- ==========================================
-               3) 요청내용 (Content)
-               ========================================== -->
+          <!-- 3) 요청내용 (Content) -->
           <h5 class="fw-bold mb-3 text-primary">요청내용</h5>
 
           <div class="mb-3">
@@ -154,27 +150,13 @@
             <textarea name="content" class="form-control" rows="5" placeholder="요청 상세 내용을 입력해주세요"></textarea>
           </div>
 
-          <!-- ==========================================
-               4) Action Buttons
-               ========================================== -->
+          <!-- 4) Action Buttons -->
           <div class="d-flex justify-content-between mt-4">
-            <!-- Back -->
-            <a href="{{ request.META.HTTP_REFERER|default:'/' }}"
-               class="btn btn-outline-secondary px-4">
-              뒤로가기
-            </a>
-
-            <!-- Generate PDF -->
-            <button type="button"
-                    id="generatePdfBtn"
-                    class="btn btn-primary px-5 fw-bold">
-              제작하기
-            </button>
+            <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-outline-secondary px-4">뒤로가기</a>
+            <button type="button" id="generatePdfBtn" class="btn btn-primary px-5 fw-bold">제작하기</button>
           </div>
 
-          <!-- ==========================================
-               5) Loading Overlay
-               ========================================== -->
+          <!-- 5) Loading Overlay (JS 제어) -->
           <div id="loadingOverlay" class="loading-overlay" style="display:none;">
             <div class="loading-box">
               <div class="spinner-border text-primary" role="status" style="width:4rem; height:4rem;"></div>
@@ -187,7 +169,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <!-- Search User Modal (Shared Component) -->
 {% include "components/search_user_modal.html" with search_url="/api/accounts/search-user/" %}
 

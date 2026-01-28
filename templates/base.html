@@ -13,8 +13,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
 
-  <!-- ✅ Project base style (cache-buster) -->
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v={% now 'U' %}">
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/plugins/datatables.css' %}">
+  <link rel="stylesheet" href="{% static 'css/fixes.css' %}">
+
+  <!-- ✅ App CSS: 페이지(앱)별로 필요할 때만 로드 -->
+  {% block app_css %}{% endblock %}
 
   <!-- ✅ Mobile Offcanvas tweak -->
   <style>
@@ -75,17 +80,17 @@
             </li>
           {% endif %}
 
-          {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
+          {% if user.grade != 'inactive' %}
             <!-- ✅ Board -->
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle {% if '/board' in request.path %}active{% else %}inactive{% endif %}"
                 href="#" id="boardMenu" data-bs-toggle="dropdown">업무요청</a>
               <ul class="dropdown-menu" aria-labelledby="boardMenu">
-                <li><a class="dropdown-item" href="{% url 'board:post_list' %}">요청게시판</a></li>
-                {% if user.grade != 'resign' %}
+                {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
+                  <li><a class="dropdown-item" href="{% url 'board:post_list' %}">요청게시판</a></li>
                   <li><a class="dropdown-item" href="{% url 'board:support_form' %}">업무요청서</a></li>
-                  <li><a class="dropdown-item" href="{% url 'board:states_form' %}">FA소명서</a></li>
                 {% endif %}
+                <li><a class="dropdown-item" href="{% url 'board:states_form' %}">FA소명서</a></li>
                 {% if user.grade == 'superuser' %}
                   <li><a class="dropdown-item" href="{% url 'board:task_list' %}">직원업무</a></li>
                 {% endif %}
@@ -213,7 +218,7 @@
           </div>
         {% endif %}
 
-        {% if user.grade == 'superuser' or user.grade == 'head' or  user.grade == 'leader' %}        
+        {% if user.grade != 'inactive' %}      
           <!-- 업무요청 -->
           <div class="accordion-item">
             <h2 class="accordion-header" id="mBoardHead">
@@ -225,11 +230,11 @@
             </h2>
             <div id="mBoard" class="accordion-collapse collapse" aria-labelledby="mBoardHead" data-bs-parent="#mobileMenuAccordion">
               <div class="accordion-body pt-0">
-                <a class="d-block py-2" href="{% url 'board:post_list' %}">요청게시판</a>
-                {% if user.grade != 'resign' %}
+                {% if user.grade == 'superuser' or user.grade == 'head' or  user.grade == 'leader' %}   
+                  <a class="d-block py-2" href="{% url 'board:post_list' %}">요청게시판</a>
                   <a class="d-block py-2" href="{% url 'board:support_form' %}">업무요청서</a>
-                  <a class="d-block py-2" href="{% url 'board:states_form' %}">FA소명서</a>
                 {% endif %}
+                <a class="d-block py-2" href="{% url 'board:states_form' %}">FA소명서</a>
                 {% if user.grade == 'superuser' %}
                   <a class="d-block py-2" href="{% url 'board:task_list' %}">직원업무</a>
                 {% endif %}

@@ -1,5 +1,22 @@
 <!-- django_ma/board/templates/board/includes/_form_common.html -->
-<!-- 필수 context: form, mode ("create"|"edit"), attachments(optional) -->
+
+<!--
+  Board Common Fields Include
+  - create/edit 공용 필드
+  - edit 모드에서만 "현재 첨부파일" 렌더
+  - file_upload_utils.js 연동 포인트(유지):
+    - #fileInput (name="attachments", multiple)
+    - #fileList / #fileNames / #noFilesText
+    - .remove-existing[data-id]
+    - #deleteContainer
+
+  Required context:
+  - form
+  - mode ("create" | "edit")
+
+  Optional:
+  - attachments (edit 모드에서만 사용)
+-->
 
 <!-- 구분 -->
 <div class="row mb-3 align-items-end">
@@ -21,25 +38,38 @@
   {{ form.content }}
 </div>
 
-<!-- ✅ edit 모드일 때만 기존 첨부파일 표시 -->
+<!-- edit 모드: 기존 첨부파일 -->
 {% if mode == "edit" %}
   <div class="mb-2">
     <label class="form-label fw-semibold">현재 첨부파일</label>
   </div>
 
-  <div id="existingFileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
+  <div id="existingFileList" class="border rounded-3 p-3 mb-4 bg-light board-filebox board-existing-filebox">
     {% if attachments %}
       <ul id="existingFiles" class="list-unstyled m-0">
         {% for att in attachments %}
-          <li class="d-flex justify-content-between align-items-center py-1 border-bottom small">
-            <span class="text-truncate" style="max-width:80%;">
+          <li class="d-flex justify-content-between align-items-center py-1 border-bottom small board-existing-file-row">
+            <span class="text-truncate board-file-name">
               <i class="bi bi-paperclip"></i>
-              <a href="{{ att.file.url }}" download>
-                {{ att.original_name|default:att.file.name }}
-              </a>
+
+              <!-- ✅ 원천차단 정책: att.file.url 직접 링크 금지 / edit 화면에서도 다운로드 뷰로 통일 (attachment_download_name 필요) -->
+              {% if attachment_download_name %}
+                {% url attachment_download_name att.id as dl_url %}
+                <a href="{{ dl_url }}">
+                  {{ att.original_name|default:att.file.name }}
+                </a>
+              {% else %}
+                <!-- (안전장치) 다운로드 URL name이 없으면 '직접 링크' 대신 텍스트만 표시 -->
+                <span>
+                  {{ att.original_name|default:att.file.name }}
+                </span>
+              {% endif %}
               <span class="text-muted">({{ att.size|filesizeformat }})</span>
             </span>
-            <button type="button" class="btn btn-sm btn-outline-danger remove-existing" data-id="{{ att.id }}">
+
+            <button type="button"
+                    class="btn btn-sm btn-outline-danger remove-existing"
+                    data-id="{{ att.id }}">
               ✖
             </button>
           </li>
@@ -51,22 +81,31 @@
   </div>
 {% endif %}
 
-<!-- ✅ 새 첨부파일 추가 (create/edit 공용) -->
+<!-- 새 첨부파일 -->
 <div class="mb-3">
   <label class="form-label fw-semibold">
     {% if mode == "edit" %}새 첨부파일 추가{% else %}첨부파일{% endif %}
   </label>
+
   <input type="file" id="fileInput" name="attachments" class="form-control" multiple>
-  <div class="form-text">파일은 개당 최대 <strong>10MB</strong>까지 업로드할 수 있습니다.</div>
+
+  <div class="form-text">
+    파일은 개당 최대 <strong>10MB</strong>까지 업로드할 수 있습니다.
+  </div>
 </div>
 
-<!-- ✅ 새 파일 목록 -->
-<div id="fileList" class="border rounded-3 p-3 mb-4 bg-light" style="min-height:80px;">
+<!-- 새 파일 목록 -->
+<div id="fileList" class="border rounded-3 p-3 mb-4 bg-light board-filebox board-new-filebox">
   <p class="text-muted m-0 small" id="noFilesText">
-    {% if mode == "edit" %}첨부된 새 파일이 없습니다.{% else %}첨부된 파일이 없습니다.{% endif %}
+    {% if mode == "edit" %}
+      첨부된 새 파일이 없습니다.
+    {% else %}
+      첨부된 파일이 없습니다.
+    {% endif %}
   </p>
+
   <ul id="fileNames" class="list-unstyled m-0"></ul>
 </div>
 
-<!-- ✅ 삭제할 파일 ID 전달용 (file_upload_utils.js가 hidden 생성) -->
+<!-- 삭제 대상 파일 ID 전달 컨테이너 -->
 <div id="deleteContainer"></div>

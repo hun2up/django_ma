@@ -10,6 +10,7 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 
 - 업무 매뉴얼 기반 지식 관리
 - 조직/권한 관리
+- 업무요청/직원업무 처리 흐름(게시판)
 - 요율변경 및 수수료/채권 관리
 - 매출 현황 및 예측 대시보드
 
@@ -20,7 +21,7 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 
 ## 2. 현재 범위 (Scope)
 
-현재 django_ma는 다음 두 개의 핵심 앱을 중심으로 구성된다.
+현재 django_ma는 아래 앱들로 구성되며, 운영 시스템으로 점진 확장 중이다.
 
 ### (1) accounts 앱
 - CustomUser 모델 기반 사용자 관리
@@ -34,7 +35,16 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 - 섹션/블록 기반 콘텐츠 구조
 - grade 기반 접근 제어
 - 운영자(superuser) 중심의 관리 UI
-- 실시간 AJAX 기반 편집/정렬/이동
+- AJAX 기반 편집/정렬/이동
+
+### (3) board 앱 (리팩토링 완료)
+- **업무요청 게시판(Post)**: 요청 등록/조회/수정/삭제 + 댓글 + 첨부
+- **직원업무 게시판(Task)**: superuser 전용 내부 업무 처리
+- **인라인 상태/담당자 업데이트**: 목록/상세에서 AJAX로 즉시 반영
+- **서식 출력(PDF)**: 업무요청서(support_form), FA 소명서(states_form)
+- **보안 첨부 다운로드**: `att.file.url` 직접 노출 금지, 다운로드 뷰로만 제공
+- **프론트 구조**: Bootstrap + Vanilla JS + 공용 includes(partials)
+- **CSS 모듈화**: `static/css/apps/board.css`를 board 스코프에서만 로드
 
 ---
 
@@ -47,8 +57,8 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 | head | 각 파트너별 최상위 관리자 |
 | leader | 각 파트너별 중간 관리자 |
 | basic | 일반 사용자(설계사) |
-| resign | 퇴사자 |
-| inactive | 비활성/마스킹 계정 |
+| resign | 퇴사자(접근 제한) |
+| inactive | 비활성/마스킹 계정(로그인 불가) |
 
 > `resign`, `inactive`는 **업무 접근 제한 대상**이며  
 > `inactive`는 시스템 레벨에서 로그인 불가 처리된다.
@@ -56,21 +66,24 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 ---
 
 ## 4. 기술 스택 요약
-
 - Backend: Django 5.2
 - Auth: CustomUser + Django Auth
 - DB: PostgreSQL
 - Cache/Broker: Redis
-- Background Task: Celery
-- Frontend: Django Template + Vanilla JS
+- Background Task: Celery (주로 accounts 엑셀 업로드 등)
+- Frontend: Django Template + Vanilla JS + Bootstrap 5
+- PDF: ReportLab (board 서식 출력)
 - Infra: Linux / Nginx / Render (또는 유사 환경)
 
 ---
 
 ## 5. 설계 원칙
-
 - **SSOT (Single Source of Truth)**  
-  → 검색 정책, 권한 정책은 단일 위치에서 관리
+  → 검색 정책, 권한 정책, 다운로드 정책은 단일 위치에서 관리
 - **비즈니스 규칙은 코드보다 문서에 먼저 기록**
-- **Admin 기능도 운영 UI로 간주**
+- **운영 UI 중심 설계** (Admin도 운영 UX)
 - **장기 운영 + 인수인계 가능성 전제**
+- **CSS 모듈화/스코프 원칙 준수**
+  - base.css: 전역 토대/토큰/공통 UI
+  - apps/*.css: 앱 단위 스코프 스타일
+  - board는 `board/base_board.html`에서만 `apps/board.css`를 로드

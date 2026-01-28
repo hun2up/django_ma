@@ -249,22 +249,55 @@ CKEDITOR_CONFIGS = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =============================================================================
-# 14) Logging
+# 14) Logging (500 에러 Traceback 확보 + 기존 로그 유지)
 # =============================================================================
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+
     "handlers": {
+        # 기존 access 로그 (유지)
         "file": {
             "level": "INFO",
             "class": "logging.FileHandler",
             "filename": BASE_DIR / "access.log",
         },
+
+        # ✅ 500 에러 전용 로그
+        "error_file": {
+            "level": "ERROR",
+            "class": "logging.FileHandler",
+            "filename": BASE_DIR / "django_error.log",
+        },
+
+        # ✅ 로컬/운영 콘솔 출력
+        "console": {
+            "class": "logging.StreamHandler",
+        },
     },
+
     "loggers": {
-        "django.security": {"handlers": ["file"], "level": "INFO", "propagate": True},
-        "accounts.access": {"handlers": ["file"], "level": "INFO", "propagate": False},
+        # 기존 유지
+        "django.security": {
+            "handlers": ["file"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "accounts.access": {
+            "handlers": ["file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+
+        # ✅ 핵심: 500 Internal Server Error Traceback
+        "django.request": {
+            "handlers": ["error_file", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
 
+# runserver 요청 로그 소음 제거 (유지)
 logging.getLogger("django.server").setLevel(logging.ERROR)
+

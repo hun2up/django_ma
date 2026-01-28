@@ -6,12 +6,7 @@
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-
-<!-- ❌ DataTables 로드 금지 -->
-<!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> -->
-
-<!-- ✅ 필요한 경우 SortableJS만 -->
+<link rel="stylesheet" href="{% static 'css/apps/partner.css' %}?v={% now 'U' %}">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 {% endblock %}
 
@@ -25,30 +20,32 @@
      data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
      data-save-url="{% url 'partner:ajax_table_save' %}"
      data-rate-template-url="{% static 'excel/양식_테이블관리.xlsx' %}"
-     >
+>
 
   {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
-      <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
   {% endif %}
 
-  <h3 class="fw-bold text-center mb-4" style="color:#003f7d;">테이블 관리 페이지</h3>
+  <h3 class="fw-bold text-center mb-4 manage-table-title">테이블 관리 페이지</h3>
 
   {% if user.grade == 'superuser' %}
   <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
     <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
-      <div style="flex:0 0 220px;">
+      <div class="ctl-part">
         <label for="partSelect" class="form-label fw-semibold">부서</label>
         <select id="partSelect" class="form-select form-select-sm">
           <option value="">불러오는 중...</option>
         </select>
       </div>
-      <div style="flex:0 0 300px;">
+
+      <div class="ctl-branch">
         <label for="branchSelect" class="form-label fw-semibold">지점</label>
         <select id="branchSelect" class="form-select form-select-sm" disabled>
           <option value="">부서를 먼저 선택하세요</option>
         </select>
       </div>
-      <div style="flex:0 0 120px;">
+
+      <div class="ctl-btn">
         <button type="button" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
       </div>
     </form>
@@ -68,16 +65,27 @@
 
     <div class="table-responsive">
       <table class="table table-bordered table-hover align-middle text-center" id="mainTable">
+        <!-- ✅ 인라인 style 제거: colgroup + CSS 변수로 폭 관리 -->
+        <colgroup>
+          <col class="mt-col-order">
+          <col class="mt-col-branch">
+          <col class="mt-col-table">
+          <col class="mt-col-rate">
+          <col class="mt-col-edit">
+          <col class="mt-col-del">
+        </colgroup>
+
         <thead class="table-light">
           <tr>
-            <th style="width:8%">순번</th>
-            <th style="width:25%">지점</th>
-            <th style="width:35%">테이블</th>
-            <th style="width:20%">요율(%)</th>
-            <th style="width:10%">편집</th> 
-            <th style="width:12%">삭제</th>
+            <th>순번</th>
+            <th>지점</th>
+            <th>테이블</th>
+            <th>요율(%)</th>
+            <th>편집</th>
+            <th>삭제</th>
           </tr>
         </thead>
+
         <tbody id="tableBody">
           <tr class="data-row" data-order="1">
             <td class="order-cell">1</td>
@@ -85,10 +93,12 @@
             <td class="editable" contenteditable="false"></td>
             <td class="editable rate-cell" contenteditable="false"></td>
             <td>
-            <button class="btn btn-outline-secondary btn-sm btnMoveUp" disabled>▲</button>
-            <button class="btn btn-outline-secondary btn-sm btnMoveDown" disabled>▼</button>
-          </td>
-            <td><button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button></td>
+              <button class="btn btn-outline-secondary btn-sm btnMoveUp" disabled>▲</button>
+              <button class="btn btn-outline-secondary btn-sm btnMoveDown" disabled>▼</button>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -102,6 +112,7 @@
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fw-bold mb-0 text-primary">지점 내 요율현황</h5>
+
         <div class="d-flex gap-2">
           <form id="rateUploadForm" enctype="multipart/form-data">
             {% csrf_token %}
@@ -110,9 +121,11 @@
               <i class="bi bi-file-earmark-arrow-up"></i> 엑셀 업로드
             </button>
           </form>
+
           <button id="btnDownloadExcel" class="btn btn-success btn-sm">
             <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
           </button>
+
           <button type="button" id="btnDownloadTemplate" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-file-earmark-arrow-down"></i> 양식 다운로드
           </button>
@@ -137,48 +150,13 @@
     </div>
   </div>
 
-
-  <div id="loadingOverlay" hidden
-      style="position:fixed;top:0;left:0;width:100%;height:100%;
-      background:rgba(255,255,255,0.7);display:flex;align-items:center;
-      justify-content:center;z-index:2000;flex-direction:column;">
+  <!-- ✅ base.css의 .loading-overlay 재사용 (인라인 style 제거) -->
+  <div id="loadingOverlay" class="loading-overlay" hidden>
     <div class="spinner-border text-primary" role="status"></div>
-    <div class="mt-2 fw-bold">처리 중...</div>
+    <div class="loading-text">처리 중...</div>
   </div>
+
 </div>
-
-<style>
-  /* ✅ 테이블 관리 카드 전체 폭 제한 */
-  #manage-table .card {
-    max-width: 1100px; /* 원하는 폭 (예: 1000~1200px 추천) */
-    margin: 0 auto;    /* 중앙 정렬 */
-  }
-
-  /* ✅ 테이블 내용 정렬 */
-  #mainTable {
-    width: 100%;
-  }
-</style>
-
-<style>
-  #mainTable td, #mainTable th { font-size: 16px; vertical-align: middle; }
-  #mainTable .btnDeleteRow { font-size: 13px; }
-  .sortable-ghost { opacity: 0.6; background: #e6f0ff; }
-</style>
-
-<style>
-  /* ✅ 지점 내 요율현황 테이블 폰트 크기 한 단계 축소 */
-  #rateUserTable {
-    font-size: 14px; /* 기존보다 한 단계 작게 */
-  }
-
-  #rateUserTable th,
-  #rateUserTable td {
-    padding: 6px 8px;  /* 여백도 살짝 줄이기 */
-    vertical-align: middle;
-  }
-</style>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -192,7 +170,7 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 
-<!-- (선택) 만약 rateUserTable에서 버튼/엑셀 기능(DataTables Buttons)을 쓴다면 -->
+<!-- (선택) rateUserTable에서 버튼/엑셀 기능(DataTables Buttons)을 쓴다면 -->
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>

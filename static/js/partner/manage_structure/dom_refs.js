@@ -9,7 +9,7 @@ export const els = {
     return byId("manage-structure");
   },
 
-  /* controls (정식) */
+  /* controls */
   get yearSelect() {
     return byId("yearSelect");
   },
@@ -29,7 +29,7 @@ export const els = {
     return byId("btnSearchPeriod") || byId("btnSearch");
   },
 
-  /* ✅ controls (호환 alias: 기존 코드가 els.year/els.month/els.branch 쓰는 경우) */
+  /* compatibility aliases */
   get year() {
     return this.yearSelect;
   },

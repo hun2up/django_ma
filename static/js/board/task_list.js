@@ -1,35 +1,20 @@
 // django_ma/static/js/board/task_list.js
+// =========================================================
+// Task List Entry
+// - 상태 UI(status_ui) 적용(preset: task)
+// - 리스트 인라인 업데이트(inline_update) 성공 시 상태 UI 재적용
+// =========================================================
+
 (function () {
   "use strict";
 
-  const INIT_FLAG = "__boardTaskListEntryInited";
+  const status = window.Board?.Common?.initStatusUI?.({ preset: "task" });
 
-  function boot() {
-    if (document.body.dataset[INIT_FLAG] === "1") return;
-    document.body.dataset[INIT_FLAG] = "1";
-
-    // superuser only 페이지여야 함. boot 없으면 조용히 종료
-    if (!document.getElementById("taskListBoot")) return;
-
-    const statusUI = window.Board?.Common?.initStatusUI
-      ? window.Board.Common.initStatusUI({
-          preset: "task",
-          badgeSelectors: [".status-badge"],
-        })
-      : null;
-
-    if (window.Board?.Common?.initListInlineUpdate) {
-      window.Board.Common.initListInlineUpdate({
-        bootId: "taskListBoot",
-        idKey: "task_id",
-        onSuccess: () => statusUI?.applyAll?.(),
-      });
-    }
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot, { once: true });
-  } else {
-    boot();
+  if (window.Board?.Common?.initListInlineUpdate) {
+    window.Board.Common.initListInlineUpdate({
+      bootId: "taskListBoot",
+      idKey: "task_id",
+      onSuccess: () => status?.applyAll?.(),
+    });
   }
 })();

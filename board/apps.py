@@ -1,3 +1,5 @@
+# django_ma/board/apps.py
+
 import logging
 from django.apps import AppConfig
 

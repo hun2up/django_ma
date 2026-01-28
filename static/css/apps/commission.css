@@ -1,0 +1,145 @@
+/* django_ma/static/css/apps/commission.css
+==========================================================
+💳 commission.css — Commission 앱 전용 스타일
+- 범위: deposit_home + approval_home 테이블 정책/스크롤/ellipsis
+========================================================== */
+
+/* ==========================================================
+ 1) Deposit Home (채권현황)
+========================================================== */
+.deposit-maxw { max-width: 1100px; }
+
+.deposit-title { color: #003f7d; }
+.deposit-section-title { color: #000000; }
+
+/* info-table 공통 */
+.info-table thead th {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #5b6b7a;
+  background: #f6f8fb;
+  border-bottom: 1px solid #e6edf5;
+  padding: 10px 12px;
+}
+
+.info-table tbody td {
+  font-size: 1rem;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+/* 테이블: 내용 기준(max-content) */
+#suretyTable,
+#otherTable {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+/* 기본: 줄바꿈 금지 */
+#suretyTable th, #suretyTable td,
+#otherTable th,  #otherTable td {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: middle;
+}
+
+/* ---------- surety 컬럼 폭 ---------- */
+#suretyTable th:nth-child(1),
+#suretyTable td:nth-child(1) { min-width: 110px; }
+
+#suretyTable th:nth-child(2),
+#suretyTable td:nth-child(2) {
+  width: 100px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+#suretyTable th:nth-child(3),
+#suretyTable td:nth-child(3) {
+  width: 100px;
+  min-width: 100px;
+  text-align: right;
+}
+
+#suretyTable th:nth-child(4),
+#suretyTable td:nth-child(4) { min-width: 80px; }
+
+#suretyTable th:nth-child(5),
+#suretyTable td:nth-child(5) { min-width: 110px; }
+
+#suretyTable th:nth-child(6),
+#suretyTable td:nth-child(6) { min-width: 110px; }
+
+/* ---------- other 컬럼 폭 ---------- */
+#otherTable th:nth-child(1),
+#otherTable td:nth-child(1) { min-width: 110px; }
+
+#otherTable th:nth-child(2),
+#otherTable td:nth-child(2) { min-width: 110px; }
+
+#otherTable th:nth-child(3),
+#otherTable td:nth-child(3) {
+  width: 100px;
+  min-width: 100px;
+  text-align: right;
+}
+
+#otherTable th:nth-child(4),
+#otherTable td:nth-child(4) { min-width: 80px; }
+
+#otherTable th:nth-child(5),
+#otherTable td:nth-child(5) { min-width: 110px; }
+
+#otherTable th:nth-child(6),
+#otherTable td:nth-child(6) { min-width: 95px; }
+
+#otherTable th:nth-child(7),
+#otherTable td:nth-child(7) {
+  width: 200px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* ellipsis cell 내부 span */
+.ellipsis-cell {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================
+ 2) Approval Home (approval_home.html)
+========================================================== */
+.commission-table-scroll{
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+}
+
+.commission-nowrap-table{
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.commission-nowrap-table th,
+.commission-nowrap-table td{
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: middle;
+}
+
+.commission-nowrap-table .money-cell{
+  white-space: nowrap !important;
+}

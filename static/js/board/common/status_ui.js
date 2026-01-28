@@ -1,26 +1,24 @@
 // django_ma/static/js/board/common/status_ui.js
 // =========================================================
-// Board Common Status UI (FINAL - Preset Edition)
-// - post_list / task_list / post_detail / task_detail 공용
-// - status-* 클래스는 프로젝트 전역(base.css) 기준으로 고정
-// - ✅ preset 지원: "post" | "task" (필요 시 추가 가능)
-// - ✅ badge selector 멀티 지원 (배지가 늘어나도 확장 쉬움)
-// - select/status badge의 data-status 동기화
+// Board Common Status UI (FINAL REFACTOR)
+// - post_list / post_detail / task_* 공용
 //
-// 사용법(권장):
-//   const statusUI = Board.Common.initStatusUI({ preset: "post" });
-//   statusUI.applyAll();
+// ✅ 목표
+// 1) 상태값에 따라 select / badge에 표준 status-* 클래스를 적용
+// 2) 필터용 select(name="status" 등)는 색칠 대상에서 제외
+// 3) 인라인 업데이트(AJAX) 후에도 applyAll() 재호출로 재적용 가능
 //
-// 옵션:
-// - preset: "post" | "task"
-// - root: document (optional)
-// - selectSelector: "select.status-select" (optional)
-// - badgeSelectors: [".status-badge", ...] (optional)
-// - syncDataset: true|false (optional)
-// - map/classes를 직접 넣으면 preset 대신 커스텀 모드로 동작(하위호환)
+// ✅ 적용 대상 규칙(중요)
+// - select:  class="status-select" AND data-status-ui="1" 인 경우만 적용
+// - badge:   .status-badge, .status-pill (data-status 또는 textContent)
 //
-// 권한 전제:
-// - 권한은 서버에서 제어. JS는 DOM 없으면 조용히 종료.
+// ✅ 사용법(템플릿 권장)
+// - 실제 상태 변경 select에만 data-status-ui="1" 추가
+//   ex) <select class="status-select" data-status="{{...}}" data-status-ui="1">
+//
+// - init:
+//   const status = window.Board?.Common?.initStatusUI?.({ preset: "post" });
+//   status?.applyAll?.();
 // =========================================================
 
 (function () {
@@ -29,181 +27,162 @@
   const Board = (window.Board = window.Board || {});
   Board.Common = Board.Common || {};
 
-  // ---------------------------------------------------------
-  // ✅ 전역 클래스 고정(base.css 기준)
-  // ---------------------------------------------------------
-  const GLOBAL_STATUS_CLASSES = [
-    "status-start",
-    "status-progress",
-    "status-fix",
-    "status-done",
-    "status-reject",
-  ];
+  const INIT_FLAG = "__boardStatusUIBound";
 
-  // ---------------------------------------------------------
-  // ✅ 프리셋 정의(페이지별 매핑)
-  // - post: 확인중/진행중/보완요청/완료/반려
-  // - task: 시작전/진행중/보완필요/보완요청/완료
-  // ---------------------------------------------------------
+  // 프로젝트 표준 클래스 (CSS는 apps/board.css 또는 base.css에 존재)
+  const STANDARD_CLASSES = ["status-start", "status-progress", "status-fix", "status-done", "status-reject"];
+
+  // preset 별 상태값 -> 표준 클래스
+  const PRESETS = {
+    post: {
+      "확인중": "status-start",
+      "접수": "status-start",
+      "진행중": "status-progress",
+      "보완요청": "status-reject",
+      "보완필요": "status-reject",
+      "완료": "status-done",
+      "처리완료": "status-done",
+      "반려": "status-fix",
+      "보류": "status-reject",
+      "취소": "status-reject",
+    },
+    task: {
+      "시작전": "status-start",
+      "진행중": "status-progress",
+      "보완필요": "status-reject",
+      "보완요청": "status-reject",
+      "완료": "status-done",
+      "반려": "status-fix",
+    },
+  };
+
+  /* =========================================================
+   * utils
+   * ========================================================= */
   function normalize(v) {
     return String(v ?? "").trim();
   }
 
-  const PRESETS = {
-    post: {
-      classes: GLOBAL_STATUS_CLASSES,
-      map: (status) => {
-        switch (normalize(status)) {
-          case "확인중":
-            return "status-start";
-          case "진행중":
-            return "status-progress";
-          case "보완요청":
-            return "status-fix";
-          case "완료":
-            return "status-done";
-          case "반려":
-            return "status-reject";
-          default:
-            return "";
-        }
-      },
-    },
-    task: {
-      // task는 reject를 안 쓰더라도 전역 제거는 해도 무방(안전)
-      classes: GLOBAL_STATUS_CLASSES,
-      map: (status) => {
-        switch (normalize(status)) {
-          case "시작전":
-            return "status-start";
-          case "진행중":
-            return "status-progress";
-          case "보완필요":
-          case "보완요청":
-            return "status-fix";
-          case "완료":
-            return "status-done";
-          default:
-            return "";
-        }
-      },
-    },
-  };
-
-  const DEFAULTS = {
-    root: document,
-    selectSelector: "select.status-select",
-    // ✅ 배지가 늘어날 수 있으니 배열로 기본 제공
-    badgeSelectors: [".status-badge"],
-    syncDataset: true,
-  };
-
-  function clearClasses(el, classes) {
-    if (!el || !Array.isArray(classes)) return;
-    classes.forEach((c) => el.classList.remove(c));
-  }
-
-  function getStatusFromSelect(sel) {
-    const opt = sel?.options?.[sel.selectedIndex];
-    return normalize(opt?.value || sel?.dataset?.status || sel?.value || "");
-  }
-
-  function getStatusFromBadge(badge) {
-    return normalize(badge?.dataset?.status || badge?.textContent || "");
-  }
-
-  function applyOne(el, status, opts) {
+  function clearStandardClasses(el) {
     if (!el) return;
-    clearClasses(el, opts.classes);
+    el.classList.remove(...STANDARD_CLASSES);
+  }
 
-    const cls = opts.map ? opts.map(status) : "";
+  function resolveClassByPreset(presetName, rawStatus) {
+    const p = PRESETS[presetName] || {};
+    return p[normalize(rawStatus)] || "";
+  }
+
+  function applyStandardClass(el, cls) {
+    if (!el) return;
+    clearStandardClasses(el);
     if (cls) el.classList.add(cls);
   }
 
-  function queryAllBadges(root, badgeSelectors) {
-    const sels = Array.isArray(badgeSelectors) ? badgeSelectors : [badgeSelectors];
-    const out = [];
-    sels.forEach((sel) => {
-      if (!sel) return;
-      root.querySelectorAll(sel).forEach((el) => out.push(el));
-    });
-    return out;
+  function getStatusFromSelect(sel) {
+    if (!(sel instanceof HTMLSelectElement)) return "";
+    const opt = sel.options?.[sel.selectedIndex];
+    return normalize(opt?.value || sel.value || sel.dataset.status || "");
   }
 
-  function applyAll(opts) {
-    const root = opts.root || document;
+  function getStatusFromBadge(el) {
+    return normalize(el?.dataset?.status || el?.textContent || "");
+  }
 
-    // select
-    root.querySelectorAll(opts.selectSelector).forEach((sel) => {
-      const st = getStatusFromSelect(sel);
-      if (opts.syncDataset) sel.dataset.status = st;
-      applyOne(sel, st, opts);
+  /* =========================================================
+   * apply
+   * ========================================================= */
+  function isEligibleStatusSelect(sel) {
+    // ✅ 필터 select(상태 전체 등)는 적용 제외
+    // 실제 상태 변경 select에만 data-status-ui="1"을 붙여서 대상 지정
+    return (
+      sel instanceof HTMLSelectElement &&
+      sel.classList.contains("status-select") &&
+      String(sel.dataset.statusUi || "") === "1"
+    );
+  }
+
+  function applyToSelect(sel, presetName) {
+    const status = getStatusFromSelect(sel);
+    const cls = resolveClassByPreset(presetName, status);
+
+    // dataset 동기화(중요: CSS 또는 다른 로직에서 참조 가능)
+    sel.dataset.status = status;
+    sel.setAttribute("data-status", status);
+
+    applyStandardClass(sel, cls);
+  }
+
+  function applyToBadge(badge, presetName) {
+    const status = getStatusFromBadge(badge);
+    const cls = resolveClassByPreset(presetName, status);
+
+    badge.dataset.status = status;
+    badge.setAttribute("data-status", status);
+
+    applyStandardClass(badge, cls);
+  }
+
+  function applyAll({ preset = "post", root = document, badgeSelectors } = {}) {
+    const scope = root || document;
+    const badgeSel =
+      Array.isArray(badgeSelectors) && badgeSelectors.length ? badgeSelectors : [".status-badge", ".status-pill"];
+
+    // ✅ select: data-status-ui="1" 대상만
+    scope.querySelectorAll("select.status-select").forEach((sel) => {
+      if (!isEligibleStatusSelect(sel)) return;
+      applyToSelect(sel, preset);
     });
 
-    // badge (멀티 셀렉터)
-    const badges = queryAllBadges(root, opts.badgeSelectors);
-    badges.forEach((badge) => {
-      const st = getStatusFromBadge(badge);
-      if (opts.syncDataset) badge.dataset.status = st;
-      applyOne(badge, st, opts);
+    // badge
+    badgeSel.forEach((selector) => {
+      scope.querySelectorAll(selector).forEach((el) => applyToBadge(el, preset));
     });
   }
 
-  function bindLiveUpdate(opts) {
-    // select 변경 시 즉시 반영
-    document.addEventListener("change", (e) => {
-      const el = e.target;
-      if (!(el instanceof HTMLSelectElement)) return;
-      if (!el.matches(opts.selectSelector)) return;
+  /* =========================================================
+   * public init
+   * ========================================================= */
+  Board.Common.initStatusUI = function initStatusUI(opts) {
+    const preset = opts?.preset || "post";
+    const badgeSelectors = opts?.badgeSelectors;
+    const root = opts?.root || document;
 
-      const st = getStatusFromSelect(el);
-      if (opts.syncDataset) el.dataset.status = st;
-      applyOne(el, st, opts);
-    });
-  }
+    const bind = () => {
+      // 최초 1회 적용
+      applyAll({ preset, root, badgeSelectors });
 
-  function resolveOptions(options) {
-    const o = Object.assign({}, DEFAULTS, options || {});
+      // ✅ change 이벤트 위임: 1회만
+      if (document.body.dataset[INIT_FLAG] === "1") return;
+      document.body.dataset[INIT_FLAG] = "1";
 
-    // 1) 커스텀 모드(하위호환): map/classes 직접 주입
-    if (typeof o.map === "function" && Array.isArray(o.classes) && o.classes.length) {
-      return o;
-    }
+      document.addEventListener(
+        "change",
+        (e) => {
+          const sel = e.target;
+          if (!(sel instanceof HTMLSelectElement)) return;
+          if (!isEligibleStatusSelect(sel)) return;
 
-    // 2) 프리셋 모드
-    const presetName = String(o.preset || "").trim();
-    const preset = PRESETS[presetName];
-    if (!preset) return null;
+          // root 스코프 밖이면 무시
+          if (root !== document && root && !root.contains(sel)) return;
 
-    o.map = preset.map;
-    o.classes = preset.classes;
-    return o;
-  }
-
-  /**
-   * initStatusUI
-   * @param {Object} options
-   * @param {string} [options.preset] - "post" | "task"
-   * @param {string[]} [options.badgeSelectors] - ex) [".status-badge", ".status-pill"]
-   * @returns {{applyAll:Function}|null}
-   */
-  Board.Common.initStatusUI = function initStatusUI(options) {
-    const opts = resolveOptions(options);
-    if (!opts) return null;
-
-    const boot = () => {
-      applyAll(opts);
-      bindLiveUpdate(opts);
+          applyToSelect(sel, preset);
+        },
+        { passive: true }
+      );
     };
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", boot, { once: true });
+      document.addEventListener("DOMContentLoaded", bind, { once: true });
     } else {
-      boot();
+      bind();
     }
 
     return {
-      applyAll: () => applyAll(opts),
+      applyAll: () => applyAll({ preset, root, badgeSelectors }),
     };
   };
+
+  // (optional) debug export
+  Board.Common.__StatusUI = { STANDARD_CLASSES, PRESETS, applyAll };
 })();

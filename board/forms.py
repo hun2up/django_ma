@@ -1,37 +1,9 @@
+# django_ma/board/forms.py
+
 from django import forms
+
 from .models import Post, Comment, Task, TaskComment
-
-
-# =========================================================
-# Category Choices
-# =========================================================
-POST_CATEGORY_CHOICES = [
-    ("", "선택"),
-    ("위해촉", "위해촉"),
-    ("리스크/유지율", "리스크/유지율"),
-    ("수수료/채권", "수수료/채권"),
-    ("운영자금", "운영자금"),
-    ("전산", "전산"),
-    ("기타", "기타"),
-]
-
-TASK_EXTRA_CATEGORY_CHOICES = [
-    ("민원", "민원"),
-    ("신규제휴", "신규제휴"),
-]
-
-
-def _merge_category_choices(base_choices, extra_choices):
-    """
-    base_choices 뒤에 extra_choices를 value 기준으로 중복 없이 병합
-    """
-    merged = list(base_choices or [])
-    exist = {v for v, _ in merged}
-    for v, label in (extra_choices or []):
-        if v not in exist:
-            merged.append((v, label))
-            exist.add(v)
-    return merged
+from .constants import POST_CATEGORY_CHOICES, TASK_CATEGORY_CHOICES
 
 
 # =========================================================
@@ -102,7 +74,7 @@ class TaskForm(_BaseCategoryTitleContentForm):
     """
     ✅ 직원업무(Task): Post 구분 + 추가 구분(민원/신규제휴)
     """
-    category_choices = _merge_category_choices(POST_CATEGORY_CHOICES, TASK_EXTRA_CATEGORY_CHOICES)
+    category_choices = TASK_CATEGORY_CHOICES
 
     class Meta(_BaseCategoryTitleContentForm.Meta):
         model = Task
@@ -119,8 +91,7 @@ class _BaseCommentForm(forms.ModelForm):
                 attrs={
                     "rows": 1,
                     "placeholder": "댓글을 입력하세요...",
-                    "class": "form-control-sm",
-                    "style": "resize:none; min-height:38px; font-size:14px; line-height:1.4;",
+                    "class": "form-control-sm board-comment-input",
                 }
             ),
         }

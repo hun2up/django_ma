@@ -3,17 +3,18 @@
 # 프로젝트 아키텍처 (Architecture)
 
 ## 1. 전체 구조 개요
-
 django_ma는 Django MVT 구조를 기반으로 하되,
 운영 편의성과 유지보수를 위해 다음과 같은 계층 분리를 따른다.
 
 [ Browser ]
 ↓
-[ Django Template ]
+[ Django Template + Vanilla JS ]
 ↓
 [ View / API Wrapper ]
 ↓
-[ Policy / Rule Layer ]
+[ Service Layer (도메인 로직) ]
+↓
+[ Policy / Rule Layer (SSOT) ]
 ↓
 [ Model ]
 ↓
@@ -22,7 +23,6 @@ django_ma는 Django MVT 구조를 기반으로 하되,
 ---
 
 ## 2. accounts 앱 기준 아키텍처
-
 accounts/
 ├── models.py        # CustomUser, 핵심 도메인 규칙
 ├── search_api.py    # 사용자 검색 정책 (SSOT)
@@ -36,7 +36,6 @@ accounts/
 ---
 
 ## 3. manual 앱 기준 아키텍처
-
 manual/
 ├── models.py              # Manual / Section / Block / Attachment
 ├── views/
@@ -49,24 +48,65 @@ manual/
 │   ├── permissions.py     # 접근 정책
 │   ├── rules.py           # 비즈니스 규칙
 │   ├── serializers.py     # 프런트 직렬화
-│   └── http.py             # JSON 응답
+│   └── http.py            # JSON 응답
 ├── constants.py
 └── urls.py
 
 ---
 
-## 4. 핵심 설계 포인트
+## 4. board 앱 기준 아키텍처 (리팩토링 완료)
 
-### (1) 정책/규칙 중앙화
-- 접근 권한: utils/permissions.py
-- 비즈니스 규칙: utils/rules.py
-- View는 **판단이 아닌 호출자 역할**
+### 4-1) 패키지 구조(권장/현행)
+board/
+├── models.py
+├── urls.py
+├── views/
+│   ├── __init__.py              # re-export
+│   ├── posts.py                 # Post list/detail/create/edit
+│   ├── tasks.py                 # Task list/detail/create/edit (superuser only)
+│   ├── forms.py                 # support_form / states_form / PDF endpoints
+│   ├── attachments.py           # 첨부 다운로드(권한/보안 SSOT)
+├── services/
+│   ├── listing.py               # 목록 공용(필터/검색/페이지네이션)
+│   ├── inline_update.py         # 인라인 업데이트 공용(handler/status)
+│   ├── comments.py              # 댓글 공용(Post/Task)
+│   └── attachments.py           # 첨부 저장/다운로드(open_fileresponse_*)
+├── templates/board/
+│   ├── base_board.html          # board 스코프 래퍼 + board.css 로드
+│   ├── post_list/detail/create/edit.html
+│   ├── task_list/detail/create/edit.html
+│   ├── support_form.html        # 업무요청서 PDF
+│   ├── states_form.html         # 소명서 PDF
+│   └── includes/                # partials(_edit_form, _comment_*, pagination 등)
+└── static/
+    ├── css/apps/board.css
+    └── js/board/common/
+        ├── status_ui.js
+        ├── inline_update.js
+        ├── detail_inline_update.js
+        └── comment_edit.js
+
+### 4-2) 핵심 설계 포인트
+- View는 “화면/엔드포인트” 역할에 집중
+- 서비스 레이어가 **공용 규칙**(목록/댓글/첨부/인라인업데이트)을 담당
+- 첨부 다운로드는 보안 정책상 **FieldFile.url 직접 노출 금지**
+- 템플릿은 include(partials)로 중복 최소화
+- CSS는 board 스코프(`.board-scope`) 내부에서만 동작하도록 설계
+
+---
+
+## 5. 핵심 설계 포인트(프로젝트 공통)
+
+### (1) 정책/규칙 중앙화(SSOT)
+- 사용자 검색 정책: accounts/search_api.py
+- board 첨부 다운로드 정책: board/views/attachments.py + services/attachments.py
+- 인라인 업데이트 공용: board/services/inline_update.py
 
 ### (2) 운영 UI 중심 설계
-- manual 앱은 내부 운영자용 기준 앱
-- Admin 기능도 하나의 사용자 경험으로 설계
+- 게시판/서식/인라인 업데이트는 운영 흐름에 최적화
+- Admin도 운영 UX의 일부로 간주
 
 ### (3) 점진적 확장 구조
-- accounts는 기준점
-- manual은 운영 앱의 첫 사례
-- 이후 partner / dash 앱도 동일 패턴으로 확장
+- accounts는 기준점(인증/검색/권한)
+- manual/board는 운영 앱 확장의 대표 사례
+- partner/dash/commission 등도 동일 패턴으로 확장

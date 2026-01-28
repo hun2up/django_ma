@@ -1,107 +1,116 @@
+<!-- django_ma/board/templates/board/includes/pagination.html -->
+
+<!--
+  Pagination Include
+  - Mobile: 처음/이전/다음/끝 + "현재/전체"
+  - Desktop:
+    - page_block_start/page_block_end 제공 시: 10개 단위 블록 표시
+    - 미제공 시: 전체 페이지 표시(fallback)
+
+  Required context:
+  - page_obj
+
+  Optional:
+  - query_string (ex: "search_type=title&keyword=aaa")
+  - page_block_start, page_block_end (int)
+-->
+
 {% if page_obj.paginator.num_pages > 1 %}
-<nav class="mt-3">
+  <nav class="mt-3 board-pagination">
 
-  {# ✅ 모바일: 간단 페이지네이션 + 처음/끝 (유지) #}
-  <div class="d-flex d-md-none justify-content-between align-items-center gap-2">
+    <!-- 모바일 페이지네이션 -->
+    <div class="d-flex d-md-none justify-content-between align-items-center gap-2">
 
-    {# 처음 #}
-    {% if page_obj.number > 1 %}
-      <a class="btn btn-outline-secondary btn-sm"
-         href="?page=1{% if query_string %}&{{ query_string }}{% endif %}">
-        처음
-      </a>
-    {% else %}
-      <button class="btn btn-outline-secondary btn-sm" disabled>처음</button>
-    {% endif %}
-
-    {# 이전 #}
-    {% if page_obj.has_previous %}
-      <a class="btn btn-outline-secondary btn-sm"
-         href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
-        이전
-      </a>
-    {% else %}
-      <button class="btn btn-outline-secondary btn-sm" disabled>이전</button>
-    {% endif %}
-
-    <div class="small text-muted fw-semibold">
-      {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-    </div>
-
-    {# 다음 #}
-    {% if page_obj.has_next %}
-      <a class="btn btn-outline-secondary btn-sm"
-         href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
-        다음
-      </a>
-    {% else %}
-      <button class="btn btn-outline-secondary btn-sm" disabled>다음</button>
-    {% endif %}
-
-    {# 끝 #}
-    {% if page_obj.number < page_obj.paginator.num_pages %}
-      <a class="btn btn-outline-secondary btn-sm"
-         href="?page={{ page_obj.paginator.num_pages }}{% if query_string %}&{{ query_string }}{% endif %}">
-        끝
-      </a>
-    {% else %}
-      <button class="btn btn-outline-secondary btn-sm" disabled>끝</button>
-    {% endif %}
-
-  </div>
-
-
-  {# ✅ PC: 10페이지 단위 페이지네이션 + 처음/끝 #}
-  <ul class="pagination justify-content-center mb-0 d-none d-md-flex">
-
-    {# 템플릿 내 계산 (10개 단위) #}
-    {% with current=page_obj.number total=page_obj.paginator.num_pages %}
-      {% with start_page=current|add:-1 %}
-        {% with start_page=start_page|divisibleby:10 %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with current=page_obj.number total=page_obj.paginator.num_pages %}
-      {% with current0=current|add:-1 %}
-        {% with block_index=current0|divisibleby:10 %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with current=page_obj.number %}
-      {# 현재가 속한 블록의 시작(1,11,21...) 계산: 1 + 10 * ((current-1)//10) #}
-      {% with current0=current|add:-1 %}
-        {% with start_page=current0|add:0 %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% if page_obj.number > 1 %}
-      <li class="page-item">
-        <a class="page-link"
+      <!-- 처음 -->
+      {% if page_obj.number > 1 %}
+        <a class="btn btn-outline-secondary btn-sm"
            href="?page=1{% if query_string %}&{{ query_string }}{% endif %}">
           처음
         </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">처음</span></li>
-    {% endif %}
+      {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled>처음</button>
+      {% endif %}
 
-    {% if page_obj.has_previous %}
-      <li class="page-item">
-        <a class="page-link"
+      <!-- 이전 -->
+      {% if page_obj.has_previous %}
+        <a class="btn btn-outline-secondary btn-sm"
            href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
           이전
         </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">이전</span></li>
-    {% endif %}
+      {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled>이전</button>
+      {% endif %}
 
-    {% for n in page_obj.paginator.page_range %}
-      {% if page_block_start and page_block_end %}
-        {% if n >= page_block_start and n <= page_block_end %}
+      <div class="small text-muted fw-semibold">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </div>
+
+      <!-- 다음 -->
+      {% if page_obj.has_next %}
+        <a class="btn btn-outline-secondary btn-sm"
+           href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+          다음
+        </a>
+      {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled>다음</button>
+      {% endif %}
+
+      <!-- 끝 -->
+      {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="btn btn-outline-secondary btn-sm"
+           href="?page={{ page_obj.paginator.num_pages }}{% if query_string %}&{{ query_string }}{% endif %}">
+          끝
+        </a>
+      {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled>끝</button>
+      {% endif %}
+
+    </div>
+
+    <!-- 데스크톱 페이지네이션 -->
+    <ul class="pagination justify-content-center mb-0 d-none d-md-flex">
+
+      <!-- 처음 -->
+      {% if page_obj.number > 1 %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?page=1{% if query_string %}&{{ query_string }}{% endif %}">
+            처음
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">처음</span></li>
+      {% endif %}
+
+      <!-- 이전 -->
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            이전
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">이전</span></li>
+      {% endif %}
+
+      <!-- 페이지 번호 -->
+      {% for n in page_obj.paginator.page_range %}
+
+        {% if page_block_start and page_block_end %}
+          {% if n >= page_block_start and n <= page_block_end %}
+            {% if n == page_obj.number %}
+              <li class="page-item active"><span class="page-link">{{ n }}</span></li>
+            {% else %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="?page={{ n }}{% if query_string %}&{{ query_string }}{% endif %}">
+                  {{ n }}
+                </a>
+              </li>
+            {% endif %}
+          {% endif %}
+        {% else %}
           {% if n == page_obj.number %}
             <li class="page-item active"><span class="page-link">{{ n }}</span></li>
           {% else %}
@@ -113,44 +122,34 @@
             </li>
           {% endif %}
         {% endif %}
+
+      {% endfor %}
+
+      <!-- 다음 -->
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            다음
+          </a>
+        </li>
       {% else %}
-        {# (fallback) 값이 없으면 기존처럼 전체 표시 #}
-        {% if n == page_obj.number %}
-          <li class="page-item active"><span class="page-link">{{ n }}</span></li>
-        {% else %}
-          <li class="page-item">
-            <a class="page-link"
-               href="?page={{ n }}{% if query_string %}&{{ query_string }}{% endif %}">
-              {{ n }}
-            </a>
-          </li>
-        {% endif %}
+        <li class="page-item disabled"><span class="page-link">다음</span></li>
       {% endif %}
-    {% endfor %}
 
-    {% if page_obj.has_next %}
-      <li class="page-item">
-        <a class="page-link"
-           href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
-          다음
-        </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">다음</span></li>
-    {% endif %}
+      <!-- 끝 -->
+      {% if page_obj.number < page_obj.paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?page={{ page_obj.paginator.num_pages }}{% if query_string %}&{{ query_string }}{% endif %}">
+            끝
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">끝</span></li>
+      {% endif %}
 
-    {% if page_obj.number < page_obj.paginator.num_pages %}
-      <li class="page-item">
-        <a class="page-link"
-           href="?page={{ page_obj.paginator.num_pages }}{% if query_string %}&{{ query_string }}{% endif %}">
-          끝
-        </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">끝</span></li>
-    {% endif %}
+    </ul>
 
-  </ul>
-
-</nav>
+  </nav>
 {% endif %}

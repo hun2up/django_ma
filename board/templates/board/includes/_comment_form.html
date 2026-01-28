@@ -1,31 +1,37 @@
 <!-- django_ma/board/templates/board/includes/_comment_form.html -->
 {% load widget_tweaks %}
 
-{% comment %}
-    required context:
-        - form
-        - action_url
-        - submit_label (optional)
-{% endcomment %}
+<!--
+  Comment Form Include
+  - 로그인: 댓글 작성 폼
+  - 비로그인: 로그인 유도 문구
+
+  Required context:
+  - form
+  - action_url
+
+  Optional:
+  - submit_label (default: "등록")
+-->
 
 {% if user.is_authenticated %}
-    <form method="post" action="{{ action_url }}" class="mt-3">
-        {% csrf_token %}
-        <input type="hidden" name="action_type" value="comment">
+  <form method="post" action="{{ action_url }}" class="mt-3 board-comment-form">
+    {% csrf_token %}
+    <input type="hidden" name="action_type" value="comment">
 
-        <div class="d-flex gap-2 align-items-start">
-            {{ form.content|add_class:"form-control"|attr:"rows:4"|attr:"placeholder:댓글을 입력하세요..." }}
+    <!-- 댓글 입력 + 등록 버튼 -->
+    <div class="d-flex gap-2 align-items-start board-comment-row">
+      {{ form.content|add_class:"form-control"|add_class:"board-comment-textarea"|attr:"rows:4"|attr:"placeholder:댓글을 입력하세요..." }}
 
-            <button type="submit"
-                    class="btn btn-primary btn-sm px-3"
-                    style="white-space: nowrap; height: fit-content;">
-            {{ submit_label|default:"등록" }}
-            </button>
-        </div>
-    </form>
-
+      <button type="submit" class="btn btn-primary btn-sm px-3 board-comment-submit">
+        {{ submit_label|default:"등록" }}
+      </button>
+    </div>
+  </form>
 {% else %}
   <p class="comment-login mt-3">
-    댓글을 작성하려면 <a href="{% url 'login' %}" class="text-primary fw-semibold">로그인</a> 하세요.
+    댓글을 작성하려면
+    <a href="{% url 'login' %}" class="text-primary fw-semibold">로그인</a>
+    하세요.
   </p>
 {% endif %}

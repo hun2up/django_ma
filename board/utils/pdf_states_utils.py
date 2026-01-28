@@ -31,25 +31,18 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 
 from accounts.models import CustomUser
+from board.policies import is_inactive
+
 
 logger = logging.getLogger("board.access")
 
-# =========================================================
-# Policy / Permission
-# =========================================================
-BOARD_ALLOWED_GRADES = {"superuser", "head", "leader"}
-
 
 def _is_allowed_board_user(user: CustomUser, *, task_only: bool = False) -> bool:
-    """
-    board 접근 정책:
-    - 기본: superuser/head/leader
-    - task_only=True: superuser만 허용
-    """
     grade = getattr(user, "grade", "") or ""
     if task_only:
         return grade == "superuser"
-    return grade in BOARD_ALLOWED_GRADES
+    # states는 기존 정책대로 "inactive만 차단"
+    return not is_inactive(user)
 
 
 # =========================================================

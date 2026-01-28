@@ -1,49 +1,37 @@
 // django_ma/static/js/partner/manage_structure/input_rows.js
 // =======================================================
-// 📘 manage_structure 입력행 컨트롤(추가/삭제/초기화/저장) - FINAL
-// - 요청자 자동 입력(표시용 rq_display + hidden rq_name/rq_id/rq_branch)
-// - 대상자 선택(모달) 시 소속(변경전)=affiliation_display 우선 반영 ✅
+// 📘 manage_structure 입력행 컨트롤 - FINAL
+// - 요청자 자동 입력(rq_display + hidden rq_*)
+// - 대상자 선택(공용 search_user_modal.js 이벤트) 연동
 // - 대상자 10명 제한
-// - 저장 후 입력 초기화 + 메인시트 즉시 갱신(fetchData)
-// - 중복 바인딩 방지 + 이벤트 위임 안전화
+// - 저장 후 입력 초기화 + 메인시트 갱신(fetchData)
+// - 중복 바인딩 방지 + 이벤트 위임(범위 안전)
 // =======================================================
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
 import { fetchData } from "./fetch.js";
 
-/* =======================================================
-  Constants / State
-======================================================= */
 const MAX_ROWS = 10;
 let bound = false;
 
-/* =======================================================
-  Public API
-======================================================= */
 export function initInputRowEvents() {
   if (bound) return;
   bound = true;
 
   if (!els.inputTable) return;
 
-  // ✅ 버튼 바인딩
   els.btnAddRow?.addEventListener("click", onAddRow);
   els.btnResetRows?.addEventListener("click", onResetRows);
   els.btnSaveRows?.addEventListener("click", onSaveRows);
 
-  // ✅ 삭제 버튼(위임)
-  document.addEventListener("click", onRemoveRowDelegated);
+  // 이벤트 위임(페이지 충돌 방지: root 범위 우선)
+  const root = els.root || document;
+  root.addEventListener("click", onRemoveRowDelegated);
+  root.addEventListener("click", onOpenSearchDelegated);
 
-  // ✅ 검색(모달) 버튼 클릭 시 "현재 행" 기억(위임)
-  document.addEventListener("click", onOpenSearchDelegated);
-
-  // ✅ 검색 모달에서 "사용자 선택" 이벤트 수신(프로젝트 공용 모달 대응)
-  // - components/search_user_modal.html 구현이 무엇이든,
-  //   아래 3가지 이벤트 중 하나로 user payload를 받으면 처리하도록 설계
   bindSearchUserSelectionEvents();
 
-  // ✅ 최초 1행 요청자 자동 입력
   const firstRow = els.inputTable.querySelector(".input-row");
   if (firstRow) fillRequesterInfo(firstRow);
 }
@@ -54,12 +42,10 @@ export function resetInputSection() {
   const tbody = els.inputTable.querySelector("tbody");
   if (!tbody) return;
 
-  // 1) 2행 이상 삭제
   tbody.querySelectorAll(".input-row").forEach((row, idx) => {
     if (idx > 0) row.remove();
   });
 
-  // 2) 첫 행 초기화
   const firstRow = tbody.querySelector(".input-row");
   if (!firstRow) return;
 
@@ -68,14 +54,9 @@ export function resetInputSection() {
   clearTargetInfo(firstRow);
 }
 
-/* =======================================================
-  Row selection target (modal)
-======================================================= */
 function setActiveRow(row) {
   if (!row) return;
-  // ✅ root에 저장해 다른 모듈에서도 필요 시 접근 가능
   if (els.root) els.root.__activeInputRow = row;
-  // ✅ dataset도 가볍게 남김(디버깅/호환)
   row.dataset.active = "1";
 }
 function getActiveRow() {
@@ -85,9 +66,6 @@ function clearActiveRowMark() {
   els.inputTable?.querySelectorAll('.input-row[data-active="1"]').forEach((r) => delete r.dataset.active);
 }
 
-/* =======================================================
-  Event Handlers
-======================================================= */
 function onAddRow() {
   const tbody = els.inputTable?.querySelector("tbody");
   if (!tbody) return;
@@ -100,7 +78,6 @@ function onAddRow() {
 
   const newRow = rows[0].cloneNode(true);
 
-  // ✅ 새 행 초기화(요청자는 다시 채움)
   clearRowInputs(newRow);
   fillRequesterInfo(newRow);
   clearTargetInfo(newRow);
@@ -134,7 +111,6 @@ function onRemoveRowDelegated(e) {
     return;
   }
 
-  // active row 제거 시 active 해제
   if (els.root?.__activeInputRow === row) els.root.__activeInputRow = null;
   row.remove();
 }
@@ -150,67 +126,40 @@ function onOpenSearchDelegated(e) {
   setActiveRow(row);
 }
 
-/* =======================================================
-  Search Modal selection integration (SSOT)
-======================================================= */
 function bindSearchUserSelectionEvents() {
-  // 1) window 이벤트 (가장 흔한 패턴)
-  window.addEventListener("userSelected", (evt) => {
+  const handler = (evt) => {
     const user = evt?.detail?.user || evt?.detail || null;
     if (!user) return;
     applySelectedUserToActiveRow(user);
-  });
+  };
 
-  // 2) document 이벤트 (다른 템플릿에서 document에 dispatch하는 경우)
-  document.addEventListener("userSelected", (evt) => {
-    const user = evt?.detail?.user || evt?.detail || null;
-    if (!user) return;
-    applySelectedUserToActiveRow(user);
-  });
-
-  // 3) 커스텀 이름 (혹시 기존에 쓰던 이벤트명)
-  window.addEventListener("searchUserSelected", (evt) => {
-    const user = evt?.detail?.user || evt?.detail || null;
-    if (!user) return;
-    applySelectedUserToActiveRow(user);
-  });
+  window.addEventListener("userSelected", handler);
+  document.addEventListener("userSelected", handler);
+  window.addEventListener("searchUserSelected", handler);
 }
 
 function applySelectedUserToActiveRow(user) {
   const row = getActiveRow() || els.inputTable?.querySelector(".input-row");
   if (!row) return;
 
-  // 대상자 세팅
   const tgName = toStr(user.name);
   const tgId = toStr(user.id);
   setTargetDisplay(row, tgName, tgId);
 
-  // ✅ 소속(변경전): affiliation_display 우선 → 없으면 branch
+  // 소속(변경전): affiliation_display 우선
   const aff = toStr(user.affiliation_display);
   const branch = toStr(user.branch);
-
-  const tgBranchEl =
-    row.querySelector('input[name="tg_branch"]') ||
-    row.querySelector(".tg_branch");
-
+  const tgBranchEl = row.querySelector('input[name="tg_branch"]') || row.querySelector(".tg_branch");
   if (tgBranchEl) tgBranchEl.value = aff || branch || "";
 
-  // 직급(변경전): rank가 있으면
   const rank = toStr(user.rank);
-  const tgRankEl =
-    row.querySelector('input[name="tg_rank"]') ||
-    row.querySelector(".tg_rank");
-
+  const tgRankEl = row.querySelector('input[name="tg_rank"]') || row.querySelector(".tg_rank");
   if (tgRankEl) tgRankEl.value = rank || "";
 
-  // active mark 해제(다음 선택 시 혼선 방지)
   clearActiveRowMark();
   if (els.root) els.root.__activeInputRow = row;
 }
 
-/* =======================================================
-  Requester Auto Fill (rq_display + hidden fields)
-======================================================= */
 function fillRequesterInfo(row) {
   const user = window.currentUser || {};
 
@@ -227,9 +176,7 @@ function fillRequesterInfo(row) {
   if (rqIdEl) rqIdEl.value = rqId;
   if (rqBranchEl) rqBranchEl.value = rqBranch;
 
-  if (rqDispEl) {
-    rqDispEl.value = fmtPerson(rqName, rqId);
-  }
+  if (rqDispEl) rqDispEl.value = fmtPerson(rqName, rqId);
 }
 
 function setTargetDisplay(rowEl, tgName, tgId) {
@@ -239,15 +186,10 @@ function setTargetDisplay(rowEl, tgName, tgId) {
 
   if (nameEl) nameEl.value = tgName || "";
   if (idEl) idEl.value = tgId || "";
-
   if (dispEl) dispEl.value = fmtPerson(tgName, tgId);
 }
 
-/* =======================================================
-  Row Utils
-======================================================= */
 function clearRowInputs(row) {
-  // input 전체 초기화(checkbox 제외)
   row.querySelectorAll("input").forEach((el) => {
     if (el.type === "checkbox") {
       el.checked = false;
@@ -256,14 +198,12 @@ function clearRowInputs(row) {
     el.value = "";
   });
 
-  // select가 있다면 초기화(방어)
   row.querySelectorAll("select").forEach((sel) => {
     sel.selectedIndex = 0;
   });
 }
 
 function clearTargetInfo(row) {
-  // 대상자 관련 필드만 확실히 초기화
   const selectors = [
     'input[name="tg_name"]',
     'input[name="tg_id"]',
@@ -285,9 +225,6 @@ function clearTargetInfo(row) {
   });
 }
 
-/* =======================================================
-  Save → Server
-======================================================= */
 async function saveRowsToServer() {
   const tbody = els.inputTable?.querySelector("tbody");
   if (!tbody) return;
@@ -341,10 +278,7 @@ async function saveRowsToServer() {
     hideLoading();
     alertBox(data?.message || "저장 완료!");
 
-    // ✅ 입력 초기화
     resetInputSection();
-
-    // ✅ 메인시트 갱신
     await fetchData(ym, branch);
   } catch (err) {
     console.error("❌ 저장 실패:", err);
@@ -355,30 +289,23 @@ async function saveRowsToServer() {
 
 function collectValidRows(rows) {
   const out = [];
-  const seen = new Set(); // (선택) 중복 대상자 방지
+  const seen = new Set();
 
   rows.forEach((row) => {
     const tg_id = getVal(row, 'input[name="tg_id"], .tg_id');
     const tg_name = getVal(row, 'input[name="tg_name"], .tg_name');
 
-    // ❌ 대상자 누락 시 제외
     if (!tg_id || !tg_name) return;
-
-    // (선택) 동일 대상자 중복 입력 방지
     if (seen.has(tg_id)) return;
     seen.add(tg_id);
 
     out.push({
       target_id: tg_id,
       target_name: tg_name,
-
-      // ✅ "소속(변경전)"은 이제 affiliation_display가 들어간 값이 tg_branch에 저장됨
       tg_branch: getVal(row, 'input[name="tg_branch"], .tg_branch'),
       tg_rank: getVal(row, 'input[name="tg_rank"], .tg_rank'),
-
       chg_branch: getVal(row, 'input[name="chg_branch"]'),
       chg_rank: getVal(row, 'input[name="chg_rank"]'),
-
       memo: getVal(row, 'input[name="memo"]'),
       or_flag: !!row.querySelector('input[name="or_flag"]')?.checked,
     });
@@ -407,9 +334,6 @@ function resolveYMAndBranch() {
   return { ym, branch };
 }
 
-/* =======================================================
-  Helpers
-======================================================= */
 function toStr(v) {
   return String(v ?? "").trim();
 }
