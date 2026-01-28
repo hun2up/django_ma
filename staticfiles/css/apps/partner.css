@@ -1,0 +1,942 @@
+/* django_ma/static/css/apps/partner.css
+==========================================================
+🏢 partner.css — Partner 앱 전용 스타일
+- 범위: Structure / Rate / Efficiency / (Dash wide 일부는 dash.css로)
+- 원칙: #manage-* 스코프 내부에서만 스타일링(전역 충돌 방지)
+- 중요: RATE 컬럼폭 정의는 rq_display/tg_display 버전만 유지(중복 제거 완료)
+========================================================== */
+
+/* ==========================================================
+ 0) Partner wide layout & shared basics
+========================================================== */
+#manage-structure,
+#manage-rate,
+#manage-efficiency {
+  width: 86vw;
+  max-width: none;
+  margin-left: calc(-43vw + 50%);
+}
+
+/* 모바일: wide 해제 */
+@media (max-width: 576px) {
+  #manage-structure,
+  #manage-rate,
+  #manage-efficiency {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* 테이블 공통 베이스 */
+#manage-structure table,
+#manage-rate table,
+#manage-efficiency table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* 테이블 헤더 공통 */
+#manage-structure th,
+#manage-rate th,
+#manage-efficiency th {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* 중간관리자 추가 모달 전용(요청 반영) */
+.modal-subadmin-sm {
+  max-width: 35%;
+}
+
+/* ==========================================================
+ 1) Top Controls (Structure/Rate 공통 규칙)
+========================================================== */
+#manage-structure,
+#manage-rate {
+  --ctl-w-ym: 90px;
+  --ctl-w-org: 160px;
+  --ctl-gap: 12px;
+}
+
+/* select 폭 */
+#manage-structure #yearSelect,
+#manage-structure #monthSelect,
+#manage-rate #yearSelect,
+#manage-rate #monthSelect { max-width: var(--ctl-w-ym); }
+
+#manage-structure #channelSelect,
+#manage-structure #partSelect,
+#manage-structure #branchSelect,
+#manage-rate #channelSelect,
+#manage-rate #partSelect,
+#manage-rate #branchSelect { max-width: var(--ctl-w-org); }
+
+/* 드랍다운 폰트 통일 */
+#manage-structure #controlsForm .form-select,
+#manage-rate #controlsForm .form-select {
+  font-size: .875rem;
+}
+
+/* md 이상: grid(col-md-*) 무력화 → 내용폭 기준 flex 배치 */
+@media (min-width: 768px) {
+  #manage-structure #controlsForm,
+  #manage-rate #controlsForm {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--ctl-gap);
+    align-items: flex-end;
+  }
+
+  #manage-structure #controlsForm > div,
+  #manage-rate #controlsForm > div {
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  #manage-structure #controlsForm .form-label,
+  #manage-rate #controlsForm .form-label { white-space: nowrap; }
+
+  #manage-structure #controlsForm .btn-search,
+  #manage-rate #controlsForm .btn-search {
+    white-space: nowrap;
+    min-width: 88px;
+  }
+}
+
+/* ==========================================================
+ 2) Input Header (공통)
+========================================================== */
+#manage-structure .manage-input-head,
+#manage-rate .manage-input-head,
+#manage-efficiency .manage-input-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+#manage-structure .manage-input-title,
+#manage-rate .manage-input-title,
+#manage-efficiency .manage-input-title {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 우측 버튼바: 가로 스크롤 허용 */
+#manage-structure .manage-input-actions,
+#manage-rate .manage-input-actions,
+#manage-efficiency .manage-input-actions {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+#manage-structure .manage-input-actions .btn,
+#manage-rate .manage-input-actions .btn,
+#manage-efficiency .manage-input-actions .btn {
+  white-space: nowrap;
+}
+
+/* ==========================================================
+ 3) Structure/Rate InputTable 정책(공통)
+  - inputTable은 nowrap + 가로 스크롤 + fixed layout
+========================================================== */
+#manage-structure #inputSection .table-responsive,
+#manage-rate #inputSection .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#manage-structure #inputTable,
+#manage-rate #inputTable {
+  table-layout: fixed !important;
+  width: max-content;
+  min-width: 1200px;
+}
+
+#manage-structure #inputTable th,
+#manage-structure #inputTable td,
+#manage-rate #inputTable th,
+#manage-rate #inputTable td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+#manage-structure #inputTable :is(input, select),
+#manage-rate #inputTable :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#manage-structure #inputTable .btn,
+#manage-rate #inputTable .btn { white-space: nowrap; }
+
+/* ==========================================================
+ 4) STRUCTURE: 폰트 한 단계 다운(입력/메인 데이터)
+========================================================== */
+#manage-structure {
+  --tbl-font-td: 13px;
+  --tbl-font-th: 11.5px;
+}
+
+#manage-structure :is(#inputTable td, #mainTable td) {
+  font-size: var(--tbl-font-td);
+}
+
+#manage-structure #inputTable :is(.form-control, .form-select),
+#manage-structure #mainTable :is(.form-control, .form-select) {
+  font-size: var(--tbl-font-td);
+}
+
+#manage-structure :is(#inputTable th, #mainTable th) {
+  font-size: var(--tbl-font-th);
+}
+
+/* ==========================================================
+ 5) RATE: 폰트/정렬 통일 + Table Check UI (FINAL)
+ - scope: #manage-rate
+ - 인라인 style 0개 정책: overlay 토글은 .is-open 클래스 사용
+ - table check col 폭은 colgroup class로 제어(.rate-table-col-name/.rate-table-col-rate)
+========================================================== */
+#manage-rate{
+  --tbl-font-td: 13px;
+  --tbl-font-th: 11.5px;
+
+  /* table-check */
+  --rate-check-z: 9999;
+  --rate-check-maxw: 720px;
+  --rate-check-maxh: 300px;
+}
+
+/* ----------------------------------------------------------
+ 5-1) RATE mainTable: 정렬/폰트
+---------------------------------------------------------- */
+/* mainTable: 전체 가운데 정렬 */
+#manage-rate #mainTable :is(th, td){
+  text-align: center !important;
+}
+
+/* date input도 가운데 */
+#manage-rate #mainTable .processDateInput{
+  text-align: center;
+}
+
+/* 헤더/데이터 폰트 */
+#manage-rate :is(#inputTable td, #mainTable td){
+  font-size: var(--tbl-font-td);
+}
+
+#manage-rate :is(#inputTable th, #mainTable th){
+  font-size: var(--tbl-font-th);
+  font-weight: 600;
+  text-align: center;
+}
+
+#manage-rate :is(
+  #inputTable .form-control, #inputTable .form-select,
+  #mainTable  .form-control, #mainTable  .form-select
+){
+  font-size: var(--tbl-font-td);
+}
+
+/* ----------------------------------------------------------
+ 5-2) RATE: Table Check (Bootstrap modal fallback overlay)
+  - overlay: .is-open 으로 display 제어 (JS에서 class toggle)
+---------------------------------------------------------- */
+#manage-rate .rate-table-check-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: var(--rate-check-z);
+  display: none;
+  background: rgba(0,0,0,.35);
+  padding: 24px;
+}
+
+#manage-rate .rate-table-check-overlay.is-open{
+  display: block;
+}
+
+#manage-rate .rate-table-check-modal{
+  max-width: var(--rate-check-maxw);
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,.2);
+}
+
+#manage-rate .rate-table-check-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+#manage-rate .rate-table-check-title{
+  font-weight: 700;
+}
+
+#manage-rate .rate-table-check-close{
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#manage-rate .rate-table-check-body{
+  padding: 14px 16px;
+}
+
+#manage-rate .rate-table-check-scroll{
+  max-height: var(--rate-check-maxh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#manage-rate .rate-table-check-table{
+  font-size: .9rem;
+  table-layout: fixed;
+  width: 100%;
+  text-align: center;
+}
+
+/* ✅ 인라인 colgroup style 제거 대응 (index.js에서 class 부여) */
+#manage-rate .rate-table-check-table col.rate-table-col-name{ width: 70%; }
+#manage-rate .rate-table-check-table col.rate-table-col-rate{ width: 30%; }
+
+/* (선택) bootstrap modal 안에서 깨짐 방지: tableCheckModal 내부는 nowrap 유지 */
+#manage-rate #tableCheckModal table :is(th, td){
+  white-space: nowrap;
+}
+
+
+/* ==========================================================
+ 6) STRUCTURE: InputTable Column Widths (vars + colgroup)
+========================================================== */
+#manage-structure{
+  --c-search: 75px;
+  --c-del: 75px;
+
+  --c-rq: 130px;
+  --c-tg: 130px;
+
+  --c-before-branch: 240px;
+  --c-after-branch: 240px;
+
+  --c-before-rank: 150px;
+  --c-after-rank: 150px;
+
+  --c-or: 44px;     /* 요청 반영: 60 → 40~50 추천 */
+  --c-memo: 350px;
+}
+
+#manage-structure #inputTable col.c-search        { width: var(--c-search); }
+#manage-structure #inputTable col.c-rq            { width: var(--c-rq); }
+#manage-structure #inputTable col.c-tg            { width: var(--c-tg); }
+#manage-structure #inputTable col.c-before-branch { width: var(--c-before-branch); }
+#manage-structure #inputTable col.c-after-branch  { width: var(--c-after-branch); }
+#manage-structure #inputTable col.c-before-rank   { width: var(--c-before-rank); }
+#manage-structure #inputTable col.c-after-rank    { width: var(--c-after-rank); }
+#manage-structure #inputTable col.c-or            { width: var(--c-or); }
+#manage-structure #inputTable col.c-memo          { width: var(--c-memo); }
+#manage-structure #inputTable col.c-del           { width: var(--c-del); }
+
+/* 요청자/대상자 display 폭이 안 줄어드는 문제 대응 */
+#manage-structure #inputTable td .rq_display,
+#manage-structure #inputTable td .tg_display {
+  width: 100%;
+  min-width: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* OR 체크박스: width:100% 강제에서 제외 + 정사각형 */
+#manage-structure #inputTable input[type="checkbox"][name="or_flag"]{
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* OR 컬럼 셀 여백/정렬 보정 (컬럼 위치가 다르면 nth-child 조정) */
+#manage-structure #inputTable th:nth-child(8),
+#manage-structure #inputTable td:nth-child(8){
+  padding-left: 6px;
+  padding-right: 6px;
+  text-align: center;
+}
+
+
+/* ==========================================================
+ 7) RATE: InputTable Column Widths (rq_display/tg_display 버전) ✅
+  - manage_rate.html colgroup/class와 1:1 매칭
+  - (중요) name/id 분리 버전 블록은 제거됨
+========================================================== */
+#manage-rate {
+  --c-search: 75px;
+  --c-rq: 130px;            /* 요청자 표시(rq_display) */
+  --c-tg: 130px;            /* 대상자 표시(tg_display) */
+
+  --c-before-ftable: 150px;
+  --c-before-frate: 90px;
+  --c-after-ftable: 150px;
+  --c-after-frate: 90px;
+
+  --c-before-ltable: 150px;
+  --c-before-lrate: 90px;
+  --c-after-ltable: 150px;
+  --c-after-lrate: 90px;
+
+  --c-memo: 200px;
+  --c-del: 75px;
+}
+
+/* colgroup 바인딩 */
+#manage-rate #inputTable col.c-search        { width: var(--c-search); }
+#manage-rate #inputTable col.c-rq            { width: var(--c-rq); }
+#manage-rate #inputTable col.c-tg            { width: var(--c-tg); }
+
+#manage-rate #inputTable col.c-before-ftable { width: var(--c-before-ftable); }
+#manage-rate #inputTable col.c-before-frate  { width: var(--c-before-frate); }
+#manage-rate #inputTable col.c-after-ftable  { width: var(--c-after-ftable); }
+#manage-rate #inputTable col.c-after-frate   { width: var(--c-after-frate); }
+
+#manage-rate #inputTable col.c-before-ltable { width: var(--c-before-ltable); }
+#manage-rate #inputTable col.c-before-lrate  { width: var(--c-before-lrate); }
+#manage-rate #inputTable col.c-after-ltable  { width: var(--c-after-ltable); }
+#manage-rate #inputTable col.c-after-lrate   { width: var(--c-after-lrate); }
+
+#manage-rate #inputTable col.c-memo          { width: var(--c-memo); }
+#manage-rate #inputTable col.c-del           { width: var(--c-del); }
+
+/* rq_display / tg_display 폭이 안 줄어드는 케이스 방지 */
+#manage-rate #inputTable :is(.rq_display, .tg_display) {
+  min-width: 0 !important;
+}
+
+
+/* ==========================================================
+ 8) MainSheet Policy (Structure / Rate)
+  - 기본: nowrap + 가로스크롤
+  - 예외: 메모(비고)는 데스크탑에서만 wrap 허용(Structure 기준)
+========================================================== */
+#manage-structure #mainSheet .table-responsive{
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+#manage-structure #mainTable,
+#manage-rate #mainTable {
+  table-layout: auto !important;
+  width: max-content !important;
+  min-width: 100% !important;
+}
+
+#manage-structure #mainTable :is(th, td),
+#manage-rate #mainTable :is(th, td) {
+  white-space: nowrap;
+  word-break: keep-all;
+  vertical-align: middle;
+}
+
+/* 메모 셀(Structure) 기본 ellipsis */
+#manage-structure .memo-cell{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* ---------- STRUCTURE: 비고 컬럼 정책 ---------- */
+#manage-structure {
+  --structure-memo-col: 8;
+  --structure-memo-maxw: 320px;
+}
+
+/* 데스크탑에서만 비고 wrap 허용 */
+@media (min-width: 769px) {
+  #manage-structure #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable td:nth-child(var(--structure-memo-col)) {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+}
+
+/* 모바일/좁은 화면: 비고 줄바꿈 금지 + ellipsis */
+@media (max-width: 768px) {
+  #manage-structure #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-structure #mainTable td:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable th:nth-child(var(--structure-memo-col)),
+  #manage-rate #mainTable td:nth-child(var(--structure-memo-col)) {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: var(--structure-memo-maxw);
+  }
+}
+
+/* 요청일자/처리일자 nowrap */
+#manage-structure #mainTable :is(
+  th:nth-child(9), td:nth-child(9),
+  th:nth-child(10), td:nth-child(10)
+) { white-space: nowrap !important; }
+
+#manage-rate #mainTable :is(
+  th:nth-child(13), td:nth-child(13),
+  th:nth-child(14), td:nth-child(14)
+) { white-space: nowrap !important; }
+
+/* RATE: 메모 컬럼 정책 */
+#manage-rate { --rate-memo-col: 13; }
+
+#manage-rate #mainTable th:nth-child(var(--rate-memo-col)),
+#manage-rate #mainTable td:nth-child(var(--rate-memo-col)) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* Rate: table check modal */
+#tableCheckModal table :is(th, td) {
+  white-space: nowrap;
+}
+
+
+/* ==========================================================
+ 9) DataTables wrapper 폭 고정(Structure/Rate)
+  - 테이블이 내용으로 커지지 못하게 방어(말줄임 전제)
+========================================================== */
+#manage-structure #mainSheet .table-responsive,
+#manage-rate #mainSheet .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 핵심: 테이블 고정 */
+#manage-structure #mainTable,
+#manage-rate #mainTable{
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+#manage-structure #mainTable :is(th, td),
+#manage-rate #mainTable :is(th, td) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: middle;
+}
+
+/* DataTables scroll wrappers 폭 고정 */
+#manage-structure #mainTable_wrapper,
+#manage-structure #mainTable_wrapper .dataTables_scroll,
+#manage-structure #mainTable_wrapper .dataTables_scrollHead,
+#manage-structure #mainTable_wrapper .dataTables_scrollBody,
+#manage-rate #mainTable_wrapper,
+#manage-rate #mainTable_wrapper .dataTables_scroll,
+#manage-rate #mainTable_wrapper .dataTables_scrollHead,
+#manage-rate #mainTable_wrapper .dataTables_scrollBody {
+  width: 100% !important;
+}
+
+/* ==========================================================
+ 10) EFFICIENCY (manage_efficiency)
+  - inputTable 고정폭 + ellipsis
+  - accordion header: "헤더 자체" 스크롤 금지 + 내부만 가로스크롤
+========================================================== */
+
+/* efficiency: 인라인 style 제거용 */
+#manage-efficiency .eff-process-date,
+#manage-calculate .eff-process-date{
+  min-width: 135px;
+}
+
+#manage-efficiency .eff-btn-nowrap,
+#manage-calculate .eff-btn-nowrap{
+  white-space: nowrap;
+}
+
+/* amount input alignment(효율) */
+#manage-efficiency input[name="amount"] {
+  text-align: right;
+}
+
+/* ---------- Efficiency inputTable ---------- */
+#manage-efficiency #inputSection .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#manage-efficiency #inputTable {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 1400px;
+}
+
+#manage-efficiency #inputTable :is(th, td) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: middle;
+}
+
+#manage-efficiency #inputTable .btn {
+  min-width: 0 !important;
+  padding: 6px 8px;
+}
+
+#manage-efficiency #inputTable :is(input, select) {
+  min-width: 0 !important;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* ---------- Efficiency vars & col widths ---------- */
+#manage-efficiency {
+  --c-rq_name: 90px;
+  --c-rq_id: 100px;
+  --c-rq_branch: 180px;
+
+  --c-category: 120px;
+  --c-amount: 120px;
+  --c-tax: 110px;
+
+  --c-ded_name: 90px;
+  --c-ded_id: 100px;
+  --c-ded_search: 80px;
+
+  --c-pay_name: 90px;
+  --c-pay_id: 100px;
+  --c-pay_search: 80px;
+
+  --c-content: 320px;
+  --c-remove: 80px;
+
+  --main-content-width: 320px;
+  --eff-header-minw: 1100px;
+
+  /* Accordion header vars */
+  --eff-header-minh: 46px;
+  --eff-toggle-left-pad: 44px;
+  --eff-confirm-gap: 8px;
+  --eff-confirm-file-w: 260px;
+}
+
+#manage-efficiency #inputTable col[data-col="rq_name"]   { width: var(--c-rq_name); }
+#manage-efficiency #inputTable col[data-col="rq_id"]     { width: var(--c-rq_id); }
+#manage-efficiency #inputTable col[data-col="rq_branch"] { width: var(--c-rq_branch); }
+#manage-efficiency #inputTable col[data-col="category"]  { width: var(--c-category); }
+#manage-efficiency #inputTable col[data-col="amount"]    { width: var(--c-amount); }
+#manage-efficiency #inputTable col[data-col="tax"]       { width: var(--c-tax); }
+#manage-efficiency #inputTable col[data-col="ded_name"]  { width: var(--c-ded_name); }
+#manage-efficiency #inputTable col[data-col="ded_id"]    { width: var(--c-ded_id); }
+#manage-efficiency #inputTable col[data-col="ded_search"]{ width: var(--c-ded_search); }
+#manage-efficiency #inputTable col[data-col="pay_name"]  { width: var(--c-pay_name); }
+#manage-efficiency #inputTable col[data-col="pay_id"]    { width: var(--c-pay_id); }
+#manage-efficiency #inputTable col[data-col="pay_search"]{ width: var(--c-pay_search); }
+#manage-efficiency #inputTable col[data-col="content"]   { width: var(--c-content); }
+#manage-efficiency #inputTable col[data-col="remove"]    { width: var(--c-remove); }
+
+/* ---------- Efficiency accordion body scroll ---------- */
+#manage-efficiency #mainSheet { min-width: 0; }
+
+#manage-efficiency #confirmGroupsAccordion .accordion-body {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#manage-efficiency #confirmGroupsAccordion .main-group-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+#manage-efficiency .main-group-table :is(th, td) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#manage-efficiency .main-table-fixed { min-width: var(--eff-header-minw); }
+
+#manage-efficiency #confirmGroupsAccordion .main-group-table :is(td.td-content, th.td-content) {
+  width: var(--main-content-width);
+  max-width: var(--main-content-width);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#manage-efficiency #confirmGroupsAccordion .main-group-table td.td-content:hover {
+  white-space: normal;
+  overflow: visible;
+  position: relative;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+/* actions bar */
+#manage-efficiency .efficiency-actions-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+/* ---------- Efficiency Accordion Header (FINAL) ---------- */
+#manage-efficiency .eff-acc-head {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+#manage-efficiency .eff-acc-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden; /* 헤더 자체 스크롤 금지 */
+  height: var(--eff-header-minh);
+  min-height: var(--eff-header-minh);
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  position: relative;
+  padding-left: var(--eff-toggle-left-pad);
+  padding-right: 14px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+#manage-efficiency .eff-acc-toggle::after {
+  position: absolute;
+  left: 12px;
+  right: auto;
+  margin: 0;
+}
+
+/* inner scroll area */
+#manage-efficiency .eff-group-scroll {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  max-height: calc(var(--eff-header-minh) - 16px);
+}
+
+#manage-efficiency .eff-group-scroll::-webkit-scrollbar { display:none; }
+#manage-efficiency .eff-group-scroll { scrollbar-width:none; }
+
+#manage-efficiency .eff-group-scroll > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#manage-efficiency .eff-group-title { font-weight: 800; line-height: 1.15; }
+#manage-efficiency .eff-group-sub   { font-size: 12px; color: #6c757d; line-height: 1.15; }
+
+#manage-efficiency .eff-acc-confirm {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--eff-confirm-gap);
+  padding: 8px 10px;
+  background: #fff;
+  height: var(--eff-header-minh);
+  min-height: var(--eff-header-minh);
+  overflow-y: hidden !important;
+}
+
+#manage-efficiency .eff-acc-confirm .confirm-file {
+  width: var(--eff-confirm-file-w);
+  max-width: var(--eff-confirm-file-w);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 30px;
+  line-height: 1.1;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#manage-efficiency .eff-acc-confirm .btn.btn-sm {
+  height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  line-height: 1.1;
+}
+
+/* y-scroll 완전 차단 */
+#manage-efficiency #confirmGroupsAccordion :is(.accordion-header, .accordion-button, .eff-acc-toggle) {
+  overflow-y: hidden !important;
+}
+#manage-efficiency #confirmGroupsAccordion .accordion-button {
+  overflow-x: hidden !important;
+}
+
+/* mobile: confirm box wrap down */
+@media (max-width: 576px) {
+  #manage-efficiency .eff-acc-head { flex-wrap: wrap; }
+  #manage-efficiency .eff-acc-confirm {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  #manage-efficiency .eff-acc-confirm .confirm-file {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* ==========================================================
+  11) MANAGE TABLES (manage_tables)
+  - "style 속성 0개" 기준 완성본
+  - 스코프: #manage-table 내부에서만 적용
+========================================================== */
+
+/* -------------------------
+  11-0) Variables (Table widths)
+-------------------------- */
+#manage-table{
+  /* mainTable col widths */
+  --mt-col-order: 8%;
+  --mt-col-branch: 25%;
+  --mt-col-table: 35%;
+  --mt-col-rate: 20%;
+  --mt-col-edit: 10%;
+  --mt-col-del: 12%;
+}
+
+/* -------------------------
+  11-1) Title
+-------------------------- */
+#manage-table .manage-table-title{
+  color: #003f7d;
+}
+
+/* -------------------------
+  11-2) Cards layout
+-------------------------- */
+#manage-table .card{
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* -------------------------
+  11-3) Superuser filter controls
+  - 기존 inline flex basis 제거용
+-------------------------- */
+#manage-table #filterForm .ctl-part   { flex: 0 0 220px; }
+#manage-table #filterForm .ctl-branch { flex: 0 0 300px; }
+#manage-table #filterForm .ctl-btn    { flex: 0 0 120px; }
+
+/* 모바일에서는 폭 유연하게 */
+@media (max-width: 576px){
+  #manage-table #filterForm .ctl-part,
+  #manage-table #filterForm .ctl-branch,
+  #manage-table #filterForm .ctl-btn{
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+/* -------------------------
+  11-4) mainTable (colgroup driven)
+-------------------------- */
+#manage-table #mainTable{
+  width: 100%;
+  table-layout: fixed; /* colgroup 비율을 확실히 적용 */
+}
+
+#manage-table #mainTable :is(th, td){
+  vertical-align: middle;
+}
+
+/* 데이터 폰트(기존 manage_table.js 기준 유지) */
+#manage-table #mainTable :is(td, th){
+  font-size: 16px;
+}
+
+/* 편집/삭제 버튼 폰트 */
+#manage-table #mainTable .btnDeleteRow{
+  font-size: 13px;
+}
+
+/* 셀 overflow 정책: 표가 fixed면 긴 텍스트가 넘칠 수 있어서 안전장치 */
+#manage-table #mainTable td{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 테이블명/요율 셀은 편집 시 줄바꿈 없이 */
+#manage-table #mainTable td.editable{
+  white-space: nowrap;
+}
+
+/* Sortable 드래그 고스트 */
+#manage-table .sortable-ghost{
+  opacity: 0.6;
+  background: #e6f0ff;
+}
+
+/* -------------------------
+  11-5) rateUserTable (DataTables 대상)
+-------------------------- */
+#manage-table #rateUserTable{
+  font-size: 14px;
+}
+
+#manage-table #rateUserTable :is(th, td){
+  padding: 6px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* -------------------------
+  11-6) loading overlay
+  - base.css .loading-overlay 재사용 + 텍스트 보강
+-------------------------- */
+#manage-table #loadingOverlay.loading-overlay{
+  flex-direction: column;
+}
+
+#manage-table #loadingOverlay .loading-text{
+  margin-top: 8px;
+  font-weight: 700;
+}

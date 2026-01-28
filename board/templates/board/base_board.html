@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block app_css %}
+  <link rel="stylesheet" href="{% static 'css/apps/board.css' %}?v={% now 'U' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+  <div class="board-scope">
+    {{ block.super }}
+  </div>
+{% endblock %}

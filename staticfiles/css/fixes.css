@@ -1,0 +1,38 @@
+/* django_ma/static/css/fixes.css
+==========================================================
+🩹 fixes.css — 전역 Fix / 충돌 방어 모음
+- 원칙: 정말 "전역"이어야 하는 최소한의 방어만 둔다
+- 로드 순서: 항상 마지막에 로드(가장 중요)
+========================================================== */
+
+/* 공용: mainSheet min-width */
+#mainSheet { min-width: 0; }
+
+/* ❌ 전역 #mainTable 금지: manage-efficiency에서만 방어 */
+#manage-efficiency #mainTable {
+  width: 100% !important;
+  table-layout: fixed;
+}
+
+/* 개인정보 워터마크 */
+.privacy-watermark{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2147483000;
+}
+
+.privacy-watermark__text{
+  font-size: clamp(90px, 9vw, 220px);
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(0, 0, 0, 0.01);
+  transform: rotate(-22deg);
+  text-shadow: 0 0 1px rgba(0,0,0,0.05);
+}

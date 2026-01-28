@@ -1,9 +1,14 @@
+# django_ma/board/admin.py
+
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
+
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.timezone import localtime
-from openpyxl import Workbook
 
 from accounts.custom_admin import custom_admin_site
 from .models import Post
@@ -35,6 +40,12 @@ def export_posts_as_excel(queryset, filename: str = "posts_export.xlsx") -> Http
     ]
     ws.append(headers)
 
+    # Header 스타일 + 고정
+    header_font = Font(bold=True)
+    for col_idx in range(1, len(headers) + 1):
+        ws.cell(row=1, column=col_idx).font = header_font
+    ws.freeze_panes = "A2"
+
     for post in queryset:
         ws.append([
             post.receipt_number,
@@ -49,6 +60,24 @@ def export_posts_as_excel(queryset, filename: str = "posts_export.xlsx") -> Http
             localtime(post.status_updated_at).strftime("%Y-%m-%d %H:%M") if post.status_updated_at else "-",
             localtime(post.created_at).strftime("%Y-%m-%d %H:%M"),
         ])
+    
+    # Auto filter
+    ws.auto_filter.ref = ws.dimensions
+    
+    # 열 너비 자동 조정(상한 적용)
+    MAX_W = 50
+    PADDING = 2
+    for col_idx in range(1, ws.max_column + 1):
+        col_letter = get_column_letter(col_idx)
+        max_len = 0
+        for row_idx in range(1, ws.max_row + 1):
+            v = ws.cell(row=row_idx, column=col_idx).value
+            if v is None:
+                continue
+            s = str(v)
+            if len(s) > max_len:
+                max_len = len(s)
+        ws.column_dimensions[col_letter].width = min(MAX_W, max(10, max_len + PADDING))
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

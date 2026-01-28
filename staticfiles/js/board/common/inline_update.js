@@ -1,21 +1,14 @@
 // django_ma/static/js/board/common/inline_update.js
 // =========================================================
-// Board Common Inline Update (LIST) - FINAL
+// Board Common Inline Update (LIST) (FINAL)
 // - post_list / task_list 공용
 // - handler/status select 인라인 변경 AJAX
 // - status_updated_at(td.status-updated-at) 갱신
-// - ✅ onSuccess 공식 지원: onSuccess(data, ctx)
+// - onSuccess 공식 지원 (예: status_ui 재적용)
 //
-// ✅ ctx 제공:
-// { fieldName, actionType, idKey, idValue, selectEl, form, updateUrl }
-//
-// 전제(템플릿):
-// - boot div: #postListBoot or #taskListBoot with data-update-url
-// - inline form: form.inline-update-form
-//   - hidden: action_type
-//   - hidden: post_id or task_id
-//   - select[name=handler], select[name=status].status-select
-// - td.status-updated-at 있으면 갱신
+// ✅ CSS 모듈화 대응
+// - 인라인 style(pointerEvents/opacity) 주입 제거
+// - disabled + aria-busy + classList('is-busy') 토글 방식
 // =========================================================
 
 (function () {
@@ -24,6 +17,11 @@
   const Board = (window.Board = window.Board || {});
   Board.Common = Board.Common || {};
 
+  const INIT_FLAG = "__boardListInlineUpdateBound";
+
+  /* =========================================================
+   * 1) Utilities
+   * ========================================================= */
   function qs(sel, root) {
     return (root || document).querySelector(sel);
   }
@@ -47,18 +45,24 @@
 
   function setBusy(selectEl, busy) {
     if (!selectEl) return;
-    selectEl.style.pointerEvents = busy ? "none" : "";
-    selectEl.style.opacity = busy ? "0.7" : "";
+
+    // ✅ 인라인 style 대신: disabled + class
+    if (busy) selectEl.setAttribute("disabled", "disabled");
+    else selectEl.removeAttribute("disabled");
+
+    selectEl.setAttribute("aria-busy", busy ? "true" : "false");
+    selectEl.classList.toggle("is-busy", !!busy);
   }
 
   function showAlert(alertHost, message, type = "success") {
-    if (!alertHost) return window.alert(message);
+    if (!alertHost) return window.alert(message || "");
     alertHost.innerHTML = `
       <div class="alert alert-${type} alert-dismissible fade show text-center" role="alert">
         ${escapeHtml(message || "")}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     `;
+
     window.setTimeout(() => {
       const el = qs(".alert", alertHost);
       if (!el) return;
@@ -99,26 +103,33 @@
     return data;
   }
 
+  /* =========================================================
+   * 2) Public init
+   * ========================================================= */
   /**
    * initListInlineUpdate
    * @param {Object} opts
-   * @param {string} opts.bootId  - "postListBoot" | "taskListBoot"
-   * @param {string} opts.idKey   - "post_id" | "task_id"
-   * @param {(data:Object, ctx:Object)=>void} [opts.onSuccess]
+   * @param {string} opts.bootId - "postListBoot" | "taskListBoot"
+   * @param {string} opts.idKey  - "post_id" | "task_id"
+   * @param {Function} [opts.onSuccess] - (data, ctx) => void
    */
   Board.Common.initListInlineUpdate = function initListInlineUpdate(opts) {
     const bootId = opts?.bootId;
     const idKey = opts?.idKey;
     const onSuccess = typeof opts?.onSuccess === "function" ? opts.onSuccess : null;
-
     if (!bootId || !idKey) return;
 
     const bind = () => {
+      // 중복 바인딩 방지(LIST 페이지는 1회만)
+      if (document.body.dataset[INIT_FLAG] === "1") return;
+      document.body.dataset[INIT_FLAG] = "1";
+
       const boot = document.getElementById(bootId);
       const updateUrl = boot?.dataset?.updateUrl || "";
-      if (!updateUrl) return; // non-superuser 화면/잘못된 템플릿에서도 안전 종료
-
       const alertHost = document.getElementById("inlineUpdateAlertHost");
+
+      // updateUrl 없으면(비권한/일반화면) 조용히 종료
+      if (!updateUrl) return;
 
       // 초기 prevValue 세팅
       document
@@ -127,7 +138,6 @@
         )
         .forEach((s) => (s.dataset.prevValue = s.value));
 
-      // 이벤트 위임
       document.addEventListener("change", async (e) => {
         const sel = e.target;
         if (!(sel instanceof HTMLSelectElement)) return;
@@ -171,33 +181,27 @@
             if (td) td.textContent = data.status_updated_at;
           }
 
-          // 서버가 status를 돌려주면 확정 동기화
-          if (fieldName === "status") {
-            const confirmed = data.status || sel.value;
-            sel.value = confirmed;
-            sel.dataset.prevValue = confirmed;
-            sel.dataset.status = confirmed; // status_ui에서 사용
+          // 서버가 status를 돌려주면 확정 반영
+          if (fieldName === "status" && data.status) {
+            sel.value = data.status;
+            sel.dataset.prevValue = data.status;
+            sel.dataset.status = data.status;
           }
 
           showAlert(alertHost, data.message || "변경되었습니다.", "success");
 
-          // ✅ 공식 onSuccess
+          // 공식 onSuccess
           if (onSuccess) {
-            onSuccess(data, {
-              fieldName,
-              actionType,
-              idKey,
-              idValue,
-              selectEl: sel,
-              form,
-              updateUrl,
-            });
+            try {
+              onSuccess(data, { sel, form, fieldName, idKey, idValue, actionType, updateUrl });
+            } catch {
+              /* ignore */
+            }
           }
         } catch (err) {
           sel.value = prev;
           sel.dataset.prevValue = prev;
-          if (fieldName === "status") sel.dataset.status = prev;
-
+          sel.dataset.status = prev;
           showAlert(alertHost, err?.message || "변경 실패", "danger");
         } finally {
           setBusy(sel, false);

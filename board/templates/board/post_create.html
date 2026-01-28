@@ -1,15 +1,19 @@
 <!-- django_ma/board/templates/board/post_create.html -->
-{% extends "base.html" %}
+{% extends "board/base_board.html" %}
 {% load static %}
 
 {% block title %}업무요청 작성{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-  <div class="mx-auto" style="max-width: 700px;">
+  <div class="mx-auto board-narrow">
+
+    {% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
+      <div class="alert alert-danger">접근 권한이 없습니다.</div>
+    {% endif %}
 
     <!-- Page Title -->
-    <h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">업무요청 작성</h3>
+    <h3 class="mb-4 text-center fw-bold board-page-title">업무요청 작성</h3>
 
     <div class="card shadow p-4 border-0 rounded-4">
 
@@ -22,14 +26,7 @@
       {% url "board:post_list" as list_url %}
 
       <!-- Main Form (shared partial) -->
-      {% include "board/includes/_edit_form.html" with
-        mode="create"
-        form=form
-        attachments=None
-        list_url=list_url
-        cancel_url=list_url
-        form_id="postForm"
-      %}
+      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="postForm" %}
     </div>
 
     <!-- Back to Home -->
@@ -44,6 +41,5 @@
 {% block extra_js %}
 <!-- Upload UI + Submit Lock -->
 <script src="{% static 'js/utils/file_upload_utils.js' %}"></script>
-<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
 <script src="{% static 'js/board/form_submit_lock.js' %}?v=20260104_2"></script>
 {% endblock %}

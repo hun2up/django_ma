@@ -1,4 +1,5 @@
 # django_ma/board/templatetags/querystring.py
+
 from urllib.parse import urlencode
 
 from django import template

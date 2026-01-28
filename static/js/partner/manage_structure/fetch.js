@@ -1,17 +1,16 @@
 // django_ma/static/js/partner/manage_structure/fetch.js
 // =========================================================
-// ✅ Structure - Fetch/Render (Final Refactor)
+// ✅ Structure - Fetch/Render (FINAL)
 // - DataTables 우선 + fallback 렌더
-// - 말줄임 + Bootstrap Tooltip(hover/클릭=focus)로 전체 텍스트 확인
-// - DataTables draw/재조회 후 tooltip 자동 재초기화
-// - 처리일자 저장 / 행 삭제 delegation 1회 바인딩
+// - 말줄임: .dt-ellipsis (base.css)
+// - 변경후 강조: .cell-after (base.css)
+// - Tooltip: Bootstrap Tooltip 사용 (container: body)
+// - 처리일자 저장/삭제 위임: root 범위로 제한(충돌 방지)
 // - dataset URL 키 안전화 + 서버 키 normalize
 // =========================================================
 
 import { els } from "./dom_refs.js";
-import { showLoading, hideLoading, alertBox, getCSRFToken } from "./utils.js";
-
-console.log("✅ [structure/fetch] LOADED", { url: import.meta?.url });
+import { showLoading, hideLoading, alertBox, getCSRFToken, pad2 } from "./utils.js";
 
 /* =========================================================
    State
@@ -25,11 +24,6 @@ let resizeBound = false;
 ========================================================= */
 function toStr(v) {
   return String(v ?? "").trim();
-}
-
-function pad2(v) {
-  const n = String(v ?? "").trim();
-  return n.length === 1 ? `0${n}` : n;
 }
 
 /* =========================================================
@@ -46,7 +40,6 @@ function dsUrl(keys = []) {
 }
 
 function getFetchUrl() {
-  // template: data-data-fetch-url => dataset.dataFetchUrl
   return dsUrl(["fetchUrl", "dataFetchUrl", "dataDataFetchUrl", "dataFetch"]);
 }
 function getUpdateProcessDateUrl() {
@@ -78,7 +71,7 @@ function revealSections() {
   if (els.inputSection) els.inputSection.hidden = false;
   if (els.mainSheet) els.mainSheet.hidden = false;
 
-  // DT 폭 계산은 “표시된 다음 프레임”에서 해야 안정적
+  // DT 폭 계산은 표시 다음 프레임에서
   requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
 }
 
@@ -91,11 +84,7 @@ async function safeReadJson(res) {
   try {
     return JSON.parse(text);
   } catch {
-    return {
-      status: "error",
-      message: "서버 응답이 JSON이 아닙니다.",
-      _raw: text.slice(0, 300),
-    };
+    return { status: "error", message: "서버 응답이 JSON이 아닙니다.", _raw: text.slice(0, 300) };
   }
 }
 
@@ -121,18 +110,17 @@ function escapeAttr(v) {
 function initTooltipsInMainTable() {
   if (!window.bootstrap?.Tooltip) return;
 
-  // mainTable 범위에서만 탐색 (성능/범위 안정)
+  // mainTable 범위에서만 탐색
   const root = els.mainTable?.closest?.("#mainSheet") || els.root || document;
   const nodes = root.querySelectorAll('[data-bs-toggle="tooltip"]');
 
   nodes.forEach((el) => {
-    // 중복 생성 방지
     const inst = window.bootstrap.Tooltip.getInstance(el);
     if (inst) inst.dispose();
 
     new window.bootstrap.Tooltip(el, {
-      trigger: "hover focus", // hover + 클릭(포커스)
-      container: "body",      // overflow:hidden 영향 회피(중요)
+      trigger: "hover focus",
+      container: "body", // overflow 영향 회피
       boundary: "viewport",
     });
   });
@@ -148,10 +136,7 @@ function fmtPerson(name, id) {
   return n || i || "";
 }
 
-/**
- * ✅ 말줄임 + tooltip(hover/focus)
- * - base.css: .dt-ellipsis { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
- */
+/** ✅ 말줄임 + tooltip (base.css: .dt-ellipsis) */
 function renderEllipsisCell(val) {
   const raw = toStr(val);
   if (!raw) return "";
@@ -168,7 +153,7 @@ function renderEllipsisCell(val) {
   `;
 }
 
-/** 변경후 값(파란색 강조 유지 + 말줄임 + tooltip) */
+/** ✅ 변경후 값 강조 + 말줄임 */
 function renderAfterEllipsis(val) {
   const raw = toStr(val);
   if (!raw) return "";
@@ -185,10 +170,7 @@ function renderAfterEllipsis(val) {
   `;
 }
 
-/**
- * ✅ OR 컬럼: 체크박스(읽기전용) 렌더
- * - 정렬/검색 제외, 비활성
- */
+/** ✅ OR: 체크박스(읽기전용) */
 function renderOrFlag(val) {
   const checked = !!val ? "checked" : "";
   return `
@@ -202,7 +184,6 @@ function renderProcessDateCell(_value, _type, row) {
   const grade = getUserGrade();
   const val = toStr(row.process_date || "");
 
-  // leader은 읽기만
   if (grade === "leader") return renderEllipsisCell(val);
 
   return `
@@ -274,33 +255,12 @@ async function deleteStructureRow(id) {
    DataTables columns
 ========================================================= */
 const MAIN_COLUMNS = [
-  // 1) 요청자
-  {
-    data: null,
-    defaultContent: "",
-    render: (_v, _t, row) => renderEllipsisCell(fmtPerson(row.requester_name, row.requester_id)),
-  },
-
-  // 2) 대상자
-  {
-    data: null,
-    defaultContent: "",
-    render: (_v, _t, row) => renderEllipsisCell(fmtPerson(row.target_name, row.target_id)),
-  },
-
-  // 3) 소속(변경전)
+  { data: null, defaultContent: "", render: (_v, _t, r) => renderEllipsisCell(fmtPerson(r.requester_name, r.requester_id)) },
+  { data: null, defaultContent: "", render: (_v, _t, r) => renderEllipsisCell(fmtPerson(r.target_name, r.target_id)) },
   { data: "target_branch", defaultContent: "", render: (v) => renderEllipsisCell(v) },
-
-  // 4) 소속(변경후)
   { data: "chg_branch", defaultContent: "", render: (v) => renderAfterEllipsis(v) },
-
-  // 5) 직급(변경전)
   { data: "rank", defaultContent: "", render: (v) => renderEllipsisCell(v) },
-
-  // 6) 직급(변경후)
   { data: "chg_rank", defaultContent: "", render: (v) => renderAfterEllipsis(v) },
-
-  // 7) OR
   {
     data: "or_flag",
     defaultContent: false,
@@ -309,30 +269,10 @@ const MAIN_COLUMNS = [
     searchable: false,
     render: (v) => renderOrFlag(!!v),
   },
-
-  // 8) 비고
   { data: "memo", defaultContent: "", render: (v) => renderEllipsisCell(v) },
-
-  // 9) 요청일자
   { data: "request_date", defaultContent: "", render: (v) => renderEllipsisCell(v) },
-
-  // 10) 처리일자
-  {
-    data: "process_date",
-    orderable: false,
-    searchable: false,
-    render: renderProcessDateCell,
-    defaultContent: "",
-  },
-
-  // 11) 삭제
-  {
-    data: "id",
-    orderable: false,
-    searchable: false,
-    render: (_id, _t, row) => buildActionButtons(row),
-    defaultContent: "",
-  },
+  { data: "process_date", orderable: false, searchable: false, render: renderProcessDateCell, defaultContent: "" },
+  { data: "id", orderable: false, searchable: false, render: (_id, _t, r) => buildActionButtons(r), defaultContent: "" },
 ];
 
 const MAIN_COLSPAN = MAIN_COLUMNS.length;
@@ -362,22 +302,16 @@ function bindResizeOnce() {
   });
 }
 
-/**
- * ✅ DataTables는 “한 번 붙으면 컬럼 정의가 고정”
- * - 기존 DT 남아있으면 destroy(true) 후 재생성
- */
 function ensureMainDT() {
   if (!canUseDataTables()) return null;
 
   const $ = window.jQuery;
 
-  // (방어) 이미 DataTable로 붙어있는데 mainDT가 null인 경우
   if (!mainDT && $.fn.DataTable.isDataTable(els.mainTable)) {
     try {
       $(els.mainTable).DataTable().destroy(true);
     } catch (_) {}
   }
-
   if (mainDT) return mainDT;
 
   mainDT = $(els.mainTable).DataTable({
@@ -391,6 +325,7 @@ function ensureMainDT() {
     autoWidth: false,
     destroy: true,
 
+    // partner.css에서 wrapper/overflow 정책을 잡고 있으므로 scrollX는 굳이 켤 필요 없음
     scrollX: false,
     scrollCollapse: false,
 
@@ -405,7 +340,6 @@ function ensureMainDT() {
 
     columns: MAIN_COLUMNS,
 
-    // ✅ DT가 매번 그린 뒤 tooltip 재초기화
     drawCallback: () => {
       initTooltipsInMainTable();
       adjustDT();
@@ -469,7 +403,6 @@ function renderFallback(rows) {
     tbody.appendChild(tr);
   });
 
-  // ✅ fallback 렌더 후 tooltip 초기화
   initTooltipsInMainTable();
 }
 
@@ -481,22 +414,23 @@ function renderMain(rows) {
   if (dt) {
     dt.clear();
     if (rows?.length) dt.rows.add(rows);
-    dt.draw(); // drawCallback에서 tooltip/adjust 실행
+    dt.draw();
     return;
   }
-
   renderFallback(rows);
 }
 
 /* =========================================================
-   Delegation (bind once)
+   Delegation (bind once) - ✅ root 범위로 제한
 ========================================================= */
 function bindDelegationOnce() {
   if (delegationBound) return;
   delegationBound = true;
 
+  const root = els.root || document;
+
   // 처리일자 변경
-  document.addEventListener("change", async (e) => {
+  root.addEventListener("change", async (e) => {
     const t = e.target;
     if (!t?.classList?.contains("processDateInput")) return;
     if (!els.mainTable || !els.mainTable.contains(t)) return;
@@ -518,14 +452,13 @@ function bindDelegationOnce() {
   });
 
   // 삭제 클릭
-  document.addEventListener("click", async (e) => {
+  root.addEventListener("click", async (e) => {
     const btn = e.target?.closest?.(".btnDeleteRow");
     if (!btn) return;
     if (!els.mainTable || !els.mainTable.contains(btn)) return;
 
     const id = toStr(btn.dataset.id || "");
     if (!id) return;
-
     if (!confirm("해당 행을 삭제할까요?")) return;
 
     btn.disabled = true;
@@ -533,16 +466,16 @@ function bindDelegationOnce() {
     try {
       await deleteStructureRow(id);
 
-      // ✅ 현재 선택값 기준으로 재조회
-      const y = toStr(els.year?.value || els.yearSelect?.value || "");
-      const m = toStr(els.month?.value || els.monthSelect?.value || "");
+      const y = toStr(els.year?.value || "");
+      const m = toStr(els.month?.value || "");
       const ym = `${y}-${pad2(m)}`;
 
       const branch =
-        toStr(els.branch?.value || els.branchSelect?.value || "") ||
+        toStr(els.branch?.value || "") ||
         toStr(window.currentUser?.branch || "") ||
         "";
 
+      // 재조회
       await fetchData(ym, branch);
     } catch (err) {
       console.error(err);

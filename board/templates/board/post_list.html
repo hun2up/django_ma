@@ -1,24 +1,26 @@
 <!-- django_ma/board/templates/board/post_list.html -->
-{% extends "base.html" %}
+{% extends "board/base_board.html" %}
 {% load static %}
 
 {% block title %}업무요청 게시판{% endblock %}
 
 {% block content %}
-
-<!-- Boot: list inline update endpoint -->
+<!-- Boot: list inline update endpoint (superuser only; JS에서 updateUrl 없으면 자동 종료) -->
 <div id="postListBoot" data-update-url="{% url 'board:ajax_update_post_field' %}" class="d-none"></div>
 
-<!-- Page Title -->
-<h3 class="mb-4 text-center fw-bold" style="color:#003f7d;">영업가족 업무요청 게시판</h3>
+{% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
+  <div class="alert alert-danger">접근 권한이 없습니다.</div>
+{% endif %}
+
+<h3 class="mb-4 text-center fw-bold board-page-title">
+  영업가족 업무요청 게시판
+</h3>
 
 <div class="container-fluid mt-4 board-font">
   <div class="board-container-wide">
 
-    <!-- Inline update alerts (JS) -->
     <div id="inlineUpdateAlertHost" class="mb-3"></div>
 
-    <!-- Messages -->
     {% if messages %}
       <div class="mb-3">
         {% for message in messages %}
@@ -30,23 +32,19 @@
       </div>
     {% endif %}
 
-    <!-- Primary Action -->
     <div class="d-flex justify-content-end mb-3">
       <a href="{% url 'board:post_create' %}" class="btn btn-primary fw-bold">+ 새 글 작성</a>
     </div>
 
-    <!-- =====================================================
-         Mobile View (sm 이하): 카드 리스트 + 접기 필터
-    ====================================================== -->
+    <!-- ================================
+         Mobile (sm 이하): 카드형 리스트
+         ================================ -->
     <div class="d-block d-md-none">
-
-      <!-- Mobile List -->
       <div class="list-group board-mobile-list">
         {% for post in posts %}
           <div class="list-group-item board-mobile-item">
             <div class="d-flex justify-content-between align-items-start gap-2">
 
-              <!-- Left: title/meta -->
               <div class="flex-grow-1" style="min-width:0;">
                 <div class="board-mobile-title">
                   <a href="{% url 'board:post_detail' post.pk %}" class="text-decoration-none text-dark">
@@ -54,59 +52,16 @@
                   </a>
                   <span class="text-muted fw-semibold">({{ post.comment_count|default:0 }})</span>
                 </div>
+
                 <div class="board-mobile-meta text-muted">
                   {{ post.created_at|date:"m-d H:i" }} · {{ post.user_name|default:"-" }}
                 </div>
               </div>
 
-              <!-- Right: handler/status -->
               <div class="text-end board-mobile-right">
-
-                <!-- Handler -->
-                <div class="board-mobile-handler">
-                  {% if is_superuser %}
-                    <form class="d-inline-block inline-update-form">
-                      {% csrf_token %}
-                      <input type="hidden" name="action_type" value="handler">
-                      <input type="hidden" name="post_id" value="{{ post.id }}">
-
-                      <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
-                        <option value="">선택</option>
-                        {% for h in handlers %}
-                          <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
-                        {% endfor %}
-                      </select>
-                    </form>
-                  {% else %}
-                    <span class="fw-semibold">{{ post.handler|default:"-" }}</span>
-                  {% endif %}
-                </div>
-
-                <!-- Status -->
-                <div class="board-mobile-status mt-1">
-                  {% if is_superuser %}
-                    <form class="d-inline-block inline-update-form">
-                      {% csrf_token %}
-                      <input type="hidden" name="action_type" value="status">
-                      <input type="hidden" name="post_id" value="{{ post.id }}">
-
-                      <select name="status"
-                              class="form-select form-select-sm d-inline-block status-select"
-                              style="width:auto;"
-                              data-status="{{ post.status|default:'' }}">
-                        {% for s in status_choices %}
-                          <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
-                        {% endfor %}
-                      </select>
-                    </form>
-                  {% else %}
-                    <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
-                      {{ post.status|default:"-" }}
-                    </span>
-                  {% endif %}
-                </div>
-
+                {% include "board/includes/_inline_handler_status_list.html" with variant="mobile" item=post id_key="post_id" is_superuser=is_superuser handlers=handlers status_choices=status_choices %}
               </div>
+
             </div>
           </div>
         {% empty %}
@@ -114,13 +69,11 @@
         {% endfor %}
       </div>
 
-      <!-- Pagination -->
       {% include "board/includes/pagination.html" with page_obj=posts query_string=query_string %}
 
-      <!-- Mobile Filter (collapse) -->
-      <div class="mt-3">
+      <!-- Mobile: 검색/필터 -->
+      <div class="d-block d-md-none mt-3">
         <div class="card board-mobile-filter shadow-sm">
-
           <button class="btn w-100 text-start board-filter-toggle"
                   type="button"
                   data-bs-toggle="collapse"
@@ -135,23 +88,23 @@
             <div class="p-3 pt-2">
               <form method="get" action="{% url 'board:post_list' %}">
                 <div class="row g-2">
-
-                  <!-- Search -->
                   <div class="col-5">
                     <select name="search_type" class="form-select form-select-sm">
-                      <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
-                      <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
-                      <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
-                      <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
+                      <option value="title" {% if search_type == "title" %}selected{% endif %}>제목</option>
+                      <option value="content" {% if search_type == "content" %}selected{% endif %}>내용</option>
+                      <option value="title_content" {% if search_type == "title_content" %}selected{% endif %}>제목+내용</option>
+                      <option value="user_name" {% if search_type == "user_name" %}selected{% endif %}>요청자</option>
                     </select>
                   </div>
 
                   <div class="col-7">
-                    <input type="text" name="keyword" value="{{ keyword }}"
-                           class="form-control form-control-sm" placeholder="검색어">
+                    <input type="text"
+                           name="keyword"
+                           value="{{ keyword }}"
+                           class="form-control form-control-sm"
+                           placeholder="검색어">
                   </div>
 
-                  <!-- Filters -->
                   <div class="col-6">
                     <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
                       <option value="전체" {% if selected_category == "전체" %}selected{% endif %}>구분(전체)</option>
@@ -162,7 +115,7 @@
                   </div>
 
                   <div class="col-6">
-                    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <select name="status" class="form-select form-select-sm status-select" onchange="this.form.submit()">
                       <option value="전체" {% if selected_status == "전체" %}selected{% endif %}>상태(전체)</option>
                       {% for s in status_choices %}
                         <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
@@ -187,20 +140,18 @@
                     </select>
                   </div>
 
-                  <!-- Date Range -->
                   <div class="col-6">
                     <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control form-control-sm">
                   </div>
+
                   <div class="col-6">
                     <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control form-control-sm">
                   </div>
 
-                  <!-- Actions -->
                   <div class="col-12 d-flex gap-2 mt-1">
                     <button type="submit" class="btn btn-primary btn-sm flex-fill">검색</button>
                     <a href="{% url 'board:post_list' %}" class="btn btn-outline-secondary btn-sm flex-fill">초기화</a>
                   </div>
-
                 </div>
               </form>
             </div>
@@ -208,27 +159,26 @@
 
         </div>
       </div>
-
     </div>
 
-    <!-- =====================================================
-         Desktop View (md 이상): 테이블 + 하단 필터
-    ====================================================== -->
+    <!-- ================================
+         Desktop (md 이상): 테이블
+         ================================ -->
     <div class="d-none d-md-block">
-
-      <!-- Table -->
       <div class="card p-4 shadow-sm rounded-4">
         <div class="table-responsive">
-          <table class="table table-hover align-middle text-center mb-0">
+          <table class="table table-hover align-middle text-center mb-0 board-post-table">
+            <!-- ✅ 9컬럼(부문 포함) / 합계 100% -->
             <colgroup>
-              <col style="width: 8%">
-              <col style="width: 8%">
-              <col style="width: 10%">
-              <col style="width: 38%">
-              <col style="width: 8%">
-              <col style="width: 10%">
-              <col style="width: 8%">
-              <col style="width: 18%">
+              <col style="width: 9%">  <!-- 접수번호 -->
+              <col style="width: 10%">  <!-- 접수일자 -->
+              <col style="width: 9%"> <!-- 구분 -->
+              <col style="width: 25%"> <!-- 제목(기존 대비 축소) -->
+              <col style="width: 8%">  <!-- 부문(신규) -->
+              <col style="width: 9%">  <!-- 요청자 -->
+              <col style="width: 10%"> <!-- 담당자 -->
+              <col style="width: 10%">  <!-- 상태 -->
+              <col style="width: 10%"> <!-- 상태변경일 -->
             </colgroup>
 
             <thead class="table-light">
@@ -237,6 +187,7 @@
                 <th>접수일자</th>
                 <th>구분</th>
                 <th class="text-center">제목</th>
+                <th class="text-center">부문</th>
                 <th>요청자</th>
                 <th>담당자</th>
                 <th>상태</th>
@@ -247,84 +198,60 @@
             <tbody>
               {% for post in posts %}
                 <tr>
-                  <td>{{ post.receipt_number }}</td>
-                  <td>{{ post.created_at|date:"Y-m-d" }}</td>
-                  <td>{{ post.category|default:"-" }}</td>
+                  <!-- 접수번호 -->
+                  <td class="board-ellipsis" title="{{ post.receipt_number }}">
+                    {{ post.receipt_number }}
+                  </td>
 
-                  <td class="text-start">
+                  <!-- 접수일자 -->
+                  <td class="board-ellipsis" title="{{ post.created_at|date:'Y-m-d' }}">
+                    {{ post.created_at|date:"Y-m-d" }}
+                  </td>
+
+                  <!-- 구분 -->
+                  <td class="board-ellipsis" title="{{ post.category|default:'-' }}">
+                    {{ post.category|default:"-" }}
+                  </td>
+
+                  <!-- 제목(기존 유지) -->
+                  <td class="text-start board-col-title">
                     <a href="{% url 'board:post_detail' post.pk %}" class="text-decoration-none text-primary">
                       {{ post.title }}
                     </a>
                     <span class="text-muted fw-semibold">({{ post.comment_count|default:0 }})</span>
                   </td>
 
-                  <td>{{ post.user_name|default:"-" }}</td>
-
-                  <!-- Handler -->
-                  <td>
-                    {% if is_superuser %}
-                      <form class="d-inline-block inline-update-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="action_type" value="handler">
-                        <input type="hidden" name="post_id" value="{{ post.id }}">
-
-                        <select name="handler" class="form-select form-select-sm d-inline-block" style="width:auto;">
-                          <option value="">선택</option>
-                          {% for h in handlers %}
-                            <option value="{{ h }}" {% if post.handler == h %}selected{% endif %}>{{ h }}</option>
-                          {% endfor %}
-                        </select>
-                      </form>
-                    {% else %}
-                      {{ post.handler|default:"-" }}
-                    {% endif %}
+                  <!-- 부문 -->
+                  <td class="board-col-channel board-ellipsis" title="{{ post.user_channel|default:'-' }}">
+                    {{ post.user_channel|default:"-" }}
                   </td>
 
-                  <!-- Status -->
-                  <td>
-                    {% if is_superuser %}
-                      <form class="d-inline-block inline-update-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="action_type" value="status">
-                        <input type="hidden" name="post_id" value="{{ post.id }}">
-
-                        <select name="status"
-                                class="form-select form-select-sm d-inline-block status-select"
-                                style="width:auto;"
-                                data-status="{{ post.status|default:'' }}">
-                          {% for s in status_choices %}
-                            <option value="{{ s }}" {% if post.status == s %}selected{% endif %}>{{ s }}</option>
-                          {% endfor %}
-                        </select>
-                      </form>
-                    {% else %}
-                      <span class="fw-semibold status-badge" data-status="{{ post.status|default:'' }}">
-                        {{ post.status|default:"-" }}
-                      </span>
-                    {% endif %}
+                  <!-- 요청자 -->
+                  <td class="board-col-requester board-ellipsis" title="{{ post.user_name|default:'-' }}">
+                    {{ post.user_name|default:"-" }}
                   </td>
 
-                  <td class="status-updated-at">
+                  <!-- include(담당자/상태) 기존 유지 -->
+                  {% include "board/includes/_inline_handler_status_list.html" with variant="desktop" item=post id_key="post_id" is_superuser=is_superuser handlers=handlers status_choices=status_choices %}
+
+                  <!-- 상태변경일 -->
+                  <td class="status-updated-at board-ellipsis" title="{{ post.status_updated_at|date:'Y-m-d H:i' }}">
                     {{ post.status_updated_at|date:"Y-m-d H:i" }}
                   </td>
                 </tr>
               {% empty %}
-                <tr>
-                  <td colspan="8" class="text-center text-muted py-4">게시글이 없습니다.</td>
-                </tr>
+                ...
               {% endfor %}
             </tbody>
           </table>
         </div>
 
-        <!-- Pagination -->
         {% include "board/includes/pagination.html" with page_obj=posts query_string=query_string %}
       </div>
 
-      <!-- Filters -->
+      <!-- Desktop: 검색/필터 -->
       <form method="get" action="{% url 'board:post_list' %}" class="mt-4 p-3 bg-light rounded-4 shadow-sm">
 
-        <!-- Top Row Filters -->
         <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
           <div class="d-flex align-items-center gap-2">
             <label class="filter-label mb-0">표시</label>
@@ -337,13 +264,15 @@
 
           <div class="d-flex align-items-center gap-2">
             <select name="search_type" class="form-select form-select-sm select-filter">
-              <option value="title" {% if search_type == 'title' %}selected{% endif %}>제목</option>
-              <option value="content" {% if search_type == 'content' %}selected{% endif %}>내용</option>
-              <option value="title_content" {% if search_type == 'title_content' %}selected{% endif %}>제목+내용</option>
-              <option value="user_name" {% if search_type == 'user_name' %}selected{% endif %}>요청자</option>
+              <option value="title" {% if search_type == "title" %}selected{% endif %}>제목</option>
+              <option value="content" {% if search_type == "content" %}selected{% endif %}>내용</option>
+              <option value="title_content" {% if search_type == "title_content" %}selected{% endif %}>제목+내용</option>
+              <option value="user_name" {% if search_type == "user_name" %}selected{% endif %}>요청자</option>
             </select>
 
-            <input type="text" name="keyword" value="{{ keyword }}"
+            <input type="text"
+                   name="keyword"
+                   value="{{ keyword }}"
                    class="form-control form-control-sm"
                    placeholder="검색어 입력"
                    style="width:180px;">
@@ -385,15 +314,12 @@
           </div>
         </div>
 
-        <!-- Date Range -->
         <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3">
           <div class="d-flex align-items-center gap-2">
             <label class="filter-label mb-0">접수일자</label>
-            <input type="date" name="date_from" value="{{ date_from|default:'' }}"
-                   class="form-control form-control-sm" style="width:150px;">
+            <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control form-control-sm" style="width:150px;">
             <span class="text-muted">~</span>
-            <input type="date" name="date_to" value="{{ date_to|default:'' }}"
-                   class="form-control form-control-sm" style="width:150px;">
+            <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control form-control-sm" style="width:150px;">
           </div>
 
           <div class="d-flex align-items-center gap-2">
@@ -403,7 +329,6 @@
         </div>
 
       </form>
-
     </div>
 
   </div>
@@ -411,8 +336,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Inline update + list page logic -->
-<script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
-<script src="{% static 'js/board/common/inline_update.js' %}?v=20260105"></script>
-<script src="{% static 'js/board/post_list.js' %}?v=20260105"></script>
+<script src="{% static 'js/board/common/status_ui.js' %}?v=20260128"></script>
+<script src="{% static 'js/board/common/inline_update.js' %}?v=20260128"></script>
+<script src="{% static 'js/board/post_list.js' %}?v=20260128"></script>
 {% endblock %}

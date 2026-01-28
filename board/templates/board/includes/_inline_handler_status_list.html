@@ -1,0 +1,112 @@
+<!-- django_ma/board/templates/board/includes/_inline_handler_status_list.html -->
+
+<!--
+  Inline Handler/Status UI (LIST 공용)
+  - post_list / task_list 공용
+  - variant="desktop": <td> 담당자 + 상태 2칸 출력
+  - variant="mobile": 카드 우측 영역에 담당자/상태 2줄 출력
+
+  Required context:
+  - item: post or task
+  - id_key: "post_id" | "task_id"
+  - is_superuser: bool
+  - handlers: 담당자 목록
+  - status_choices: 상태 목록
+
+  Optional:
+  - variant: "desktop" | "mobile" (default: "desktop")
+-->
+
+{% with v=variant|default:"desktop" %}
+
+  {% if v == "desktop" %}
+    <!-- 담당자 (DESKTOP) -->
+    <td class="board-inline-cell board-inline-handler">
+      {% if is_superuser %}
+        <form class="d-inline-block inline-update-form">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="handler">
+          <input type="hidden" name="{{ id_key }}" value="{{ item.id }}">
+
+          <select name="handler" class="form-select form-select-sm d-inline-block board-inline-select">
+            <option value="">선택</option>
+            {% for h in handlers %}
+              <option value="{{ h }}" {% if item.handler == h %}selected{% endif %}>{{ h }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      {% else %}
+        {{ item.handler|default:"-" }}
+      {% endif %}
+    </td>
+
+    <!-- 상태 (DESKTOP) -->
+    <td class="board-inline-cell board-inline-status">
+      {% if is_superuser %}
+        <form class="d-inline-block inline-update-form">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="status">
+          <input type="hidden" name="{{ id_key }}" value="{{ item.id }}">
+
+          <select name="status"
+                  class="form-select form-select-sm d-inline-block status-select board-inline-select"
+                  data-status="{{ item.status|default:'' }}"
+                  data-status-ui="1">
+            {% for s in status_choices %}
+              <option value="{{ s }}" {% if item.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      {% else %}
+        <span class="fw-semibold status-badge" data-status="{{ item.status|default:'' }}">
+          {{ item.status|default:"-" }}
+        </span>
+      {% endif %}
+    </td>
+
+  {% elif v == "mobile" %}
+    <!-- 담당자/상태 (MOBILE) -->
+    <div class="board-mobile-handler">
+      {% if is_superuser %}
+        <form class="d-inline-block inline-update-form">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="handler">
+          <input type="hidden" name="{{ id_key }}" value="{{ item.id }}">
+
+          <select name="handler" class="form-select form-select-sm d-inline-block board-inline-select">
+            <option value="">선택</option>
+            {% for h in handlers %}
+              <option value="{{ h }}" {% if item.handler == h %}selected{% endif %}>{{ h }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      {% else %}
+        <span class="fw-semibold">{{ item.handler|default:"-" }}</span>
+      {% endif %}
+    </div>
+
+    <div class="board-mobile-status mt-1">
+      {% if is_superuser %}
+        <form class="d-inline-block inline-update-form">
+          {% csrf_token %}
+          <input type="hidden" name="action_type" value="status">
+          <input type="hidden" name="{{ id_key }}" value="{{ item.id }}">
+
+          <select name="status"
+                  class="form-select form-select-sm d-inline-block status-select board-inline-select"
+                  data-status="{{ item.status|default:'' }}"
+                  data-status-ui="1">
+            {% for s in status_choices %}
+              <option value="{{ s }}" {% if item.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      {% else %}
+        <span class="fw-semibold status-badge" data-status="{{ item.status|default:'' }}">
+          {{ item.status|default:"-" }}
+        </span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+{% endwith %}

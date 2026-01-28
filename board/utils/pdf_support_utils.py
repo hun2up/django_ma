@@ -34,13 +34,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 
 from accounts.models import CustomUser
+from board.constants import BOARD_ALLOWED_GRADES
+
 
 logger = logging.getLogger("board.access")
-
-# =========================================================
-# Policy / Permission
-# =========================================================
-BOARD_ALLOWED_GRADES = {"superuser", "head", "leader"}
 
 
 def _is_allowed_board_user(user: CustomUser, *, task_only: bool = False) -> bool:

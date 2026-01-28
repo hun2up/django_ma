@@ -1,12 +1,13 @@
 // django_ma/static/js/partner/manage_rate/index.js
 // =========================================================
-// ✅ Manage Rate - Index (Final Refactor)
+// ✅ Manage Rate - Index (Final Refactor + No Inline Styles)
 // - dataset/key 안전화
 // - requester autofill 안정화
 // - superuser parts/branches loader 대기
 // - table check modal 안전화 (bootstrap 유무 대응: fallback overlay 제공)
 // - ✅ autoload 중복 방지 강화 (manage_boot vs index 전역 가드)
 // - ✅ 검색 버튼 id 혼재(btnSearchPeriod/btnSearch) 대응
+// - ✅ 인라인 style 0개: overlay/table-check UI는 partner.css로 이동
 // =========================================================
 
 import { els } from "./dom_refs.js";
@@ -18,12 +19,8 @@ import { initInputRowEvents } from "./input_rows.js";
    constants / guards
 ========================================================= */
 const AUTOLOAD_GRADES = new Set(["head", "leader"]);
-
-// dataset에 억지로 "__xxx" 같은 키를 쓰면 브라우저별로 애매할 수 있어
-// 안전한 키로 고정
 const INIT_DATAKEY = "manageRateIndexInited";
 const ELLIPSIS_DATAKEY = "ellipsisTitleBound";
-
 const AUTOLOAD_FLAG = "__manageRateAutoLoaded";
 
 /* =========================================================
@@ -144,7 +141,6 @@ async function runSearch({ ym, branch } = {}) {
 }
 
 function resolveSearchButton() {
-  // ✅ 템플릿에서 btnSearchPeriod 사용, 혹시 구버전 btnSearch도 있을 수 있어 둘 다 지원
   return (
     els.btnSearch ||
     els.btnSearchPeriod ||
@@ -183,7 +179,6 @@ function initSuperuserPartsBranchesWait() {
    table check modal (bootstrap 유무 대응)
 ========================================================= */
 function getTableFetchUrl(branch) {
-  // root dataset: data-table-fetch-url → dataset key: tableFetchUrl
   const base = ds("tableFetchUrl");
   if (!base) return "";
 
@@ -214,12 +209,11 @@ function renderTableCheckHTML(rows) {
     .join("");
 
   return `
-    <div class="table-responsive" style="max-height:300px; overflow-y:auto;">
-      <table class="table table-sm table-bordered align-middle mb-0"
-             style="font-size:.9rem; table-layout:fixed; width:100%; text-align:center;">
+    <div class="table-responsive rate-table-check-scroll">
+      <table class="table table-sm table-bordered align-middle mb-0 rate-table-check-table">
         <colgroup>
-          <col style="width:70%;">
-          <col style="width:30%;">
+          <col class="rate-table-col-name">
+          <col class="rate-table-col-rate">
         </colgroup>
         <thead class="table-light">
           <tr>
@@ -240,7 +234,10 @@ function showBootstrapModal(modalEl) {
   return true;
 }
 
-// ✅ bootstrap 없을 때도 “확인” 가능하도록 아주 단순한 오버레이 fallback
+/* =========================================================
+   fallback overlay (bootstrap 없을 때)
+   - ✅ 인라인 style 0개: partner.css에서 전부 처리
+========================================================= */
 let __rateTableOverlayEl = null;
 
 function ensureFallbackOverlay() {
@@ -248,38 +245,35 @@ function ensureFallbackOverlay() {
 
   const wrap = document.createElement("div");
   wrap.id = "rateTableCheckOverlay";
-  wrap.style.cssText = `
-    position: fixed; inset: 0; z-index: 9999;
-    display: none;
-    background: rgba(0,0,0,.35);
-    padding: 24px;
-  `;
+  wrap.className = "rate-table-check-overlay";
+  wrap.setAttribute("aria-hidden", "true");
 
   wrap.innerHTML = `
-    <div style="
-      max-width: 720px; margin: 40px auto; background: #fff;
-      border-radius: 12px; overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,.2);
-    ">
-      <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 16px; border-bottom: 1px solid #eee;">
-        <div style="font-weight: 700;">테이블 확인</div>
-        <button type="button" id="rateTableOverlayClose" style="
-          border: 0; background: transparent; font-size: 18px; line-height: 1;
-          cursor: pointer;
-        " aria-label="close">✕</button>
+    <div class="rate-table-check-modal" role="dialog" aria-modal="true" aria-label="테이블 확인">
+      <div class="rate-table-check-header">
+        <div class="rate-table-check-title">테이블 확인</div>
+        <button type="button"
+                id="rateTableOverlayClose"
+                class="rate-table-check-close"
+                aria-label="close">✕</button>
       </div>
-      <div id="rateTableOverlayBody" style="padding: 14px 16px;"></div>
+      <div id="rateTableOverlayBody" class="rate-table-check-body"></div>
     </div>
   `;
 
+  // overlay 바깥 클릭 시 닫기
   wrap.addEventListener("click", (e) => {
     if (e.target === wrap) hideFallbackOverlay();
   });
 
   document.body.appendChild(wrap);
 
-  const btnClose = wrap.querySelector("#rateTableOverlayClose");
-  btnClose?.addEventListener("click", hideFallbackOverlay);
+  wrap.querySelector("#rateTableOverlayClose")?.addEventListener("click", hideFallbackOverlay);
+
+  // ESC로 닫기
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideFallbackOverlay();
+  });
 
   __rateTableOverlayEl = wrap;
   return wrap;
@@ -289,12 +283,15 @@ function showFallbackOverlay(html) {
   const wrap = ensureFallbackOverlay();
   const body = wrap.querySelector("#rateTableOverlayBody");
   if (body) body.innerHTML = html;
-  wrap.style.display = "block";
+
+  wrap.classList.add("is-open");
+  wrap.setAttribute("aria-hidden", "false");
 }
 
 function hideFallbackOverlay() {
   if (!__rateTableOverlayEl) return;
-  __rateTableOverlayEl.style.display = "none";
+  __rateTableOverlayEl.classList.remove("is-open");
+  __rateTableOverlayEl.setAttribute("aria-hidden", "true");
 }
 
 function initTableCheckModal() {
@@ -315,14 +312,14 @@ function initTableCheckModal() {
 
     const loadingHTML = `<div class="py-4 text-muted">불러오는 중...</div>`;
 
-    // bootstrap modal이 있으면 그걸 우선 사용
+    // bootstrap modal 우선
     let useBootstrap = false;
     if (modalBody && modalEl) {
       modalBody.innerHTML = loadingHTML;
       useBootstrap = showBootstrapModal(modalEl);
     }
 
-    // bootstrap 없거나 modal 요소가 없으면 fallback overlay
+    // 없으면 fallback overlay
     if (!useBootstrap) showFallbackOverlay(loadingHTML);
 
     try {
@@ -378,8 +375,6 @@ function buildFallbackYM() {
 
 function initAutoLoadAssist() {
   if (isAutoLoaded()) return;
-
-  // ✅ manage_boot가 이미 rate autoload 수행했으면 index는 절대 재실행 X
   if (window.__manageBootInited?.rate) return;
 
   const grade = getGrade();
@@ -408,34 +403,23 @@ function attachEllipsisTitleBehavior() {
   const setTitle = (el) => {
     if (!el) return;
 
-    // select는 선택된 텍스트를 title로
     if (el.tagName === "SELECT") {
       const opt = el.selectedOptions?.[0];
       el.title = opt ? String(opt.textContent || "").trim() : "";
       return;
     }
 
-    // input/textarea
     if ("value" in el) el.title = String(el.value || "").trim();
   };
 
-  // 초기 1회 세팅
   root
-    .querySelectorAll(
-      "#inputTable input, #inputTable select, #mainTable input, #mainTable select"
-    )
+    .querySelectorAll("#inputTable input, #inputTable select, #mainTable input, #mainTable select")
     .forEach(setTitle);
 
-  // 이벤트 위임으로 계속 갱신
   const handler = (e) => {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
-    if (
-      !t.matches(
-        "#inputTable input, #inputTable select, #mainTable input, #mainTable select"
-      )
-    )
-      return;
+    if (!t.matches("#inputTable input, #inputTable select, #mainTable input, #mainTable select")) return;
     setTitle(t);
   };
 
@@ -451,21 +435,18 @@ function attachEllipsisTitleBehavior() {
 function init() {
   if (!els.root) return;
 
-  // 페이지 단위 중복 init 방지
   if (els.root.dataset[INIT_DATAKEY] === "1") return;
   els.root.dataset[INIT_DATAKEY] = "1";
 
-  initPeriodDropdowns(); // 단독 실행 대비
-  initInputRowEvents(); // 입력 이벤트
-  fillRequesterAllRows(); // 요청자 자동입력
+  initPeriodDropdowns();
+  initInputRowEvents();
+  fillRequesterAllRows();
 
   initSuperuserPartsBranchesWait();
   initSearchButton();
   initTableCheckModal();
 
-  // ✅ autoload는 보조로만
   initAutoLoadAssist();
-
   attachEllipsisTitleBehavior();
 }
 

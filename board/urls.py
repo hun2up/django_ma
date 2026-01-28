@@ -1,3 +1,5 @@
+# django_ma/board/urls.py
+
 from django.urls import path
 from . import views
 
@@ -8,11 +10,13 @@ app_name = "board"
 # -------------------------------
 post_patterns = [
     path("", views.post_list, name="post_list"),
-    path("create/", views.post_create, name="post_create"),
-    path("post/<int:pk>/", views.post_detail, name="post_detail"),
-    path("<int:pk>/edit/", views.post_edit, name="post_edit"),
+    path("posts/create/", views.post_create, name="post_create"),
+    path("posts/<int:pk>/", views.post_detail, name="post_detail"),
+    path("posts/<int:pk>/edit/", views.post_edit, name="post_edit"),
     path("ajax/update-post-field/", views.ajax_update_post_field, name="ajax_update_post_field"),
-    path("ajax/post/<int:pk>/update-field/", views.ajax_update_post_field_detail, name="ajax_update_post_field_detail"),
+    path("ajax/posts/<int:pk>/update-field/", views.ajax_update_post_field_detail, name="ajax_update_post_field_detail"),
+    path("posts/attachments/<int:att_id>/download/", views.post_attachment_download, name="post_attachment_download"),
+
 ]
 
 # -------------------------------
@@ -30,12 +34,13 @@ support_patterns = [
 # Task (직원업무 게시판) - superuser only (views에서 강제)
 # -------------------------------
 task_patterns = [
-    path("task/", views.task_list, name="task_list"),
-    path("task/create/", views.task_create, name="task_create"),
-    path("task/<int:pk>/", views.task_detail, name="task_detail"),
-    path("task/<int:pk>/edit/", views.task_edit, name="task_edit"),
-    path("task/ajax/update-task-field/", views.ajax_update_task_field, name="ajax_update_task_field"),
-    path("task/ajax/task/<int:pk>/update-field/", views.ajax_update_task_field_detail, name="ajax_update_task_field_detail"),
+    path("tasks/", views.task_list, name="task_list"),
+    path("tasks/create/", views.task_create, name="task_create"),
+    path("tasks/<int:pk>/", views.task_detail, name="task_detail"),
+    path("tasks/<int:pk>/edit/", views.task_edit, name="task_edit"),
+    path("ajax/tasks/update-task-field/", views.ajax_update_task_field, name="ajax_update_task_field"),
+    path("ajax/tasks/<int:pk>/update-field/", views.ajax_update_task_field_detail, name="ajax_update_task_field_detail"),
+    path("tasks/attachments/<int:att_id>/download/", views.task_attachment_download, name="task_attachment_download"),
 ]
 
 urlpatterns = [

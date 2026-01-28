@@ -306,7 +306,7 @@ function renderProcessDateCell(r) {
            data-row-id="${escapeAttr(str(r.id))}"
            data-prev-value="${escapeAttr(val)}"
            value="${escapeAttr(val)}"
-           style="min-width:135px;" />
+           class="form-control form-control-sm js-process-date eff-process-date" />
   `;
 }
 
@@ -441,7 +441,7 @@ function renderGroups(groups, rowsByGroup) {
                   class="btn btn-outline-danger btn-sm js-confirm-delete"
                   data-action="delete-group"
                   data-group-id="${escapeAttr(gid)}"
-                  style="white-space:nowrap;">
+                  class="btn btn-outline-danger btn-sm eff-btn-nowrap">
             삭제
           </button>
         `
@@ -516,7 +516,7 @@ function renderGroups(groups, rowsByGroup) {
                                   class="btn btn-outline-danger btn-sm"
                                   data-action="delete-row"
                                   data-row-id="${escapeAttr(rowId)}"
-                                  style="white-space:nowrap;"
+                                  class="btn btn-outline-danger btn-sm eff-btn-nowrap"
                                   ${rowDeleteDisabled}>
                             삭제
                           </button>

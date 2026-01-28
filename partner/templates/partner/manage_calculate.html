@@ -3,6 +3,10 @@
 {% load static %}
 {% block title %}지점효율{% endblock %}
 
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/partner/manage_efficiency.css' %}?v={% now 'U' %}">
+{% endblock %}
+
 {% block content_wrapper %}
 <div class="container-fluid my-5">
   {% block content %}

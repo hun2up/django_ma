@@ -3,19 +3,18 @@
 // Board Common Comment Inline Edit (post_detail / task_detail 공용)
 //
 // ✅ 주요 기능
-// - .edit-comment-btn 클릭 시 해당 댓글을 textarea 인라인 편집 모드로 전환
-// - 저장은 기존 폼 POST 흐름을 그대로 사용(action_type=edit_comment)
-// - 취소 시 원문 복구(새로고침 없음)
+// - .edit-comment-btn 클릭 → 댓글을 textarea 인라인 편집 모드로 전환
+// - 저장: 기존 폼 POST 흐름 재사용(action_type=edit_comment)
+// - 취소: 원문 복구(새로고침 없음)
 // - CSRF: #commentEditCsrfToken 우선 → 없으면 페이지 내 csrf input fallback
 //
-// ✅ 권한 전제
-// - board 앱 접근 자체는 서버에서 (superuser/head/leader)로 제한
-// - task_detail은 superuser만 접근 가능 (서버에서 제한)
-// - 따라서 JS는 권한검증을 하지 않으며, DOM/토큰 미존재 시 안전 종료
+// ✅ CSS 모듈화 대응
+// - 인라인 style 제거(white-space/font-size 등)
+// - 클래스 기반 UI 구성(comment-text/comment-edit-* 활용)
 //
 // ✅ 템플릿 전제(권장)
 // - <input type="hidden" id="commentEditCsrfToken" value="{{ csrf_token }}">
-// - 댓글 컨테이너: .comment-content (권장: data-comment-id 포함)
+// - 댓글 컨테이너: .comment-content[data-comment-id]
 // - 수정 버튼: .edit-comment-btn[data-id]
 // - 버튼 그룹: .edit-delete-btns
 // - 본문: p.comment-text
@@ -24,14 +23,14 @@
 (function () {
   "use strict";
 
-  const NS = (window.Board = window.Board || {});
-  NS.Common = NS.Common || {};
+  const Board = (window.Board = window.Board || {});
+  Board.Common = Board.Common || {};
 
   const INIT_FLAG = "__boardCommentEditInited";
 
-  /* -----------------------------
-   * DOM helpers
-   * ----------------------------- */
+  /* =========================================================
+   * 1) Small DOM utilities
+   * ========================================================= */
   function qs(sel, root = document) {
     return root.querySelector(sel);
   }
@@ -42,82 +41,112 @@
     return qs("input[name='csrfmiddlewaretoken']")?.value || "";
   }
 
-  // textarea innerHTML로 주입되므로 최소 escape(HTML로 깨지지 않도록)
-  function escapeForTextarea(str) {
-    return String(str ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
+  function getOldText(container) {
+    const p = qs("p.comment-text", container) || qs("p", container);
+    // innerText는 줄바꿈 유지에 유리
+    return String(p?.innerText || "").trim();
   }
 
-  /* -----------------------------
-   * UI helpers
-   * ----------------------------- */
-  function restoreStaticText(container, text) {
-    // 기존 편집폼 제거
-    qs("form.comment-edit-form", container)?.remove();
-
-    // 본문 복구(p.comment-text)
+  /* =========================================================
+   * 2) UI builders
+   * ========================================================= */
+  function buildStaticParagraph(text) {
     const p = document.createElement("p");
     p.className = "mb-0 small comment-text";
-    p.style.whiteSpace = "pre-wrap";
     p.textContent = text ?? "";
-    container.insertBefore(p, container.firstChild);
+    return p;
+  }
 
-    // 버튼 그룹 복구
+  function buildEditForm({ csrf, commentId, oldText }) {
+    const form = document.createElement("form");
+    form.method = "post";
+    form.className = "comment-edit-form comment-edit-form-js";
+
+    // ✅ innerHTML로 textarea 값을 넣지 말고(value 사용) DOM 깨짐 방지
+    const csrfInput = document.createElement("input");
+    csrfInput.type = "hidden";
+    csrfInput.name = "csrfmiddlewaretoken";
+    csrfInput.value = csrf;
+
+    const actInput = document.createElement("input");
+    actInput.type = "hidden";
+    actInput.name = "action_type";
+    actInput.value = "edit_comment";
+
+    const idInput = document.createElement("input");
+    idInput.type = "hidden";
+    idInput.name = "comment_id";
+    idInput.value = String(commentId || "");
+
+    const ta = document.createElement("textarea");
+    ta.name = "content";
+    ta.className = "form-control form-control-sm comment-edit-textarea";
+    ta.rows = 7;
+    ta.value = String(oldText ?? "");
+
+    const actions = document.createElement("div");
+    actions.className = "comment-edit-actions mt-2";
+    actions.innerHTML = `
+      <button type="submit" class="btn btn-sm btn-primary">저장</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary cancel-edit">취소</button>
+    `;
+
+    form.append(csrfInput, actInput, idInput, ta, actions);
+    return form;
+  }
+
+  function showActionButtons(container, visible) {
     const actionBtns = qs(".edit-delete-btns", container);
-    if (actionBtns) actionBtns.style.display = "";
+    if (!actionBtns) return;
+    actionBtns.style.display = visible ? "" : "none";
+  }
+
+  function clearEditForm(container) {
+    qs("form.comment-edit-form", container)?.remove();
+  }
+
+  function clearStaticText(container) {
+    (qs("p.comment-text", container) || qs("p", container))?.remove();
+  }
+
+  function restoreStatic(container, oldText) {
+    clearEditForm(container);
+    clearStaticText(container);
+
+    container.insertBefore(buildStaticParagraph(oldText), container.firstChild);
+    showActionButtons(container, true);
+    container.dataset.editing = "0";
   }
 
   function enterEditMode(container, commentId, oldText) {
     const csrf = getCsrfToken();
     if (!csrf) {
       alert("CSRF 토큰을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.");
-      container.dataset.editing = "0";
-      restoreStaticText(container, oldText);
+      restoreStatic(container, oldText);
       return;
     }
 
-    // 버튼 숨김
-    const actionBtns = qs(".edit-delete-btns", container);
-    if (actionBtns) actionBtns.style.display = "none";
+    // 버튼 숨김 + 본문 제거
+    showActionButtons(container, false);
+    clearStaticText(container);
 
-    // 기존 본문 제거
-    const textP = qs("p.comment-text", container) || qs("p", container);
-    textP?.remove();
-
-    // 편집폼 생성 (기존 서버 POST 로직 재사용)
-    const form = document.createElement("form");
-    form.method = "post";
-    form.className = "comment-edit-form comment-edit-form-js";
-
-    form.innerHTML = `
-      <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
-      <input type="hidden" name="action_type" value="edit_comment">
-      <input type="hidden" name="comment_id" value="${commentId}">
-      <textarea name="content"
-                class="form-control form-control-sm comment-edit-textarea"
-                rows="7">${escapeForTextarea(oldText)}</textarea>
-      <div class="comment-edit-actions mt-2 d-flex gap-2">
-        <button type="submit" class="btn btn-sm btn-primary px-2 py-1" style="font-size:12px;">저장</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1 cancel-edit" style="font-size:12px;">취소</button>
-      </div>
-    `;
-
+    // 편집폼 삽입
+    const form = buildEditForm({ csrf, commentId, oldText });
     container.insertBefore(form, container.firstChild);
 
-    // 취소 버튼
+    // 취소
     qs(".cancel-edit", form)?.addEventListener("click", () => {
-      container.dataset.editing = "0";
-      restoreStaticText(container, oldText);
+      restoreStatic(container, oldText);
     });
+
+    // UX: textarea focus
+    qs("textarea[name='content']", form)?.focus?.();
   }
 
-  /* -----------------------------
-   * Event binding (delegation)
-   * ----------------------------- */
+  /* =========================================================
+   * 3) Event binding (delegation, once)
+   * ========================================================= */
   function bind() {
-    // 중복 바인딩 방지
     if (document.body.dataset[INIT_FLAG] === "1") return;
     document.body.dataset[INIT_FLAG] = "1";
 
@@ -132,18 +161,15 @@
       if (container.dataset.editing === "1") return;
       container.dataset.editing = "1";
 
-      // 원문 텍스트 확보
-      const textP = qs("p.comment-text", container) || qs("p", container);
-      const oldText = (textP?.innerText || "").trim();
-
+      const oldText = getOldText(container);
       enterEditMode(container, commentId, oldText);
     });
   }
 
-  /* -----------------------------
-   * Public init
-   * ----------------------------- */
-  NS.Common.initCommentEdit = function initCommentEdit() {
+  /* =========================================================
+   * 4) Public init
+   * ========================================================= */
+  Board.Common.initCommentEdit = function initCommentEdit() {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", bind, { once: true });
     } else {

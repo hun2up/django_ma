@@ -1,17 +1,28 @@
 <!-- django_ma/board/templates/board/includes/_comment_list.html -->
 
-{% comment %}
-    required context:
-        - comments (QuerySet)
-        - csrf_token (template var)
-        - empty_text (optional)
-{% endcomment %}
+<!--
+  Comment List Include
+  - 댓글 목록 렌더
+  - 작성자 본인일 때: 수정/삭제 버튼 노출
+  - JS(comment_edit.js) 연동 포인트(유지):
+    - .comment-content[data-comment-id]
+    - .edit-comment-btn[data-id]
+    - .edit-delete-btns
+    - p.comment-text
 
-<div class="card p-3 mt-3 border-0 shadow-sm rounded-4">
+  Required context:
+  - comments (QuerySet)
+
+  Optional:
+  - empty_text (default: "아직 댓글이 없습니다.")
+-->
+
+<div class="card p-3 mt-3 border-0 shadow-sm rounded-4 board-comment-card">
+
   {% for comment in comments %}
-    <div class="mb-3 position-relative">
+    <div class="board-comment-item mb-3 position-relative">
 
-      <!-- ✅ 작성자 + 작성일시 (작성자 왼쪽) -->
+      <!-- 메타: 작성자 / 작성일시 -->
       <div class="comment-meta d-flex align-items-center justify-content-between mb-1">
         <div class="comment-meta-left">
           <span class="comment-author fw-semibold">{{ comment.author.name }}</span>
@@ -20,31 +31,44 @@
         </div>
       </div>
 
+      <!-- 본문 + 액션 -->
       <div class="comment-box">
         <div class="comment-content position-relative" data-comment-id="{{ comment.id }}">
+
+          <!-- 본문 텍스트 -->
           <p class="mb-0 small comment-text">{{ comment.content }}</p>
 
+          <!-- 작성자 본인만 수정/삭제 -->
           {% if user == comment.author %}
-            <div class="position-absolute top-0 end-0 mt-1 me-2 edit-delete-btns">
+            <div class="edit-delete-btns board-comment-actions">
               <button type="button"
                       class="btn btn-sm btn-outline-primary px-2 py-0 edit-comment-btn"
                       data-id="{{ comment.id }}">
                 수정
               </button>
 
-              <form method="post" style="display:inline;">
+              <form method="post" class="board-comment-delete-form">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="delete_comment">
                 <input type="hidden" name="comment_id" value="{{ comment.id }}">
-                <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-0">삭제</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-0">
+                  삭제
+                </button>
               </form>
             </div>
           {% endif %}
+
         </div>
       </div>
 
     </div>
   {% empty %}
-    <p class="comment-empty mb-0">{{ empty_text|default:"아직 댓글이 없습니다." }}</p>
+
+    <!-- Empty state -->
+    <p class="comment-empty mb-0">
+      {{ empty_text|default:"아직 댓글이 없습니다." }}
+    </p>
+
   {% endfor %}
+
 </div>
