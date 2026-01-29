@@ -10,8 +10,9 @@
 ---
 
 ## 2. 검색 결과가 안 나오는 경우
-- accounts/search_api.py 정책 확인
-- grade / scope / branch 점검
+- affiliation_display가 응답에 포함되는지 확인
+- 프론트에서 team 필드를 재조합하고 있지 않은지 점검 (금지)
+- search_user_modal.js의 search_url fallback 경로 확인
 - 공통 모달(search_user_modal)에서 search_url이 올바른지 확인
 
 ---
@@ -60,6 +61,9 @@
 ## 8. [board] 댓글 인라인 수정이 동작하지 않음
 - `#commentEditCsrfToken` hidden input이 detail 템플릿에 존재하는지 확인
 - `static/js/board/common/comment_edit.js` 로드 여부 확인
+  (board 전용)
+- `static/js/common/forms/*.js`가 누락되지 않았는지도 확인
+  (행/금액 입력 관련 이슈 시)
 - 댓글 리스트 템플릿 구조(.comment-content[data-comment-id], p.comment-text 등)가 기준과 일치하는지 점검
 
 ---

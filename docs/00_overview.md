@@ -27,8 +27,11 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 - CustomUser 모델 기반 사용자 관리
 - 사용자 권한(grade) 및 상태(status) 관리
 - 관리자(Admin) 엑셀 업로드/다운로드
-- 사용자 검색 API (공통 모달용)
-- Celery + Redis 기반 비동기 업로드 처리
+- 사용자 검색 API (SSOT, 권한 범위 서버 강제)
+- affiliation_display 기반 공통 검색 응답
+- Celery + Redis 기반 비동기 엑셀 업로드
+  - 진행률 polling
+  - 결과 리포트 다운로드
 
 ### (2) manual 앱
 - 내부 업무 매뉴얼(지식) 관리

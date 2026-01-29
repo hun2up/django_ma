@@ -55,13 +55,22 @@ board/
 │           ├── _comment_list.html
 │           ├── _inline_handler_status_list.html
 │           └── pagination.html
-├── static/
-│   ├── css/apps/board.css
-│   └── js/board/common/
-│       ├── status_ui.js
-│       ├── inline_update.js
-│       ├── detail_inline_update.js
-│       └── comment_edit.js
+└── static/
+    ├── css/apps/board.css
+    └── js/
+        ├── common/
+        │   └── forms/
+        │       ├── dom.js
+        │       ├── rows.js
+        │       └── premium.js
+        └── board/
+            ├── states_form.js
+            ├── support_form.js
+            └── common/
+                ├── status_ui.js
+                ├── inline_update.js
+                ├── detail_inline_update.js
+                └── comment_edit.js
 └── templatetags/
     ├── board_filters.py
     ├── querystring.py
@@ -159,6 +168,19 @@ board/
 - 댓글 인라인 수정/취소
 - delegation 기반 바인딩
 - CSRF 토큰 자동 탐색
+
+## 5-5. forms 공통 유틸 (js/common/forms)
+
+- dom.js
+  - querySelector / show-hide 등 DOM 유틸
+- rows.js
+  - 행 추가/삭제/초기화 공통 패턴
+- premium.js
+  - 숫자 입력 + 콤마 포맷 처리
+  - submit 시 숫자 정규화
+
+> board 뿐 아니라 commission / partner 등
+> 모든 “폼 중심 화면”에서 재사용 가능하도록 설계됨
 
 ---
 

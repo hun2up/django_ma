@@ -23,15 +23,22 @@ django_ma는 Django MVT 구조를 기반으로 하되,
 ---
 
 ## 2. accounts 앱 기준 아키텍처
+
 accounts/
-├── models.py        # CustomUser, 핵심 도메인 규칙
-├── search_api.py    # 사용자 검색 정책 (SSOT)
-├── views.py         # HTTP endpoint / wrapper
-├── tasks.py         # Celery 비동기 처리
-├── admin.py         # 관리자 UI + 업로드
-├── constants.py     # 공통 상수
+├── models.py              # CustomUser (SSOT)
+├── search_api.py          # 사용자 검색 정책 (SSOT)
+├── views.py               # HTTP wrapper / progress API
+├── tasks.py               # Celery 비동기 업로드
+├── admin.py               # 관리자 UI + 업로드 진입점
+├── constants.py           # 공통 상수
+├── decorators.py          # grade_required / inactive 차단
+├── forms.py               # ExcelUploadForm, Auth 보강
+├── services/
+│   └── users_excel_import.py  # 엑셀 업로드 SSOT
+├── signals.py             # CustomUser ↔ SubAdminTemp 동기화
+├── utils.py               # affiliation_display 생성
 ├── urls.py
-└── static/js/
+└── templates/admin/accounts/customuser/
 
 ---
 
@@ -56,7 +63,7 @@ manual/
 
 ## 4. board 앱 기준 아키텍처 (리팩토링 완료)
 
-### 4-1) 패키지 구조(권장/현행)
+### 4-1. 패키지 구조(권장/현행)
 board/
 ├── models.py
 ├── urls.py
@@ -80,13 +87,22 @@ board/
 │   └── includes/                # partials(_edit_form, _comment_*, pagination 등)
 └── static/
     ├── css/apps/board.css
-    └── js/board/common/
-        ├── status_ui.js
-        ├── inline_update.js
-        ├── detail_inline_update.js
-        └── comment_edit.js
+    └── js/
+        ├── common/
+        │   └── forms/
+        │       ├── dom.js
+        │       ├── rows.js
+        │       └── premium.js
+        └── board/
+            ├── states_form.js
+            ├── support_form.js
+            └── common/
+                ├── status_ui.js
+                ├── inline_update.js
+                ├── detail_inline_update.js
+                └── comment_edit.js
 
-### 4-2) 핵심 설계 포인트
+### 4-2. 핵심 설계 포인트
 - View는 “화면/엔드포인트” 역할에 집중
 - 서비스 레이어가 **공용 규칙**(목록/댓글/첨부/인라인업데이트)을 담당
 - 첨부 다운로드는 보안 정책상 **FieldFile.url 직접 노출 금지**
