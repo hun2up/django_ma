@@ -22,3 +22,17 @@ __pycache__/
 # OS별 불필요 파일
 .DS_Store
 Thumbs.db
+
+# DB dumps / backups
+*.dump
+*.sql
+*.sql.*
+backup_*.sql
+
+# Django runtime
+media/
+uploads/
+staticfiles/
+
+# Django local settings (있다면)
+local_settings.py
