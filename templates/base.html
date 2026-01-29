@@ -104,7 +104,7 @@
               <a class="nav-link dropdown-toggle {% if '/partner' in request.path %}active{% else %}inactive{% endif %}"
                 href="#" id="partnerMenu" data-bs-toggle="dropdown">조직관리</a>
               <ul class="dropdown-menu" aria-labelledby="partnerMenu">
-                {% if user.grade != 'resign' %}
+                {% if user.is_active %}
                   <li><a class="dropdown-item" href="{% url 'partner:join_form' %}">위촉서류</a></li>
                 {% endif %}
                 {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
@@ -132,7 +132,7 @@
             </li>
           {% endif %}
 
-          {% if user.grade != 'resign' %}
+          {% if user.is_active %}
             <!-- ✅ Manual -->
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle {% if '/manual' in request.path %}active{% else %}inactive{% endif %}"
@@ -254,7 +254,7 @@
           </h2>
           <div id="mPartner" class="accordion-collapse collapse" aria-labelledby="mPartnerHead" data-bs-parent="#mobileMenuAccordion">
             <div class="accordion-body pt-0">
-              {% if user.grade != 'resign' %}
+              {% if user.is_active %}
                 <a class="d-block py-2" href="{% url 'partner:join_form' %}">위촉서류</a>
               {% endif %}
               {% if user.grade == 'superuser' or user.grade == 'head' or user.grade == 'leader' %}
@@ -289,7 +289,7 @@
           </div>
         {% endif %}
 
-        {% if user.grade != 'resign' %}
+        {% if user.is_active %}
           <!-- 매뉴얼 -->
           <div class="accordion-item">
             <h2 class="accordion-header" id="mManualHead">

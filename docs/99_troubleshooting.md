@@ -26,8 +26,10 @@
 
 ## 4. 매뉴얼은 보이는데 들어가면 권한 오류
 - 목록 노출과 상세 접근 권한은 다를 수 있음
-- manual_accessible_or_denied 로직 확인
+- `manual/utils/permissions.py`의 `manual_accessible_or_denied()` 로직 확인(SSOT)
 - admin_only / is_published / grade 점검
+- 목록 필터링은 `manual/views/pages.py::manual_list` 규칙을 따름
+- 편집 기능(AJAX)이 동작/노출되는지 여부와 무관하게, 서버는 `ensure_superuser_or_403()`로 최종 차단함(정상)
 
 ---
 

@@ -17,9 +17,10 @@ manual 앱의 핵심 책임은 다음과 같다.
 - 업무 매뉴얼 생성 / 수정 / 삭제
 - 매뉴얼 공개 범위(일반 / 관리자전용 / 직원전용) 관리
 - 섹션(카드) 단위 구조화
-- 블록 단위 콘텐츠 관리 (텍스트 / 이미지 / 첨부)
+- 블록 단위 콘텐츠 관리 (텍스트(HTML) / 이미지 / 첨부파일)
 - 드래그 기반 정렬 및 섹션 간 이동
 - grade 기반 접근 제어 (accounts 정책 연동)
+- 템플릿/JS/CSS 모듈화(앱 CSS는 app_css 블록에서만 로드)
 
 ---
 
@@ -50,11 +51,13 @@ manual 앱의 접근 정책은 **accounts.grade**를 기준으로 한다.
 
 | 조건 | 접근 가능 |
 |----|----|
-| admin_only = True | superuser, head |
-| is_published = False (직원전용) | superuser |
-| 일반 매뉴얼 | superuser, head, leader, basic |
+| admin_only = True (관리자 전용) | 운영 정책에 따른 관리자 범위(예: superuser / head / leader) |
+| is_published = False (직원 전용) | 운영 정책에 따른 내부 사용자 범위(예: superuser) |
+| 일반 매뉴얼 | 로그인 사용자(권한 정책에 따라 필터링) |
 
-> 최종 접근 판단은 **서버(View)** 에서 수행한다.
+> ✅ 최종 접근 판단은 **서버(View)** 에서 수행한다.  
+> 문서의 “접근 가능 등급”은 운영 정책에 따라 조정될 수 있으므로, **View 로직(필터/권한체크)을 SSOT로 본다.**
+ 
 
 ---
 
@@ -82,19 +85,21 @@ manual/
 ├── forms.py
 ├── urls.py
 ├── views/
-│ ├── init.py
-│ ├── pages.py # HTML Page View
-│ ├── manual.py # Manual AJAX
-│ ├── section.py # Section AJAX
-│ ├── block.py # Block AJAX
-│ └── attachment.py # Attachment AJAX
+│ ├── __init__.py
+│ │   └── 모든 view callable re-export (__all__ 포함, SSOT)
+│ ├── pages.py        # HTML Page View (목록/상세/폼)
+│ ├── manual.py       # Manual AJAX (생성/수정/삭제/정렬)
+│ ├── section.py      # Section AJAX (카드 CRUD/정렬)
+│ ├── block.py        # Block AJAX (블록 CRUD/이동/정렬)
+│ └── attachment.py   # Attachment AJAX (첨부 업로드/삭제)
 ├── utils/
-│ ├── init.py
-│ ├── http.py # JSON 파싱 / 응답 통일
-│ ├── permissions.py # 접근/권한 정책
-│ ├── rules.py # 비즈니스 규칙
-│ ├── parsing.py # 입력 파싱
-│ └── serializers.py # 프런트 렌더용 dict 변환
+│ ├── __init__.py
+│ │   └── utils 공식 export (SSOT)
+│ ├── http.py         # JSON 파싱 / ok·fail 응답 통일
+│ ├── permissions.py # 접근/노출/편집 권한 정책 (SSOT)
+│ ├── rules.py        # 비즈니스 규칙 (기본 섹션 보장 등)
+│ ├── parsing.py      # 입력 파싱 유틸
+│ └── serializers.py  # 프런트 즉시 렌더용 dict 변환
 └── templates/manual/
 
 ---
@@ -104,42 +109,47 @@ manual/
 - **pages.py**
   - HTML 렌더링 전용
   - 접근 권한 최종 판정 포함
+  - 목록 노출 정책은 utils.permissions의 SSOT 함수를 사용
 
-- **manual / section / block / attachment**
+- **manual / section / block / attachment (AJAX 전용)**
   - 순수 AJAX 엔드포인트
   - JSON 응답만 반환
-  - 권한 체크는 공통 유틸 사용
+  - 권한 체크는 utils.permissions.ensure_superuser_or_403 사용
+  - 파싱/검증/직렬화는 utils에 위임
+  - 트랜잭션 단위로 데이터 정합성 보장
 
-> View 파일은 **기능 단위로 분리**하며  
-> urls.py / 기존 import 경로는 `views/__init__.py`에서 유지한다.
+> ❗️manual/views.py(모놀리식)는 제거되었으며  
+> **모든 외부 접근은 `views/__init__.py` re-export + `__all__`을 통해서만 허용**한다.
 
 ---
 
-## 5. utils 패키지 설계
+## 5. 프런트엔드(템플릿/JS/CSS) 구조
 
-manual 앱의 핵심 설계 포인트 중 하나는
-**비즈니스 규칙과 View 로직의 분리**이다.
+manual 앱은 “운영자가 직접 쓰는 내부 시스템” 성격상, UI/편집 흐름이 중요하다.
 
-### (1) utils/http.py
-- json_body
-- ok / fail
-- 응답 포맷 통일
+### (1) CSS 모듈화 (apps/manual.css)
+- `base.html`은 코어 CSS만 로드하고, 앱별 CSS는 `{% block app_css %}`에서만 로드한다.
+- `manual_list.html`, `manual_detail.html`에서 아래처럼 manual.css를 명시적으로 로드해야 한다.
+  - 예: `{% block app_css %}<link rel="stylesheet" href="{% static 'css/apps/manual.css' %}">{% endblock %}`
 
-### (2) utils/permissions.py
-- grade 판별
-- superuser / head 여부
-- 매뉴얼 접근 가능 여부 판단
-- View에서 직접 grade 비교 금지
+### (2) 공통 검색 모달 호환 (base.css)
+- `base.css`에는 검색 결과 hover UX 규칙이 있으며,
+  `components/search_user_modal.html`의 결과 컨테이너 id가 `searchResults`로 유지되어야 한다.
+- 현재 템플릿은 `<div id="searchResults" class="mt-3"></div>`로 유지 중이며 호환된다.
 
-### (3) utils/rules.py
-- 기본 섹션 자동 생성
-- 공개 범위(access) → DB 플래그 변환
+### (3) wide layout 정책 (manual.css)
+- `#manual-detail`은 viewport 기반 폭(`72vw`) + max-width 토큰을 사용한다.
+- manual 페이지가 기본 container wrapper를 사용하지 않을 수 있으므로,
+  wide layout은 **wrapper 구조가 변해도 가운데 정렬이 유지되도록** `margin-left/right:auto` 기반으로 설계한다.
 
-### (4) utils/serializers.py
-- Block / Attachment를
-  프런트가 즉시 DOM 업데이트 가능한 dict로 변환
++### (4) JS 모듈 구조
++- 목록: `manual_list_boot.js` + `manual_list_edit.js` (superuser 편집모드/정렬/삭제/일괄수정)
++- 상세:
+  - `manual_detail_subnav.js` (sticky subnav / active 처리)
+  - `manual_detail_section_sort.js` (섹션 정렬)
+  - `manual_detail_block/*` (Quill 편집/블록 CRUD/첨부 업로드/블록 정렬)
 
-> utils는 **SSOT(Single Source of Truth)** 역할을 한다.
+> 프런트는 서버 응답(JSON) 기반으로 DOM을 갱신하며, 페이지는 BFCache/중복 바인딩 가드를 포함한다.
 
 ---
 
@@ -162,13 +172,24 @@ manual 앱의 핵심 설계 포인트 중 하나는
 
 ---
 
+## 6-1. 권한/노출 정책 SSOT 위치
+
+- **목록 노출 정책**: `utils.permissions.filter_manuals_for_user`
+- **상세 접근 판정**: `utils.permissions.manual_accessible_or_denied`
+- **편집 권한 차단**: `utils.permissions.ensure_superuser_or_403`
+
+→ View/템플릿/JS 어디에서도 grade를 직접 비교하지 않는다.
+
+---
+
 ## 7. 설계 원칙 요약
 
-- **권한 판단은 View에서 직접 하지 않는다**
-- **정책은 utils에 집중**
+- **접근/권한은 서버(View)에서 최종 판정**
 - **프런트는 서버 판단을 신뢰**
-- **0개 상태를 허용하지 않는다**
+- **섹션 0개 상태를 허용하지 않는다(기본 섹션 보장)**
 - **정렬/이동은 항상 서버 기준으로 확정**
+- **앱 CSS는 base.html이 아닌 app_css 블록에서만 로드(모듈화)**
+- **View/권한/노출 정책은 utils를 SSOT로 유지**
 
 manual 앱은
 > “운영자가 직접 쓰는 내부 시스템”  

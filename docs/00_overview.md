@@ -36,9 +36,12 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 ### (2) manual 앱
 - 내부 업무 매뉴얼(지식) 관리
 - 섹션/블록 기반 콘텐츠 구조
-- grade 기반 접근 제어
-- 운영자(superuser) 중심의 관리 UI
-- AJAX 기반 편집/정렬/이동
+- grade 기반 접근 제어(서버에서 최종 판정)
+- 운영자(superuser) 중심의 관리 UI(목록/상세 편집 플로우)
+- AJAX 기반 편집/정렬/이동(섹션/블록/첨부)
+- View는 views 패키지로 기능 분리(pages/manual/section/block/attachment)
+- utils 패키지로 파싱/응답/권한/규칙/직렬화 중앙화(SSOT)
+- CSS 모듈화: manual 페이지는 app_css 블록에서만 apps/manual.css 로드
 
 ### (3) board 앱 (리팩토링 완료)
 - **업무요청 게시판(Post)**: 요청 등록/조회/수정/삭제 + 댓글 + 첨부
@@ -48,6 +51,10 @@ django_ma는 보험 GA 조직의 내부 업무를 지원하기 위한 Django 기
 - **보안 첨부 다운로드**: `att.file.url` 직접 노출 금지, 다운로드 뷰로만 제공
 - **프론트 구조**: Bootstrap + Vanilla JS + 공용 includes(partials)
 - **CSS 모듈화**: `static/css/apps/board.css`를 board 스코프에서만 로드
+  - base.css: 전역 토대/토큰/공통 UI
+  - apps/*.css: 앱 단위 스코프 스타일
+  - board는 `board/base_board.html`에서만 `apps/board.css`를 로드
+  - manual은 `manual_list.html`, `manual_detail.html`에서 `apps/manual.css`를 app_css 블록으로 로드
 
 ---
 

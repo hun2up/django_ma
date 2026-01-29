@@ -4,6 +4,25 @@
 - 범위: manual_list / manual_detail / subnav / quill modal / FAB
 ========================================================== */
 
+
+/* ==========================================================
+ 0) Manual wide layout tokens
+ - wrapper(.container) 구조가 바뀌어도 중앙정렬이 안정적으로 유지되도록
+========================================================== */
+:root{
+  --manual-wide-width: 72vw;
+  --manual-wide-max: 1200px; /* 필요 시 조절 */
+}
+
+/* wide layout */
+#manual-detail{
+  width: var(--manual-wide-width);
+  max-width: var(--manual-wide-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
 /* ==========================================================
  1) Badges & list helpers
 ========================================================== */
@@ -23,8 +42,13 @@
   padding: 4px 10px;
 }
 
+/* Sortable helpers */
 .sortable-ghost { opacity: 0.6; }
+.manual-sort-ghost { opacity: 0.5; }
+.manual-sort-chosen { cursor: grabbing !important; }
+
 a.manual-item.manual-editing { background: #fbfdff; }
+
 
 /* ==========================================================
  2) Manual List (manual_list.html)
@@ -115,6 +139,7 @@ a.manual-item.manual-editing { background: #fbfdff; }
   .btn-manual-delete{ min-width: 64px; }
 }
 
+
 /* ==========================================================
  3) Manual Detail (manual_detail.html)
 ========================================================== */
@@ -123,26 +148,25 @@ a.manual-item.manual-editing { background: #fbfdff; }
   z-index: 1040 !important;
 }
 
-/* wide layout */
-#manual-detail{
-  width: 72vw;
-  max-width: none;
-  margin-left: calc(-36vw + 50%);
-}
 #manual-detail .manual-section{
   width: 100%;
   position: relative;
 }
+
+/* Mobile: wide layout 해제 */
 @media (max-width: 576px){
   #manual-detail{
     width: 100%;
-    margin-left: 0;
+    max-width: none;
   }
 }
 
 .manual-detail-title{ color: #003f7d; }
 
-/* section header actions */
+
+/* -----------------------
+ 3-1) Section header actions
+------------------------ */
 .sec-card-actions{
   position: absolute;
   top: 14px;
@@ -169,10 +193,12 @@ a.manual-item.manual-editing { background: #fbfdff; }
   line-height: 1.2;
   word-break: break-word;
 }
+
 .sec-title.empty{
   color: #6c757d;
   font-weight: 700;
 }
+
 .sec-title-actions{
   display: flex;
   gap: 6px;
@@ -180,13 +206,17 @@ a.manual-item.manual-editing { background: #fbfdff; }
   white-space: nowrap;
 }
 
-/* block grid */
+
+/* -----------------------
+ 3-2) Block grid
+------------------------ */
 .manual-block-grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   align-items: start;
 }
+
 @media (max-width: 768px){
   .manual-block-grid{ grid-template-columns: 1fr; }
 }
@@ -213,7 +243,10 @@ a.manual-item.manual-editing { background: #fbfdff; }
   cursor: zoom-in;
 }
 
-.manual-block-text{ width: 100%; overflow-wrap: anywhere; }
+.manual-block-text{
+  width: 100%;
+  overflow-wrap: anywhere;
+}
 
 .manual-block-actions{
   display: flex;
@@ -222,7 +255,10 @@ a.manual-item.manual-editing { background: #fbfdff; }
   margin-top: 10px;
 }
 
-/* floating actions */
+
+/* ==========================================================
+ 4) Floating Actions (FAB)
+========================================================== */
 .manual-fab{
   position: fixed;
   right: 18px;
@@ -232,6 +268,7 @@ a.manual-item.manual-editing { background: #fbfdff; }
   flex-direction: column;
   gap: 10px;
 }
+
 .manual-fab a,
 .manual-fab button{
   width: 64px;
@@ -244,6 +281,7 @@ a.manual-item.manual-editing { background: #fbfdff; }
   overflow: hidden;
   cursor: pointer;
 }
+
 .manual-fab img{
   width: 100%;
   height: 100%;
@@ -251,7 +289,10 @@ a.manual-item.manual-editing { background: #fbfdff; }
   display: block;
 }
 
-/* subnav */
+
+/* ==========================================================
+ 5) Subnav (sticky)
+========================================================== */
 .manual-subnav{
   position: sticky;
   top: 70px;
@@ -261,8 +302,11 @@ a.manual-item.manual-editing { background: #fbfdff; }
 }
 
 .manual-subnav .subnav-inner{
-  width: 72vw;
-  margin-left: calc(-36vw + 50%);
+  width: var(--manual-wide-width);
+  max-width: var(--manual-wide-max);
+  margin-left: auto;
+  margin-right: auto;
+
   display: flex;
   align-items: center;
   gap: 12px;
@@ -311,11 +355,13 @@ a.manual-item.manual-editing { background: #fbfdff; }
   background: #f8f9fa;
   white-space: nowrap;
 }
+
 .manual-subnav .subnav-links a:hover{
   border-color: #005BAC;
   color: #005BAC;
   background: #fff;
 }
+
 .manual-subnav .subnav-links a.active{
   border-color: #005BAC;
   color: #fff;
@@ -326,23 +372,28 @@ a.manual-item.manual-editing { background: #fbfdff; }
   .manual-subnav{ top: 70px; }
   .manual-subnav .subnav-inner{
     width: 100%;
+    max-width: none;
     margin-left: 0;
+    margin-right: 0;
     padding: 10px 12px;
     border-radius: 14px;
   }
 }
 
-/* modal helpers */
+
+/* ==========================================================
+ 6) Modal helpers (viewer / editor)
+========================================================== */
 .manual-viewer-img{
   max-width: 95vw;
   max-height: 85vh;
   object-fit: contain;
 }
+
 .manual-block-modal{ border-radius: 14px; }
 .manual-block-modal-title{ color: #003f7d; }
 .manual-block-preview-img{ width: 100%; height: auto; object-fit: contain; }
 .manual-quill-editor{ height: 320px; }
 
-.manual-sort-ghost { opacity: 0.5; }
-.manual-sort-chosen { cursor: grabbing !important; }
+/* drag handles */
 .jsSectionDragHandle { cursor: grab; }

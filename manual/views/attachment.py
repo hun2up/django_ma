@@ -40,7 +40,7 @@ def manual_block_attachment_upload_ajax(request):
         size=int(getattr(upfile, "size", 0) or 0),
     )
 
-    # 기존 직렬화 형태 유지
+    # ✅ SSOT 직렬화(utils.serializers) 사용
     return ok({"attachment": attachment_to_dict(a)})
 
 
