@@ -8,7 +8,7 @@ from accounts.decorators import grade_required, not_inactive_required
 
 from ..forms import ManualForm
 from ..models import Manual
-from ..utils import ensure_default_section, manual_accessible_or_denied
+from ..utils import ensure_default_section, manual_accessible_or_denied, filter_manuals_for_user
 
 
 @grade_required("superuser", "head", "leader", "basic")
@@ -23,14 +23,8 @@ def manual_list(request):
     - 직원전용(is_published=False)은 superuser만 노출
     - 관리자전용(admin_only=True)은 superuser/head만 노출
     """
-    grade = getattr(request.user, "grade", "")
     qs = Manual.objects.all()
-
-    if grade != "superuser":
-        qs = qs.filter(is_published=True)
-
-    if grade not in ("superuser", "head"):
-        qs = qs.filter(admin_only=False)
+    qs = filter_manuals_for_user(qs, request.user)
 
     qs = qs.order_by("sort_order", "-updated_at")
     return render(request, "manual/manual_list.html", {"manuals": qs})

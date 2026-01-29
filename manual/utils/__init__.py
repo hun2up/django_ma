@@ -18,6 +18,7 @@ from .permissions import (
     is_head,
     ensure_superuser_or_403,
     manual_accessible_or_denied,
+    filter_manuals_for_user,
 )
 from .rules import ensure_default_section, access_to_flags
 from .serializers import attachment_to_dict, block_to_dict
@@ -32,6 +33,7 @@ __all__ = [
     "is_head",
     "ensure_superuser_or_403",
     "manual_accessible_or_denied",
+    "filter_manuals_for_user",
     "ensure_default_section",
     "access_to_flags",
     "attachment_to_dict",

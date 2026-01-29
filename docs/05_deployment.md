@@ -23,16 +23,22 @@
 ---
 
 ## 4. 정적 파일(CSS/JS) 운영 원칙
-### 4-1) CSS 모듈화(최종 기준)
+### 4-1. CSS 모듈화(최종 기준)
 - `static/css/base.css` : 전역 토대/토큰/공통 컴포넌트
 - `static/css/fixes.css` : 전역 충돌 방어(최소)
 - `static/css/plugins/datatables.css` : DataTables 버튼/스킨 전용
 - `static/css/apps/*.css` : 앱 단위 스코프 스타일
 
-### 4-2) board 앱 적용 방식
+### 4-2. board 앱 적용 방식
 - `base.html`은 core CSS만 전역 로드
 - `board/base_board.html`에서만 `apps/board.css`를 로드
 - content를 `<div class="board-scope">...</div>`로 감싸 스코프 누수 방지
+
+### 4-3. manual 앱 적용 방식
+- `base.html`은 core CSS만 전역 로드
+- manual 페이지 템플릿에서만 `apps/manual.css`를 로드
+  - `manual/manual_list.html` / `manual/manual_detail.html`에서 `{% block app_css %}` 사용
+- wide layout/편집 UI는 manual.css 스코프 내에서만 동작하도록 설계
 
 ---
 

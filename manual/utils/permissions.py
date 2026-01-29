@@ -33,6 +33,25 @@ def ensure_superuser_or_403(request) -> Optional[object]:
     return None
 
 
+def filter_manuals_for_user(qs, user):
+    """
+    ✅ 목록 노출 정책(SSOT)
+    - 직원전용(is_published=False): superuser만 노출
+    - 관리자전용(admin_only=True): superuser/head만 노출
+    """
+    grade = user_grade(user)
+
+    # 직원전용(비공개)은 superuser만
+    if grade != "superuser":
+        qs = qs.filter(is_published=True)
+
+    # 관리자전용은 superuser/head만
+    if grade not in ("superuser", "head"):
+        qs = qs.filter(admin_only=False)
+
+    return qs
+
+
 def manual_accessible_or_denied(request, manual: Manual):
     """
     ✅ 매뉴얼 접근 권한 체크

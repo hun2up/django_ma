@@ -46,16 +46,19 @@ accounts/
 manual/
 ├── models.py              # Manual / Section / Block / Attachment
 ├── views/
-│   ├── pages.py           # 화면 렌더링
-│   ├── manual.py          # 매뉴얼 CRUD
-│   ├── section.py         # 섹션 관리
-│   ├── block.py           # 블록 관리
-│   └── attachment.py      # 첨부 관리
+│   ├── __init__.py         # urls.py 호환용 re-export 레이어(__all__ 포함)
+│   ├── pages.py            # 화면 렌더링(목록/상세/폼)
+│   ├── manual.py           # Manual AJAX(생성/제목수정/일괄수정/정렬/삭제)
+│   ├── section.py          # Section AJAX(추가/제목수정/삭제/정렬)
+│   ├── block.py            # Block AJAX(추가/수정/삭제/정렬/이동)
+│   └── attachment.py       # Attachment AJAX(업로드/삭제)
 ├── utils/
-│   ├── permissions.py     # 접근 정책
-│   ├── rules.py           # 비즈니스 규칙
-│   ├── serializers.py     # 프런트 직렬화
-│   └── http.py            # JSON 응답
+│   ├── __init__.py         # utils 공식 export(SSOT)
+│   ├── http.py             # JSON 파싱/통일 응답(ok/fail)
+│   ├── parsing.py          # 입력 정규화(to_str/is_digits)
+│   ├── permissions.py      # 접근/권한 정책(SSOT)
+│   ├── rules.py            # 비즈니스 규칙(기본 섹션 보장/access 플래그 변환)
+│   └── serializers.py      # 프런트 즉시 렌더 dict 변환(block/attachment)
 ├── constants.py
 └── urls.py
 

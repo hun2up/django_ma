@@ -2,7 +2,13 @@
 
 from django.urls import path
 
-from . import views
+"""
+✅ 주의: manual/views.py(모듈) 제거 후에는
+`manual.views`는 '패키지(manual/views/)' 를 가리키게 된다.
+따라서 여기서는 반드시 'from . import views' (패키지)로 사용.
+"""
+
+from . import views  # manual/views/__init__.py (re-export)
 
 app_name = "manual"
 

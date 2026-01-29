@@ -4,6 +4,18 @@
 {% load static %}
 {% block title %}업무매뉴얼{% endblock %}
 
+<!-- ✅ Manual app CSS 로드: base.html은 app_css 블록에서만 앱별 CSS를 로드 -->
+{% block app_css %}
+  <link rel="stylesheet" href="{% static 'css/apps/manual.css' %}?v=20260129_01">
+{% endblock %}
+
+<!-- ✅ (권장) base.html 기본 container wrapper를 사용하지 않고, list도 manual 전용으로 통일 -->
+{% block content_wrapper %}
+  <div class="container my-5">
+    {% block content %}{% endblock %}
+  </div>
+{% endblock %}
+
 {% block content %}
 <!-- =============================================================================
   Manual List Page (FINAL)
