@@ -22,6 +22,7 @@
   ];
 
   const $ = (id) => document.getElementById(id);
+  const qs = (root, sel) => root?.querySelector?.(sel) || document.querySelector(sel);
 
   /* ----------------------------
    * Utils
@@ -248,9 +249,10 @@
     const grade = getGradeFromRoot(root);
     if (grade !== "superuser") return;
 
-    const channelSelect = $("channelSelect");
-    const partSelect = $("partSelect");
-    const branchSelect = $("branchSelect");
+    const channelSelect = qs(root, "#channelSelect");
+    const partSelect = qs(root, "#partSelect");
+    const branchSelect = qs(root, "#branchSelect");
+    
     const btnSearch = getBtnSearch();
 
     if (!partSelect || !branchSelect) return;

@@ -34,6 +34,15 @@
    * ======================================================= */
   const toStr = (v) => String(v ?? "").trim();
 
+  function readDatasetAny(ds, keys = []) {
+    if (!ds) return "";
+    for (const k of keys) {
+      const v = ds[k];
+      if (v && String(v).trim()) return String(v).trim();
+    }
+    return "";
+  }
+
   function escapeHtml(v) {
     const s = String(v ?? "");
     return s
@@ -467,19 +476,20 @@
       const item = e.target?.closest?.(".search-result");
       if (!item) return;
 
+      const ds = item.dataset || {};
       const selected = {
-        id: toStr(item.dataset.id),
-        name: toStr(item.dataset.name),
-        branch: toStr(item.dataset.branch),
-        affiliation_display: toStr(item.dataset.affiliationDisplay),
-        rank: toStr(item.dataset.rank),
-        part: toStr(item.dataset.part),
-        team_a: toStr(item.dataset.teamA),
-        team_b: toStr(item.dataset.teamB),
-        team_c: toStr(item.dataset.teamC),
-        regist: toStr(item.dataset.regist),
-        enter: toStr(item.dataset.enter),
-        quit: toStr(item.dataset.quit),
+        id: readDatasetAny(ds, ["id"]),
+        name: readDatasetAny(ds, ["name"]),
+        branch: readDatasetAny(ds, ["branch"]),
+        affiliation_display: readDatasetAny(ds, ["affiliationDisplay", "affiliation_display", "affiliation"]),
+        rank: readDatasetAny(ds, ["rank"]),
+        part: readDatasetAny(ds, ["part"]),
+        team_a: readDatasetAny(ds, ["teamA", "team_a", "teama"]),
+        team_b: readDatasetAny(ds, ["teamB", "team_b", "teamb"]),
+        team_c: readDatasetAny(ds, ["teamC", "team_c", "teamc"]),
+        regist: readDatasetAny(ds, ["regist"]),
+        enter: readDatasetAny(ds, ["enter"]),
+        quit: readDatasetAny(ds, ["quit"]),
       };
 
       const root = getActiveRoot();

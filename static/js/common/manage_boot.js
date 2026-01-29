@@ -277,12 +277,14 @@ export function initManageBoot(contextName) {
   if (!ctxName) return null;
 
   // 컨텍스트별 1회만 (BFCache에서도 재호출될 수 있으니, index.js는 별도 1회가드 권장)
-  if (g.__manageBootInited[ctxName]) {
+  const rootId = resolveRootId(ctxName);
+  const rootGuardKey = rootId ? `${ctxName}:${rootId}` : ctxName;
+
+  if (g.__manageBootInited[rootGuardKey]) {
     return g.__manageBootCtx[ctxName] || {};
   }
-  g.__manageBootInited[ctxName] = true;
+  g.__manageBootInited[rootGuardKey] = true;
 
-  const rootId = resolveRootId(ctxName);
   const root = rootId ? document.getElementById(rootId) : null;
 
   if (!root) {

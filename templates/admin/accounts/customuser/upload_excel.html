@@ -1,40 +1,34 @@
+{# django_ma/templates/admin/accounts/customuser/upload__excel.html #}
 {% extends "admin/base_site.html" %}
 {% load static %}
 
 {% block content %}
 <div class="container mt-4" style="max-width: 640px;">
 
-  <!-- Page title -->
   <h3 class="fw-bold mb-4 text-center">사용자 엑셀 업로드</h3>
 
-  <!-- Django messages (optional) -->
   {% if messages %}
-    <div class="mb-3">
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} text-center mb-2">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
+  <div class="mb-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} text-center mb-2">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
   {% endif %}
 
-  <!-- Upload form card -->
-  <div class="card shadow-sm p-4 border-0 rounded-4">
+  <div class="card p-4 rounded-4">
     <form method="post" enctype="multipart/form-data" id="excelUploadForm">
       {% csrf_token %}
-
-      <!-- Excel file input -->
       <div class="mb-3">
         {{ form.as_p }}
       </div>
 
-      <!-- Submit -->
       <button type="submit" class="btn btn-primary w-100 fw-bold">
         업로드 시작
       </button>
     </form>
 
-    <!-- Back to changelist -->
     <div class="text-center mt-4">
       <a href="{% url 'admin:accounts_customuser_changelist' %}"
          class="btn btn-outline-secondary">
@@ -44,25 +38,31 @@
   </div>
 
   {% if task_id %}
-  <!-- Progress box (data only): JS reads task_id + progress_url from dataset -->
+  <!--
+    진행률 표시 박스
+    - JS(admin_upload_progress.js)가 data-* 속성을 읽어 polling
+  -->
   <div class="mt-4"
        id="uploadProgressBox"
        data-task-id="{{ task_id|escape }}"
        data-progress-url="{% url 'accounts:accounts_upload_progress' %}">
-    <div class="card p-3 border-0 shadow-sm rounded-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="fw-bold">처리 진행률</div>
-        <div class="small text-muted" id="progressStatusText">대기 중...</div>
+    <div class="card p-3 rounded-4">
+      <div class="d-flex justify-content-between mb-2">
+        <strong>처리 진행률</strong>
+        <span id="progressStatusText" class="small text-muted">대기 중...</span>
       </div>
 
       <div class="progress" style="height: 20px;">
         <div id="progressBar" class="progress-bar" style="width: 0%;">0%</div>
       </div>
 
-      <div class="text-danger mt-2" id="progressErrorText"></div>
+      <div id="progressErrorText" class="text-danger mt-2"></div>
 
       <div class="mt-3">
-        <a id="resultDownloadBtn" class="btn btn-success disabled" href="#" aria-disabled="true">
+        <a id="resultDownloadBtn"
+           class="btn btn-success disabled"
+           href="#"
+           aria-disabled="true">
           결과 다운로드
         </a>
       </div>
@@ -73,8 +73,6 @@
 </div>
 
 {% if task_id %}
-<!-- Upload progress polling script (external) -->
 <script src="{% static 'js/accounts/admin_upload_progress.js' %}?v={{ STATIC_VER|default:'1' }}"></script>
 {% endif %}
-
 {% endblock %}

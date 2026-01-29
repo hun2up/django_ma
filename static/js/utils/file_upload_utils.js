@@ -1,11 +1,11 @@
 /**
- * file_upload_utils.js (FINAL)
- * ---------------------------------------------------------
+ * django_ma/static/js/utils/file_upload_utils.js (FINAL REFACTOR)
+ * -----------------------------------------------------------------------------
  * ✅ 전역 범용 파일 업로드 유틸리티
- * - 파일 추가/삭제, 용량 제한, FormData 전송, 기존 첨부 삭제 처리
- * - 인라인 style 0개 (CSS 클래스로 제어)
- * - 재사용성 강화: 기존 첨부 영역 selector 옵션화
- * - CSRF 보강: X-CSRFToken 헤더 자동 세팅
+ * - 신규 첨부: 다중 추가/삭제, 용량 제한, 목록 UI
+ * - 기존 첨부 삭제: delete_files hidden input 누적 + UI 제거 + empty message 처리
+ * - FormData 전송: CSRF 헤더 + same-origin + XHR header
+ * - ✅ submit 중복 전송 방지 (dataset.submitting)
  *
  * 사용법:
  *   initFileUpload({
@@ -16,36 +16,38 @@
  *     deleteContainerSelector: "#deleteContainer",
  *     existingFileSelector: ".remove-existing",
  *
- *     // ✅ 옵션화 (기존 첨부 영역이 페이지마다 다를 수 있음)
  *     existingFilesSelector: "#existingFiles",
  *     existingFileListWrapSelector: "#existingFileList",
  *     existingEmptyHtml: '<p class="text-muted small m-0">첨부된 파일이 없습니다.</p>',
  *
- *     // ✅ UI classes (인라인 style 제거)
- *     fileNameMaxWidthClass: "file-name-80", // CSS에서 max-width 설정
+ *     fileNameMaxWidthClass: "file-name-80",
+ *     maxFileSize: 10 * 1024 * 1024,
  *
- *     maxFileSize: 10 * 1024 * 1024, // 10MB
+ *     // 선택 옵션
+ *     attachmentsKey: "attachments", // or "attachments[]"
+ *     onSubmitSuccess: (redirectUrl) => {},
+ *     onSubmitError: (htmlText) => {},
  *   });
- *
- * ⚠️ CSS 필요(예: apps/board.css):
- *   .file-name-80 { max-width: 80%; }
  */
-
 (function () {
   "use strict";
 
+  /* ===========================================================================
+   * DOM helpers
+   * =========================================================================== */
   function qs(sel, root) {
     return (root || document).querySelector(sel);
   }
-
   function qsa(sel, root) {
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
-
   function str(v) {
     return String(v == null ? "" : v).trim();
   }
 
+  /* ===========================================================================
+   * CSRF helpers
+   * =========================================================================== */
   function getCookie(name) {
     var value = "; " + (document.cookie || "");
     var parts = value.split("; " + name + "=");
@@ -56,28 +58,28 @@
   function getCSRFToken(form) {
     // 1) form 내부 hidden input 우선
     var input = form ? qs('input[name="csrfmiddlewaretoken"]', form) : null;
-    var fromInput = str(input && input.value);
-    if (fromInput) return fromInput;
+    var v1 = str(input && input.value);
+    if (v1) return v1;
 
     // 2) 문서 내 전역 csrf input
     var any = qs('input[name="csrfmiddlewaretoken"]');
-    var fromDoc = str(any && any.value);
-    if (fromDoc) return fromDoc;
+    var v2 = str(any && any.value);
+    if (v2) return v2;
 
     // 3) cookie fallback
     return str(getCookie("csrftoken"));
   }
 
   function buildHeaders(csrf) {
-    var h = {};
-    // FormData 사용 시 Content-Type을 직접 지정하지 않는게 안전
-    if (csrf) {
-      h["X-CSRFToken"] = csrf;
-    }
-    h["X-Requested-With"] = "XMLHttpRequest";
+    var h = { "X-Requested-With": "XMLHttpRequest" };
+    // FormData 사용 시 Content-Type을 직접 지정하지 않음
+    if (csrf) h["X-CSRFToken"] = csrf;
     return h;
   }
 
+  /* ===========================================================================
+   * Format
+   * =========================================================================== */
   function formatFileSize(bytes) {
     if (!bytes) return "0 B";
     var units = ["B", "KB", "MB", "GB"];
@@ -86,10 +88,13 @@
     return size.toFixed(1) + " " + units[i];
   }
 
+  /* ===========================================================================
+   * Main API
+   * =========================================================================== */
   window.initFileUpload = function (options) {
-    // ---------------------------------------------
-    // ⚙️ 옵션 병합
-    // ---------------------------------------------
+    /* ---------------------------------------------
+     * ⚙️ 옵션 병합
+     * --------------------------------------------- */
     var config = Object.assign(
       {
         formSelector: "#postForm",
@@ -98,30 +103,26 @@
         noFilesTextSelector: "#noFilesText",
         deleteContainerSelector: "#deleteContainer",
 
-        // 기존 첨부 삭제 버튼 selector
         existingFileSelector: ".remove-existing",
 
-        // ✅ 기존 첨부 영역 옵션화
-        existingFilesSelector: "#existingFiles", // li들이 들어있는 컨테이너
-        existingFileListWrapSelector: "#existingFileList", // empty message를 넣을 wrapper
+        existingFilesSelector: "#existingFiles",
+        existingFileListWrapSelector: "#existingFileList",
         existingEmptyHtml: '<p class="text-muted small m-0">첨부된 파일이 없습니다.</p>',
 
-        // ✅ 인라인 style 제거용 클래스
         fileNameMaxWidthClass: "file-name-80",
 
-        // size limit
         maxFileSize: 10 * 1024 * 1024, // 10MB
+        attachmentsKey: "attachments", // 필요 시 "attachments[]"
 
-        // submit callbacks
-        onSubmitSuccess: null, // function(redirectUrl){}
-        onSubmitError: null, // function(htmlText){}
+        onSubmitSuccess: null,
+        onSubmitError: null,
       },
       options || {}
     );
 
-    // ---------------------------------------------
-    // 📋 주요 DOM 요소
-    // ---------------------------------------------
+    /* ---------------------------------------------
+     * 📋 주요 DOM 요소
+     * --------------------------------------------- */
     var form = qs(config.formSelector);
     var fileInput = qs(config.fileInputSelector);
     var fileList = qs(config.fileListSelector);
@@ -135,52 +136,65 @@
       });
       return;
     }
+    if (!deleteContainer) deleteContainer = form; // 방어
 
-    // deleteContainer가 없으면 form에 붙임(방어)
-    if (!deleteContainer) deleteContainer = form;
-
-    // 선택된 파일(신규 첨부)
+    /* ---------------------------------------------
+     * 상태: 신규 첨부 파일
+     * --------------------------------------------- */
     var selectedFiles = [];
 
-    // ---------------------------------------------
-    // 🗑️ 기존 첨부파일 삭제 (수정 페이지)
-    // ---------------------------------------------
-    var existingButtons = qsa(config.existingFileSelector);
-    existingButtons.forEach(function (btn) {
-      if (btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
+    /* ===========================================================================
+     * 1) 기존 첨부 삭제 처리 (수정 페이지)
+     * - delete_files hidden input 중복 생성 방지
+     * =========================================================================== */
+    (function bindExistingDeleteButtons() {
+      var existingButtons = qsa(config.existingFileSelector);
+      if (!existingButtons.length) return;
 
-      btn.addEventListener("click", function () {
-        var fileId = str(btn.dataset.id);
-        if (!fileId) return;
+      existingButtons.forEach(function (btn) {
+        if (btn.dataset.bound === "1") return;
+        btn.dataset.bound = "1";
 
-        var li = btn.closest ? btn.closest("li") : null;
+        btn.addEventListener("click", function () {
+          var fileId = str(btn.dataset.id);
+          if (!fileId) return;
 
-        // delete_files hidden input 추가
-        var hiddenInput = document.createElement("input");
-        hiddenInput.type = "hidden";
-        hiddenInput.name = "delete_files";
-        hiddenInput.value = fileId;
-        deleteContainer.appendChild(hiddenInput);
-
-        if (li && li.remove) li.remove();
-
-        // 남은 기존 파일이 없으면 empty message 표시
-        var existingList = qs(config.existingFilesSelector);
-        var wrap = qs(config.existingFileListWrapSelector);
-        if (existingList && wrap) {
-          var remaining = qsa("li", existingList).length;
-          if (remaining === 0) {
-            wrap.innerHTML = config.existingEmptyHtml;
+          // ✅ 동일 fileId 중복 hidden input 방지
+          var already = qs('input[name="delete_files"][value="' + fileId + '"]', deleteContainer);
+          if (already) {
+            // UI만 제거되어야 하는 케이스 방어
+            var li0 = btn.closest ? btn.closest("li") : null;
+            if (li0 && li0.remove) li0.remove();
+            return;
           }
-        }
-      });
-    });
 
-    // ---------------------------------------------
-    // 📎 새 파일 추가
-    // ---------------------------------------------
-    if (fileInput.dataset.bound !== "1") {
+          // delete_files hidden input 추가
+          var hidden = document.createElement("input");
+          hidden.type = "hidden";
+          hidden.name = "delete_files";
+          hidden.value = fileId;
+          deleteContainer.appendChild(hidden);
+
+          // UI 제거
+          var li = btn.closest ? btn.closest("li") : null;
+          if (li && li.remove) li.remove();
+
+          // 남은 기존 파일이 없으면 empty message 표시
+          var existingList = qs(config.existingFilesSelector);
+          var wrap = qs(config.existingFileListWrapSelector);
+          if (existingList && wrap) {
+            var remaining = qsa("li", existingList).length;
+            if (remaining === 0) wrap.innerHTML = config.existingEmptyHtml;
+          }
+        });
+      });
+    })();
+
+    /* ===========================================================================
+     * 2) 신규 첨부 추가
+     * =========================================================================== */
+    (function bindFileInput() {
+      if (fileInput.dataset.bound === "1") return;
       fileInput.dataset.bound = "1";
 
       fileInput.addEventListener("change", function (event) {
@@ -203,34 +217,32 @@
           selectedFiles.push(file);
         });
 
-        updateFileList();
+        renderSelectedFiles();
         fileInput.value = ""; // 동일 파일 재선택 가능
       });
-    }
+    })();
 
-    // ---------------------------------------------
-    // 📦 파일 목록 갱신
-    // ---------------------------------------------
-    function updateFileList() {
+    /* ===========================================================================
+     * 3) 신규 첨부 목록 렌더
+     * =========================================================================== */
+    function renderSelectedFiles() {
       if (!fileList) return;
 
       fileList.innerHTML = "";
 
       if (!selectedFiles.length) {
-        if (noFilesText) noFilesText.style.display = "block"; // (기존 UI 유지) *inline style 아닌 display 토글은 괜찮음
+        if (noFilesText) noFilesText.hidden = false;
         return;
       }
-      if (noFilesText) noFilesText.style.display = "none";
+      if (noFilesText) noFilesText.hidden = true;
 
       selectedFiles.forEach(function (file, index) {
         var li = document.createElement("li");
-        li.className =
-          "d-flex justify-content-between align-items-center py-1 border-bottom";
+        li.className = "d-flex justify-content-between align-items-center py-1 border-bottom";
 
         var nameSpan = document.createElement("span");
         nameSpan.textContent = file.name + " (" + formatFileSize(file.size) + ")";
-        nameSpan.className =
-          "small text-dark text-truncate " + str(config.fileNameMaxWidthClass);
+        nameSpan.className = "small text-dark text-truncate " + str(config.fileNameMaxWidthClass);
 
         var removeBtn = document.createElement("button");
         removeBtn.type = "button";
@@ -238,7 +250,7 @@
         removeBtn.textContent = "✖";
         removeBtn.addEventListener("click", function () {
           selectedFiles.splice(index, 1);
-          updateFileList();
+          renderSelectedFiles();
         });
 
         li.appendChild(nameSpan);
@@ -247,20 +259,25 @@
       });
     }
 
-    // ---------------------------------------------
-    // 🚀 FormData 전송 (CSRF 보강)
-    // ---------------------------------------------
-    if (form.dataset.boundUpload !== "1") {
+    /* ===========================================================================
+     * 4) Submit → FormData 전송 (CSRF + 중복 제출 방지)
+     * =========================================================================== */
+    (function bindSubmit() {
+      if (form.dataset.boundUpload === "1") return;
       form.dataset.boundUpload = "1";
 
       form.addEventListener("submit", function (e) {
         e.preventDefault();
 
+        // ✅ 중복 제출 방지
+        if (form.dataset.submitting === "1") return;
+        form.dataset.submitting = "1";
+
         var formData = new FormData(form);
 
-        // selectedFiles를 attachments로 append
+        // 신규 첨부 append
         selectedFiles.forEach(function (file) {
-          formData.append("attachments", file);
+          formData.append(config.attachmentsKey, file);
         });
 
         var csrf = getCSRFToken(form);
@@ -296,11 +313,14 @@
           .catch(function (err) {
             alert("파일 업로드 중 오류가 발생했습니다.");
             console.error(err);
+          })
+          .finally(function () {
+            form.dataset.submitting = "0";
           });
       });
-    }
+    })();
 
     // 초기 상태 반영
-    updateFileList();
+    renderSelectedFiles();
   };
 })();

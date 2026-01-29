@@ -1,30 +1,38 @@
-<!-- django_ma/templates/components/search_user_modal.html -->
+{# templates/components/search_user_modal.html #}
 {% load static %}
-<div class="modal fade" id="searchUserModal" tabindex="-1" data-search-url="{{ search_url }}">
+
+<div class="modal fade"
+     id="searchUserModal"
+     tabindex="-1"
+     data-search-url="{{ search_url }}">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4">
+
       <div class="modal-header">
         <h6 class="modal-title fw-bold">대상자 검색</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"></button>
       </div>
+
       <div class="modal-body">
         <form id="searchUserForm" class="d-flex gap-2">
-          <input type="text" id="searchKeyword" name="q" class="form-control" placeholder="사번 또는 성명 입력">
-          <button type="submit" class="btn btn-primary btn-search">검색</button>
+          <input type="text"
+                 id="searchKeyword"
+                 name="q"
+                 class="form-control"
+                 placeholder="사번 또는 성명 입력">
+          <button type="submit"
+                  class="btn btn-primary btn-search">
+            검색
+          </button>
         </form>
+
         <div id="searchResults" class="mt-3"></div>
       </div>
+
     </div>
   </div>
 </div>
-
-<script>
-window.fetch = new Proxy(window.fetch, {
-  apply(target, thisArg, args) {
-    console.log("➡️ FETCH 호출:", args[0]);
-    return Reflect.apply(target, thisArg, args);
-  }
-});
-</script>
 
 <script src="{% static 'js/common/search_user_modal.js' %}"></script>

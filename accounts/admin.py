@@ -9,6 +9,7 @@ from typing import Iterable, Optional
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.staticfiles import finders
 from django.core.cache import cache
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
@@ -31,6 +32,9 @@ from .forms import ExcelUploadForm
 from .models import CustomUser
 from .tasks import process_users_excel_task
 
+# =============================================================================
+# Settings / Constants
+# =============================================================================
 
 TEMPLATE_REL_PATH = "accounts/excel/양식_계정관리.xlsx"
 TEMPLATE_DOWNLOAD_NAME = "양식_계정관리.xlsx"
@@ -52,9 +56,9 @@ GRADE_DISPLAY = {
 }
 
 
-# -----------------------------------------------------------------------------
-# Cache init (constants 기반)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Cache helpers (constants 기반)
+# =============================================================================
 def _init_upload_cache(task_id: str) -> None:
     cache.set(cache_key(CACHE_PROGRESS_PREFIX, task_id), 0, timeout=CACHE_TIMEOUT_SECONDS)
     cache.set(cache_key(CACHE_STATUS_PREFIX, task_id), "PENDING", timeout=CACHE_TIMEOUT_SECONDS)
@@ -62,9 +66,9 @@ def _init_upload_cache(task_id: str) -> None:
     cache.delete(cache_key(CACHE_RESULT_PATH_PREFIX, task_id))
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # File helpers
-# -----------------------------------------------------------------------------
+# =============================================================================
 def _get_upload_temp_dir() -> Path:
     media_root = Path(getattr(settings, "MEDIA_ROOT", "media"))
     default_dir = media_root / "upload_temp"
@@ -98,17 +102,27 @@ def _file_response_or_404(abs_path: str | Path, *, download_name: Optional[str] 
     return FileResponse(fh, as_attachment=True, filename=(download_name or p.name))
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # Excel export
-# -----------------------------------------------------------------------------
+# =============================================================================
 def _build_users_export_workbook(users: Iterable[CustomUser]) -> Workbook:
     wb = Workbook()
     ws = wb.active
     ws.title = "Users"
 
     headers = [
-        "ID", "Name", "Branch", "Channel", "Division", "Part",
-        "Grade", "Status", "입사일", "퇴사일", "Is Staff", "Is Active",
+        "ID",
+        "Name",
+        "Branch",
+        "Channel",
+        "Division",
+        "Part",
+        "Grade",
+        "Status",
+        "입사일",
+        "퇴사일",
+        "Is Staff",
+        "Is Active",
     ]
     ws.append(headers)
 
@@ -149,9 +163,9 @@ def export_all_users_excel_view(request: HttpRequest) -> HttpResponse:
     return export_users_as_excel(CustomUser.objects.all(), EXPORT_ALL_FILENAME)
 
 
-# -----------------------------------------------------------------------------
-# Admin views
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Admin extra views (Excel upload)
+# =============================================================================
 def upload_users_from_excel_view(request: HttpRequest) -> HttpResponse:
     template_name = "admin/accounts/customuser/upload_excel.html"
     incoming_task_id = (request.GET.get("task_id") or request.POST.get("task_id") or "").strip()
@@ -161,25 +175,41 @@ def upload_users_from_excel_view(request: HttpRequest) -> HttpResponse:
 
     form = ExcelUploadForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(request, template_name, {"form": form, "task_id": incoming_task_id, "error": "폼이 유효하지 않습니다."})
+        return render(
+            request,
+            template_name,
+            {"form": form, "task_id": incoming_task_id, "error": "폼이 유효하지 않습니다."},
+        )
 
     excel_file = request.FILES.get("file")
     if not excel_file:
-        return render(request, template_name, {"form": form, "task_id": incoming_task_id, "error": "파일이 첨부되지 않았습니다."})
+        return render(
+            request,
+            template_name,
+            {"form": form, "task_id": incoming_task_id, "error": "파일이 첨부되지 않았습니다."},
+        )
 
     task_id = uuid.uuid4().hex
 
     try:
         save_path = _save_uploaded_file_to_disk(excel_file, task_id=task_id)
     except Exception as e:
-        return render(request, template_name, {"form": ExcelUploadForm(), "task_id": incoming_task_id, "error": f"파일 저장 실패: {e}"})
+        return render(
+            request,
+            template_name,
+            {"form": ExcelUploadForm(), "task_id": incoming_task_id, "error": f"파일 저장 실패: {e}"},
+        )
 
     _init_upload_cache(task_id)
 
-    # tasks.py에서도 동일 constants 사용하도록 아래에서 반영
+    # tasks.py에서도 동일 constants 사용 (cache_key/prefix 통일)
     process_users_excel_task.delay(task_id, str(save_path), DEFAULT_BATCH_SIZE)
 
-    return render(request, template_name, {"form": ExcelUploadForm(), "task_id": task_id, "message": "업로드 작업을 시작했습니다. 진행률을 확인하세요."})
+    return render(
+        request,
+        template_name,
+        {"form": ExcelUploadForm(), "task_id": task_id, "message": "업로드 작업을 시작했습니다. 진행률을 확인하세요."},
+    )
 
 
 def upload_users_result_view(request: HttpRequest, task_id: str) -> FileResponse:
@@ -207,29 +237,145 @@ def upload_excel_template_view(request: HttpRequest) -> FileResponse:
     )
 
 
+# =============================================================================
+# Admin forms (✅ username 제거: USERNAME_FIELD='id' 대응)
+# =============================================================================
+class CustomUserCreationAdminForm(UserCreationForm):
+    """
+    CustomUser는 USERNAME_FIELD='id' 입니다.
+    기본 UserAdmin add_view는 username을 기대할 수 있으므로,
+    admin에서 사용할 creation form을 명시하여 FieldError를 방지합니다.
+    """
+
+    class Meta(UserCreationForm.Meta):
+        model = CustomUser
+        fields = (
+            "id",
+            "name",
+            "channel",
+            "division",
+            "part",
+            "branch",
+            "grade",
+            "status",
+            "enter",
+            "quit",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+        )
+
+
+class CustomUserChangeAdminForm(UserChangeForm):
+    """변경 폼도 명시(fields)해서 커스텀 유저 스키마와 정확히 맞춥니다."""
+
+    class Meta(UserChangeForm.Meta):
+        model = CustomUser
+        fields = (
+            "id",
+            "name",
+            "regist",
+            "birth",
+            "channel",
+            "division",
+            "part",
+            "branch",
+            "grade",
+            "status",
+            "enter",
+            "quit",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+            "password",
+        )
+
+
+# =============================================================================
+# Admin registration
+# =============================================================================
 @admin.register(CustomUser)
 @admin.register(CustomUser, site=custom_admin_site)
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
+
     actions = [export_selected_users_to_excel]
     change_list_template = "admin/accounts/customuser/change_list.html"
 
+    # ✅ add_view / change_view에서 username을 요구하지 않도록 폼 지정
+    add_form = CustomUserCreationAdminForm
+    form = CustomUserChangeAdminForm
+
     list_display = (
-        "id", "name", "channel", "division", "part", "branch",
-        "grade", "status", "enter", "quit",
-        "is_staff", "is_active",
+        "id",
+        "name",
+        "channel",
+        "division",
+        "part",
+        "branch",
+        "grade",
+        "status",
+        "enter",
+        "quit",
+        "is_staff",
+        "is_active",
     )
     search_fields = ("id", "name", "channel", "division", "part", "branch", "grade", "status")
     ordering = ("id", "name", "channel", "division", "part", "branch")
 
+    def get_readonly_fields(self, request, obj=None):
+        # ✅ 수정 화면에서만 id를 잠금
+        if obj:  # change_view
+            return ("id",)
+        return ()  # add_view에서는 입력 가능
+
     fieldsets = (
         (None, {"fields": ("id", "password")}),
-        ("Personal Info", {"fields": ("name", "channel", "division", "part", "branch", "grade", "status", "enter", "quit")}),
+        (
+            "Personal Info",
+            {"fields": ("name", "regist", "birth", "channel", "division", "part", "branch", "grade", "status", "enter", "quit")},
+        ),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
     )
 
+    # ✅ 사용자 추가 화면에서 UserAdmin 기본 add_fieldsets(username 포함) 대체
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "id",
+                    "name",
+                    "regist",
+                    "birth",
+                    "channel",
+                    "division",
+                    "part",
+                    "branch",
+                    "grade",
+                    "status",
+                    "enter",
+                    "quit",
+                    "password1",
+                    "password2",
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+    )
+
     def save_model(self, request, obj, form, change):
-        if obj.quit:
+        # 운영 정책: 퇴사일이 있으면 상태 "퇴사"로 동기화
+        if getattr(obj, "quit", None):
             obj.status = "퇴사"
         super().save_model(request, obj, form, change)
 
@@ -239,6 +385,10 @@ class CustomUserAdmin(UserAdmin):
             path("export-all/", self.admin_site.admin_view(export_all_users_excel_view), name="export_all_users_excel"),
             path("upload-excel/", self.admin_site.admin_view(upload_users_from_excel_view), name="upload_users_excel"),
             path("upload-template/", self.admin_site.admin_view(upload_excel_template_view), name="upload_excel_template"),
-            path("upload-result/<str:task_id>/", self.admin_site.admin_view(upload_users_result_view), name="upload_users_result"),
+            path(
+                "upload-result/<str:task_id>/",
+                self.admin_site.admin_view(upload_users_result_view),
+                name="upload_users_result",
+            ),
         ]
         return custom_urls + urls

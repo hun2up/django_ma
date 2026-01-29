@@ -1,89 +1,67 @@
-<!-- django_ma/templates/admin/accounts/customuser/change_list.html -->
+{# django_ma/templates/admin/accounts/customuser/change_list.html #}
 {% extends "admin/change_list.html" %}
 
 {% block extrastyle %}
-  {{ block.super }}
-  <style>
-    /* 1) object-tools가 ul이든 div든 전부 flex로 */
-    .object-tools {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-      gap: 8px !important;
-      align-items: center !important;
-      float: none !important;
-      margin: 0 0 12px 0 !important;
-      padding: 0 !important;
-    }
+{{ block.super }}
+<style>
+/* ==========================================================
+   CustomUser Admin — Object Tools Layout Fix
+   목적: 버튼이 세로로 떨어지는 Admin 테마 문제 방어
+========================================================== */
 
-    /* 2) ul 기본 불릿/들여쓰기 제거 + 혹시 ul이 중첩이면 그것도 flex */
-    ul.object-tools {
-      list-style: none !important;
-      padding-left: 0 !important;
-      margin-left: 0 !important;
-    }
+.object-tools {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  float: none;
+  margin-bottom: 12px;
+}
 
-    /* 3) li가 block/100%로 잡히는 테마 강제 해제 */
-    .object-tools > li,
-    .object-tools li {
-      list-style: none !important;
-      display: inline-flex !important;
-      width: auto !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      float: none !important;
-      clear: none !important;
-    }
+.object-tools,
+.object-tools ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
 
-    /* 4) a.button이 block으로 잡히는 것도 방지 */
-    .object-tools a.button {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: auto !important;
-      white-space: nowrap !important;
-      border-radius: 999px !important;
-      padding: 6px 14px !important;
-      margin: 0 !important;
-    }
+.object-tools li {
+  display: inline-flex;
+}
 
-    /* 5) 만약 구조가 div.object-tools 안에 ul이 있는 형태면 이것도 강제 */
-    div.object-tools > ul {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-      gap: 8px !important;
-      align-items: center !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      list-style: none !important;
-    }
-  </style>
+.object-tools a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+</style>
 {% endblock %}
 
-
 {% block object-tools %}
-  <div class="object-tools" style="float:none;">
-    <ul class="object-tools" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; list-style:none; padding:0; margin:0 0 12px 0;">
-      <!-- ✅ 기본 '추가' 버튼 유지 -->
-      {% if has_add_permission and cl.add_url %}
-        <li style="margin:0; padding:0;">
-          <a href="{{ cl.add_url }}" class="addlink">
-            {{ cl.opts.verbose_name|default:"USER" }} 추가
-          </a>
-        </li>
-      {% endif %}
+<ul class="object-tools">
 
-      <!-- ✅ 커스텀 버튼: 같은 UL 안에 강제 삽입 -->
-      <li style="margin:0; padding:0;">
-        <a href="{% url 'admin:export_all_users_excel' %}" class="button">엑셀 다운로드</a>
-      </li>
-      <li style="margin:0; padding:0;">
-        <a href="{% url 'admin:upload_users_excel' %}" class="button">엑셀 업로드</a>
-      </li>
+  {% if has_add_permission and cl.add_url %}
+  <li>
+    <a href="{{ cl.add_url }}" class="addlink">
+      {{ cl.opts.verbose_name|default:"USER" }} 추가
+    </a>
+  </li>
+  {% endif %}
 
-      <!-- 필요시: 숨김 템플릿 -->
-    <!-- <li style="display:none;"><a ...>양식 다운로드</a></li> -->
-    </ul>
-  </div>
+  <li>
+    <a href="{% url 'admin:export_all_users_excel' %}" class="button">
+      엑셀 다운로드
+    </a>
+  </li>
+
+  <li>
+    <a href="{% url 'admin:upload_users_excel' %}" class="button">
+      엑셀 업로드
+    </a>
+  </li>
+
+</ul>
 {% endblock %}
