@@ -36,3 +36,5 @@ staticfiles/
 
 # Django local settings (있다면)
 local_settings.py
+
+static/pdf/*.pdf
