@@ -12,7 +12,7 @@
 <!-- ✅ (권장) base.html 기본 container wrapper를 사용하지 않고, list도 manual 전용으로 통일 -->
 {% block content_wrapper %}
   <div class="container my-5">
-    {% block content %}{% endblock %}
+    {{ block.super }}
   </div>
 {% endblock %}
 
