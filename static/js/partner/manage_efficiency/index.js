@@ -12,7 +12,6 @@
 
 import { els } from "./dom_refs.js";
 import { initInputRowEvents } from "./input_rows.js";
-import { fetchData } from "./fetch.js";
 import { initManageBoot } from "../../common/manage_boot.js";
 import { initConfirmUploadHandlers } from "./confirm_upload.js";
 import { attachEfficiencyDeleteHandlers } from "./delete.js";
@@ -205,39 +204,19 @@ onReady(() => {
     const br = getBranch();
     const g = grade();
 
-    if (!ym) {
-      alert("연도/월도를 확인해주세요.");
-      return;
-    }
-
+    if (!ym) { alert("연도/월도를 확인해주세요."); return; }
     if (g === "superuser") {
-      if (!els.branch) {
-        alert("지점 선택 UI가 없습니다. (superuser 템플릿 조건 확인)");
-        return;
-      }
-      if (!str(els.branch.value)) {
-        alert("지점을 먼저 선택하세요.");
-        return;
-      }
+      if (!els.branch) { alert("지점 선택 UI가 없습니다. (superuser 템플릿 조건 확인)"); return; }
+      if (!str(els.branch.value)) { alert("지점을 먼저 선택하세요."); return; }
     }
-
-    if (!br) {
-      warn("⚠️ branch를 찾지 못했습니다.", {
-        trigger,
-        g,
-        ym,
-        user,
-        boot,
-        dataset: root.dataset,
-      });
-      alert("지점 정보를 확인할 수 없습니다. (권한/부서/지점 설정 확인)");
-      return;
-    }
+    if (!br) { alert("지점 정보를 확인할 수 없습니다. (권한/부서/지점 설정 확인)"); return; }
 
     openSections();
 
-    // ✅ fetchData는 내부에서 accordion 렌더까지 수행
-    await fetchData(ym, br);
+    // ✅ 캐시 버스터
+    const v = root.dataset.staticVersion || String(Date.now());
+    const mod = await import(`./fetch.js?v=${encodeURIComponent(v)}`);
+    await mod.fetchData(ym, br);
   }
 
   // 4) 이벤트 바인딩

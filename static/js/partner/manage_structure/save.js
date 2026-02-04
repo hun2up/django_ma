@@ -5,6 +5,7 @@
 // - 저장 성공 시: 필터 저장(sessionStorage) → page reload
 // =========================================================
 
+import { fetchData } from "./fetch.js";
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox, getCSRFToken, selectedYM } from "./utils.js";
 import { resetInputSection } from "./input_rows.js";
@@ -116,8 +117,17 @@ export async function saveRows() {
 
       resetInputSection();
 
-      stashFiltersForReloadFallback();
-      window.location.reload();
+      /* 🔑 저장 직후 즉시 재조회 */
+      const y = toStr(els.year?.value);
+      const m = toStr(els.month?.value);
+      const ym = `${y}-${pad2(m)}`;
+
+      const branch = getBranchForSave();
+      await fetchData(ym, branch);
+
+      /* (선택) 스크롤을 메인시트로 */
+      document.getElementById("mainSheet")?.scrollIntoView({ behavior: "smooth" });
+
       return;
     }
 

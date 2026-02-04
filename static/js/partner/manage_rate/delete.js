@@ -1,7 +1,9 @@
 // django_ma/static/js/partner/manage_rate/delete.js
 // ======================================================
-// 📘 요율변경 요청 페이지 - 삭제 로직 (dataset 키 통일 + 공통화)
-// - 기능/동작 동일 (leader 삭제 차단, 삭제 후 재조회)
+// ✅ 요율변경 - 삭제 로직 (FINAL)
+// - superuser/head: 삭제 가능
+// - leader: 삭제 불가 (버튼 자체는 fetch.js에서 렌더 X + 바인딩도 X)
+// - 삭제 후 현재 조건으로 재조회
 // ======================================================
 
 import { els } from "./dom_refs.js";
@@ -11,17 +13,24 @@ import { fetchData } from "./fetch.js";
 import { getCSRFToken } from "../../common/manage/csrf.js";
 import { getDatasetUrl } from "../../common/manage/dataset.js";
 
-/* ==========================
-   ✅ 공통: grade/branch/ym
-========================== */
+const BOUND_KEY = "rateDeleteBound";
+
+/* ======================================================
+   grade/branch/ym helpers
+====================================================== */
 function getGrade() {
-  return (els.root?.dataset?.userGrade || window.currentUser?.grade || "").trim();
+  return String(els.root?.dataset?.userGrade || window.currentUser?.grade || "").trim();
+}
+
+function canDelete() {
+  const g = getGrade();
+  return g === "superuser" || g === "head";
 }
 
 function getEffectiveBranch() {
   const grade = getGrade();
-  if (grade === "superuser") return (els.branchSelect?.value || "").trim();
-  return (window.currentUser?.branch || els.root?.dataset?.defaultBranch || "").trim();
+  if (grade === "superuser") return String(els.branchSelect?.value || "").trim();
+  return String(window.currentUser?.branch || els.root?.dataset?.defaultBranch || "").trim();
 }
 
 function buildFetchPayload() {
@@ -30,43 +39,50 @@ function buildFetchPayload() {
     ym,
     branch: getEffectiveBranch(),
     grade: getGrade(),
-    level: (els.root?.dataset?.userLevel || "").trim(),
-    team_a: (els.root?.dataset?.teamA || "").trim(),
-    team_b: (els.root?.dataset?.teamB || "").trim(),
-    team_c: (els.root?.dataset?.teamC || "").trim(),
+    level: String(els.root?.dataset?.userLevel || "").trim(),
+    team_a: String(els.root?.dataset?.teamA || "").trim(),
+    team_b: String(els.root?.dataset?.teamB || "").trim(),
+    team_c: String(els.root?.dataset?.teamC || "").trim(),
   };
 }
 
-/* ============================================================
-   ✅ 삭제 URL: 기존 dataset 키 호환 유지
-============================================================ */
+/* ======================================================
+   URL helpers
+====================================================== */
 function getDeleteUrl() {
-  // manage_rate.html 템플릿이 어떤 키를 쓰든 호환
   return getDatasetUrl(els.root, ["deleteUrl", "dataDeleteUrl", "deleteURL", "dataDeleteURL"]);
 }
 
-/* ============================================================
-   ✅ 삭제 이벤트 등록 (중복 방지)
-============================================================ */
+/* ======================================================
+   Event binding (once)
+====================================================== */
 export function attachDeleteHandlers() {
-  document.removeEventListener("click", handleDeleteClick);
+  if (!els.root) return;
+
+  // ✅ leader는 버튼도 없고, 이벤트 바인딩 자체도 불필요
+  if (!canDelete()) return;
+
+  // ✅ 중복 바인딩 방지
+  if (els.root.dataset[BOUND_KEY] === "1") return;
+  els.root.dataset[BOUND_KEY] = "1";
+
   document.addEventListener("click", handleDeleteClick);
 }
 
-/* ============================================================
-   ✅ 삭제 처리
-============================================================ */
+/* ======================================================
+   Click handler
+====================================================== */
 async function handleDeleteClick(e) {
-  const btn = e.target.closest(".btnDeleteRow");
+  const btn = e.target?.closest?.(".btnDeleteRow");
   if (!btn || !els.root) return;
 
-  const grade = getGrade();
-  if (grade === "leader") {
-    alertBox("삭제 권한이 없습니다. (leader)");
+  // ✅ 방어: 혹시 DOM이 생겼더라도 권한 없으면 즉시 차단
+  if (!canDelete()) {
+    alertBox("삭제 권한이 없습니다.");
     return;
   }
 
-  const id = (btn.dataset.id || "").trim();
+  const id = String(btn.dataset.id || "").trim();
   if (!id) return;
 
   if (!confirm("해당 데이터를 삭제하시겠습니까?")) return;
@@ -87,6 +103,7 @@ async function handleDeleteClick(e) {
         "X-CSRFToken": getCSRFToken(),
         "X-Requested-With": "XMLHttpRequest",
       },
+      credentials: "same-origin",
       body: JSON.stringify({ id }),
     });
 
@@ -102,7 +119,7 @@ async function handleDeleteClick(e) {
     await fetchData(buildFetchPayload());
   } catch (err) {
     console.error("❌ [rate/delete] 오류:", err);
-    alertBox("삭제 중 오류가 발생했습니다.");
+    alertBox(err?.message || "삭제 중 오류가 발생했습니다.");
   } finally {
     hideLoading();
   }

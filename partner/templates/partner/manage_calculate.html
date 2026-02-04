@@ -3,8 +3,8 @@
 {% load static %}
 {% block title %}지점효율{% endblock %}
 
-{% block extra_head %}
-  <link rel="stylesheet" href="{% static 'css/partner/manage_efficiency.css' %}?v={% now 'U' %}">
+{% block app_css %}
+  <link rel="stylesheet" href="{% static 'css/apps/partner.css' %}?v={% now 'U' %}">
 {% endblock %}
 
 {% block content_wrapper %}
@@ -13,6 +13,7 @@
   <div class="mt-4" id="manage-efficiency"
       data-user-grade="{{ user.grade }}"
       data-branch="{{ user.branch|default:'' }}"
+      data-fetch-channels-url="{% url 'partner:ajax_fetch_channels' %}"
       data-current-year="{{ current_year }}"
       data-current-month="{{ current_month }}"
       data-selected-year="{{ selected_year }}"
@@ -43,214 +44,218 @@
       }'
       data-main-col-widths='{
         "requester": 6,
-        "requester_id": 6,
-        "category": 8,
-        "amount": 7,
+        "category": 6,
+        "amount": 8,
         "tax": 6,
         "ded": 10,
         "pay": 10,
-        "content": 28,
+        "content": 33,
         "request_date": 7,
         "process_date": 7,
         "remove": 6
-      }'>
+      }'
+      data-static-version="{% now 'U' %}">
 
     {% if user.grade not in 'superuser head leader' %}
       <div class="alert alert-danger">접근 권한이 없습니다.</div>
     {% endif %}
 
     <h3 class="text-center fw-bold mb-4" style="color:#003f7d;">지점효율 요청 페이지</h3>
+    
+    <div class="partner-sheet-wrap">
 
-    <!-- Top controls -->
-    <div class="card shadow p-3 border-0 rounded-4 mb-3">
-      <form id="controlsForm" class="row g-2 align-items-end">
-        {% csrf_token %}
+      <!-- Top controls -->
+      <div class="card shadow p-3 border-0 rounded-4 mb-3">
+        <form id="controlsForm" class="row g-2 align-items-end">
+          {% csrf_token %}
 
-        <div class="col-6 col-md-1">
-          <label class="form-label mb-1">연도</label>
-          <select id="yearSelect" name="year" class="form-select"></select>
-        </div>
+          <div class="col-6 col-md-1">
+            <label class="form-label mb-1">연도</label>
+            <select id="yearSelect" name="year" class="form-select form-select-sm"></select>
+          </div>
 
-        <div class="col-6 col-md-1">
-          <label class="form-label mb-1">월도</label>
-          <select id="monthSelect" name="month" class="form-select"></select>
-        </div>
+          <div class="col-6 col-md-1">
+            <label class="form-label mb-1">월도</label>
+            <select id="monthSelect" name="month" class="form-select form-select-sm"></select>
+          </div>
 
-        {% if user.grade == 'superuser' %}
-        <div class="col-6 col-md-2">
-          <label class="form-label mb-1">부서</label>
-          <select id="partSelect" class="form-select form-select-sm">
-            <option value="">불러오는 중...</option>
-          </select>
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label mb-1">지점</label>
-          <select id="branchSelect" class="form-select form-select-sm" disabled>
-            <option value="">부서를 먼저 선택하세요</option>
-          </select>
-        </div>
-        {% endif %}
+          {% if user.grade == 'superuser' %}
+          <div class="col-6 col-md-2">
+            <label class="form-label mb-1">부문</label>
+            <select id="channelSelect" class="form-select form-select-sm">
+              <option value="">불러오는 중...</option>
+            </select>
+          </div>
 
-        <div class="col-12 col-md-1 d-grid">
-          <button type="button" id="btnSearchPeriod" class="btn btn-primary btn-search">검색</button>
-        </div>
-      </form>
+          <div class="col-6 col-md-2">
+            <label class="form-label mb-1">부서</label>
+            <select id="partSelect" class="form-select form-select-sm" disabled>
+              <option value="">부문을 먼저 선택하세요</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label mb-1">지점</label>
+            <select id="branchSelect" class="form-select form-select-sm" disabled>
+              <option value="">부서를 먼저 선택하세요</option>
+            </select>
+          </div>
+          {% endif %}
 
-      <div id="periodHints" class="mt-2 small text-muted">
-        ※ 과거 시점은 데이터가 존재하는 월도만 선택 가능 (미래 시점은 현재월 기준 +1개월까지만 가능)
+          <div class="col-12 col-md-1 d-grid">
+            <button type="button" id="btnSearchPeriod" class="btn btn-primary btn-search">검색</button>
+          </div>
+        </form>
       </div>
+
+      {% if user.grade == 'superuser' or user.grade == 'head' %}
+        <div class="alert alert-info w-100 py-2 mb-3 text-start">
+          지점효율 기능 사용 전 반드시
+          <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
+          를 설정해야 합니다.
+        </div>
+      {% endif %}
+
+      <!-- 입력 섹션 -->
+      <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
+        <div class="manage-input-head">
+          <h5 class="manage-input-title fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
+
+          <!-- 기존 버튼바 그대로 사용 -->
+          <div class="manage-input-actions efficiency-actions-bar">
+            <a href="{% url 'partner:efficiency_confirm_template_download' %}" class="btn btn-outline-success btn-sm">
+              확인서양식
+            </a>
+
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnUploadConfirm"
+                    data-bs-toggle="modal" data-bs-target="#confirmUploadModal">
+              확인서 업로드
+            </button>
+
+            <input type="text" id="confirmFileName" class="form-control form-control-sm"
+                  style="max-width:260px" placeholder="업로드 된 확인서 파일명" readonly>
+
+            <input type="hidden" id="confirmGroupId" value="">
+            <input type="hidden" id="confirmAttachmentId" value="">
+
+            <button type="button" class="btn btn-primary btn-sm" id="btnAddRow">추가</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnResetRows">초기화</button>
+            <button type="button" class="btn btn-success btn-sm" id="btnSaveRows">저장</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle" id="inputTable">
+            <colgroup>
+              <col class="c-rq">
+              <col class="c-rq-branch">
+              <col class="c-category">
+              <col class="c-amount">
+              <col class="c-tax">
+              <col class="c-ded">
+              <col class="c-pay">
+              <col class="c-content">
+              <col class="c-del">
+            </colgroup>
+            <thead class="table-light">
+              <tr>
+                <th>요청자</th>
+                <th>소속(요청자)</th>
+                <th>구분<span class="text-danger">*</span></th>
+                <th>금액<span class="text-danger">*</span></th>
+                <th>세액</th>
+                <th>공제자</th>
+                <th>지급자</th>
+                <th>내용<span class="text-danger">*</span></th>
+                <th>삭제</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr class="input-row">
+                <td>
+                  <input type="text" name="rq_display" class="form-control form-control-sm" readonly>
+                  <input type="hidden" class="form-control readonly-field" name="rq_name" readonly>
+                  <input type="hidden" class="form-control readonly-field" name="rq_id" readonly>
+                <td><input type="text" class="form-control readonly-field" name="rq_branch" readonly></td>
+
+                <td>
+                  <select name="category" class="form-select" required>
+                    <option value="" selected disabled>선택</option>
+                    <option value="지점관리">지점관리</option>
+                    <option value="지점시상">지점시상</option>
+                    <option value="상위차감">상위차감</option>
+                  </select>
+                </td>
+
+                <td>
+                  <input type="text" name="amount" class="form-control"
+                        inputmode="numeric" pattern="\d*" autocomplete="off"
+                        placeholder="숫자만 입력" required>
+                </td>
+
+                <td><input type="text" class="form-control readonly-field text-end" name="tax" readonly></td>
+
+                <!-- 공제자 -->
+                <td>
+                  <div class="input-group input-group-sm">
+                    <input type="text" name="ded_display" class="form-control" readonly placeholder="공제자 선택">
+                    <button type="button" class="btn btn-outline-secondary btnSearchDed" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+                  </div>
+
+                  <input type="hidden" name="ded_name">
+                  <input type="hidden" name="ded_id">
+                </td>
+
+                <!-- 지급자 -->
+                <td>
+                  <div class="input-group input-group-sm">
+                    <input type="text" name="pay_display" class="form-control" readonly placeholder="지급자 선택">
+                    <button type="button" class="btn btn-outline-secondary btnSearchPay" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+                  </div>
+
+                  <input type="hidden" name="pay_name">
+                  <input type="hidden" name="pay_id">
+                </td>
+
+                <!-- 내용 -->
+                <td>
+                  <input type="text" class="form-control" name="content" maxlength="80"
+                        placeholder="내용 상세 기재" required>
+                </td>
+
+                <td class="text-center">
+                  <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="small fw-bold" style="color:#dc3545;">※ 반드시 확인서를 첨부해야 내용 저장이 가능합니다.</div>
+        <div class="small text-muted">※ 한 번에 최대 10건까지 추가할 수 있습니다.</div>
+      </div>
+
+      <div class="alert alert-info py-2 mb-3">
+        입력 후 수정이 불가합니다. 수정이 필요한 경우 최상위관리자에게 문의 바랍니다.
+      </div>
+
+      <!-- ✅ 메인: Accordion(그룹) + 그룹 내부 테이블(행) -->
+      <div class="card shadow p-3 border-0 rounded-4" id="mainSheet" hidden>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
+          <div class="small text-muted" id="sheetNotice"></div>
+        </div>
+      
+        <!-- ✅ JS가 확실히 잡을 수 있는 wrapper 추가 -->
+        <div id="confirmGroups">
+          <div class="accordion" id="confirmGroupsAccordion">
+            <!-- JS render -->
+          </div>
+        </div>
+      </div>
+
     </div>
-
-    {% if user.grade == 'superuser' or user.grade == 'head' %}
-      <div class="alert alert-info w-100 py-2 mb-3 text-start">
-        지점효율 기능 사용 전 반드시
-        <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
-        를 설정해야 합니다.
-      </div>
-    {% endif %}
-
-    <!-- 입력 섹션 -->
-    <div id="inputSection" class="card shadow p-3 border-0 rounded-4 mb-3" hidden>
-      <div class="manage-input-head">
-        <h5 class="manage-input-title fw-bold mb-0" style="color:#005BAC;">내용입력</h5>
-
-        <!-- 기존 버튼바 그대로 사용 -->
-        <div class="manage-input-actions efficiency-actions-bar">
-          <a href="{% url 'partner:efficiency_confirm_template_download' %}" class="btn btn-outline-success btn-sm">
-            확인서양식
-          </a>
-
-          <button type="button" class="btn btn-outline-primary btn-sm" id="btnUploadConfirm"
-                  data-bs-toggle="modal" data-bs-target="#confirmUploadModal">
-            확인서 업로드
-          </button>
-
-          <input type="text" id="confirmFileName" class="form-control form-control-sm"
-                style="max-width:260px" placeholder="업로드 된 확인서 파일명" readonly>
-
-          <input type="hidden" id="confirmGroupId" value="">
-          <input type="hidden" id="confirmAttachmentId" value="">
-
-          <button type="button" class="btn btn-primary btn-sm" id="btnAddRow">추가</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnResetRows">초기화</button>
-          <button type="button" class="btn btn-success btn-sm" id="btnSaveRows">저장</button>
-        </div>
-      </div>
-
-      <div class="table-responsive">
-        <table class="table align-middle" id="inputTable">
-          <colgroup>
-            <col data-col="rq_name">
-            <col data-col="rq_id">
-            <col data-col="rq_branch">
-            <col data-col="category">
-            <col data-col="amount">
-            <col data-col="tax">
-            <col data-col="ded_name">
-            <col data-col="ded_id">
-            <col data-col="ded_search">
-            <col data-col="pay_name">
-            <col data-col="pay_id">
-            <col data-col="pay_search">
-            <col data-col="content">
-            <col data-col="remove">
-          </colgroup>
-          <thead class="table-light">
-            <tr>
-              <th>성명<br>(요청자)</th>
-              <th>사번<br>(요청자)</th>
-              <th>소속<br>(요청자)</th>
-              <th>구분<span class="text-danger">*</span></th>
-              <th>금액<span class="text-danger">*</span></th>
-              <th>세액</th>
-              <th>성명<br>(공제자)</th>
-              <th>사번<br>(공제자)</th>
-              <th>검색<br>(공제자)</th>
-              <th>성명<br>(지급자)</th>
-              <th>사번<br>(지급자)</th>
-              <th>검색<br>(지급자)</th>
-              <th>내용<span class="text-danger">*</span></th>
-              <th>삭제</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr class="input-row">
-              <td><input type="text" class="form-control readonly-field" name="rq_name" readonly></td>
-              <td><input type="text" class="form-control readonly-field" name="rq_id" readonly></td>
-              <td><input type="text" class="form-control readonly-field" name="rq_branch" readonly></td>
-
-              <td>
-                <select name="category" class="form-select" required>
-                  <option value="" selected disabled>선택</option>
-                  <option value="지점관리">지점관리</option>
-                  <option value="지점시상">지점시상</option>
-                  <option value="상위차감">상위차감</option>
-                </select>
-              </td>
-
-              <td>
-                <input type="text" name="amount" class="form-control"
-                       inputmode="numeric" pattern="\d*" autocomplete="off"
-                       placeholder="숫자만 입력" required>
-              </td>
-
-              <td><input type="text" class="form-control readonly-field text-end" name="tax" readonly></td>
-
-              <td><input type="text" class="form-control readonly-field" name="ded_name" readonly></td>
-              <td><input type="text" class="form-control readonly-field" name="ded_id" readonly></td>
-              <td class="text-center">
-                <!-- 공제자 검색 버튼 -->
-                <button type="button"
-                        class="btn btn-outline-primary btn-sm btnSearchDed btnOpenSearch"
-                        data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-              </td>
-
-              <td><input type="text" class="form-control readonly-field" name="pay_name" readonly></td>
-              <td><input type="text" class="form-control readonly-field" name="pay_id" readonly></td>
-              <td class="text-center">
-                <!-- 지급자 검색 버튼 -->
-                <button type="button"
-                        class="btn btn-outline-primary btn-sm btnSearchPay btnOpenSearch"
-                        data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
-              </td>
-
-              <td>
-                <input type="text" class="form-control" name="content" maxlength="80"
-                       placeholder="내용 상세 기재" required>
-              </td>
-
-              <td class="text-center">
-                <button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="small fw-bold" style="color:#dc3545;">※ 반드시 확인서를 첨부해야 내용 저장이 가능합니다.</div>
-      <div class="small text-muted">※ 한 번에 최대 10건까지 추가할 수 있습니다.</div>
-    </div>
-
-    <div class="alert alert-info py-2 mb-3">
-      입력 후 수정이 불가합니다. 수정이 필요한 경우 최상위관리자에게 문의 바랍니다.
-    </div>
-
-    <!-- ✅ 메인: Accordion(그룹) + 그룹 내부 테이블(행) -->
-    <div class="card shadow p-3 border-0 rounded-4" id="mainSheet" hidden>
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
-        <div class="small text-muted" id="sheetNotice"></div>
-      </div>
-
-      <!-- ✅ JS가 확실히 잡을 수 있는 wrapper 추가 -->
-      <div id="confirmGroups">
-        <div class="accordion" id="confirmGroupsAccordion">
-          <!-- JS render -->
-        </div>
-      </div>
-    </div>
-
+  
     <div class="loading-overlay" id="loadingOverlay" hidden>
       <div class="loading-box">
         <div class="spinner-border" role="status"></div>

@@ -4,15 +4,14 @@
 {% block title %}편제변경{% endblock %}
 
 {% block extra_head %}
-  <!-- ✅ jQuery 먼저 -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-  <!-- ✅ DataTables + Bootstrap5 -->
   <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-  
-  <link rel="stylesheet" href="{% static 'css/partner/manage_structure.css' %}?v={% now 'U' %}">
+{% endblock %}
+
+{% block app_css %}
+  <link rel="stylesheet" href="{% static 'css/apps/partner.css' %}?v={% now 'U' %}">
 {% endblock %}
 
 {% block content %}
@@ -87,7 +86,7 @@
 
   {% if user.grade == 'superuser' or user.grade == 'head' %}
     <div class="alert alert-info w-100 py-2 mb-3 text-start">
-      편제변경 기능 사용 전 반드시 
+      편제변경 기능 사용 전 반드시
       <a href="{% url 'partner:manage_grades' %}" class="fw-bold text-decoration-underline text-primary">중간관리자별 권한</a>
       를 설정해야 합니다.
     </div>
@@ -106,13 +105,12 @@
       </div>
     </div>
 
-
     <div class="table-responsive">
       <table class="table align-middle" id="inputTable">
-      <colgroup class="input-cols-structure">
-          <col class="c-search"> <!-- 검색 --> 
+        <colgroup class="input-cols-structure">
+          <col class="c-search"> <!-- 검색 -->
           <col class="c-rq"> <!-- 요청자 -->
-          <col class="c-tg"> <!-- 요청자 --> 
+          <col class="c-tg"> <!-- 대상자 -->
           <col class="c-before-branch"> <!-- 소속(변경전) -->
           <col class="c-after-branch"> <!-- 소속(변경후) -->
           <col class="c-before-rank"> <!-- 직급(변경전) -->
@@ -121,6 +119,7 @@
           <col class="c-memo"> <!-- 비고 -->
           <col class="c-del"> <!-- 삭제 -->
         </colgroup>
+
         <thead class="table-light">
           <tr>
             <th>검색</th>
@@ -130,16 +129,18 @@
             <th>소속(변경후)<span class="text-danger">*</span></th>
             <th>직급(변경전)</th>
             <th>직급(변경후)<span class="text-danger">*</span></th>
-            <th>OR<span class="text-danger">*</span></th>            
-            <th>비고<span class="text-danger">*</span></th>            
+            <th>OR<span class="text-danger">*</span></th>
+            <th>비고<span class="text-danger">*</span></th>
             <th>삭제</th>
           </tr>
         </thead>
+
         <tbody>
-          {# 최초 1행 템플릿 — JS로 복제/최대 10개까지 #}
+          <!-- 최초 1행 템플릿 — JS로 복제/최대 10개까지 -->
           <tr class="input-row">
             <td>
-              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch" data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
+              <button type="button" class="btn btn-outline-primary btn-sm btnOpenSearch"
+                      data-bs-toggle="modal" data-bs-target="#searchUserModal">검색</button>
             </td>
             <td>
               <input type="text" class="form-control form-control-sm rq_display" readonly>
@@ -153,11 +154,11 @@
               <input type="hidden" class="form-control readonly-field" name="tg_id" readonly>
             </td>
             <td><input type="text" class="form-control readonly-field" name="tg_branch" readonly></td>
-            <td><input type="text" name="chg_branch" class="form-control"></td>   
+            <td><input type="text" name="chg_branch" class="form-control"></td>
             <td><input type="text" class="form-control readonly-field" name="tg_rank" readonly></td>
             <td><input type="text" name="chg_rank" class="form-control"></td>
             <td class="text-center"><input type="checkbox" name="or_flag" class="form-check-input"></td>
-            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>            
+            <td><input type="text" class="form-control" name="memo" maxlength="50" placeholder="상세하게 기재"></td>
             <td><button type="button" class="btn btn-outline-danger btn-sm btnRemoveRow">삭제</button></td>
           </tr>
         </tbody>
@@ -177,6 +178,7 @@
       <h5 class="fw-bold mb-0" style="color:#005BAC;">메인시트</h5>
       <div class="small text-muted" id="sheetNotice"></div>
     </div>
+
     <div class="table-responsive">
       <table class="table table-striped align-middle main-table-fixed" id="mainTable">
         <colgroup>
@@ -184,7 +186,7 @@
           <col style="width: 120px"> <!-- 대상자 -->
           <col style="width: 210px"> <!-- 소속(변경전) -->
           <col style="width: 210px"> <!-- 소속(변경후) -->
-          <col style="width: 120px"> <!-- 직급(변경전) -->          
+          <col style="width: 120px"> <!-- 직급(변경전) -->
           <col style="width: 120px"> <!-- 직급(변경후) -->
           <col style="width: 40px"> <!-- OR -->
           <col style="width: 260px"> <!-- 비고 -->
@@ -192,6 +194,7 @@
           <col style="width: 120px"> <!-- 처리일자 -->
           <col style="width: 60px"> <!-- 삭제 -->
         </colgroup>
+
         <thead class="table-light">
           <tr>
             <th>요청자</th>
@@ -207,6 +210,7 @@
             <th>삭제</th>
           </tr>
         </thead>
+
         <tbody></tbody>
       </table>
     </div>

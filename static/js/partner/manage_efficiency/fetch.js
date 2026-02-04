@@ -43,6 +43,17 @@ function escapeAttr(s) {
 }
 
 /* -------------------------
+   Requester display
+   - "요청자성명(요청자사번)" 형태로 통합 출력
+-------------------------- */
+function formatRequesterDisplay(r) {
+  const name = str(r?.requester_name ?? r?.requester ?? "");
+  const empId = str(r?.requester_id ?? r?.rq_id ?? r?.requester_empno ?? "");
+  if (name && empId) return `${name}(${empId})`;
+  return name || empId || "-";
+}
+
+/* -------------------------
    Root / grade / dataset
 -------------------------- */
 function getRoot() {
@@ -97,7 +108,6 @@ function getGroupsContainer() {
 -------------------------- */
 const MAIN_COL_KEYS = [
   "requester",
-  "requester_id",
   "category",
   "amount",
   "tax",
@@ -111,7 +121,6 @@ const MAIN_COL_KEYS = [
 
 const DEFAULT_MAIN_COL_WIDTHS = {
   requester: 8,
-  requester_id: 7,
   category: 8,
   amount: 8,
   tax: 6,
@@ -455,7 +464,6 @@ function renderGroups(groups, rowsByGroup) {
               <thead class="table-light">
                 <tr>
                   <th class="text-center">요청자</th>
-                  <th class="text-center">사번</th>
                   <th class="text-center">구분</th>
                   <th class="text-center">금액</th>
                   <th class="text-center">세액</th>
@@ -495,8 +503,7 @@ function renderGroups(groups, rowsByGroup) {
 
                     return `
                       <tr>
-                        <td class="text-center">${escapeHtml(str(r.requester_name))}</td>
-                        <td class="text-center">${escapeHtml(str(r.requester_id))}</td>
+                        <td class="text-center">${escapeHtml(formatRequesterDisplay(r))}</td>
                         <td class="text-center">${escapeHtml(str(r.category))}</td>
 
                         <td class="text-end">${fmtNumber(amountNum)}</td>
@@ -583,6 +590,9 @@ function renderGroups(groups, rowsByGroup) {
     .join("");
 
   acc.innerHTML = html;
+
+  // ✅ requester 컬럼 2칸(요청자+사번) → 1칸 통합이므로
+  // 템플릿(root.dataset.mainColWidths)에서도 requester_id 제거/조정 권장
 
   // ✅ 렌더 후 컬럼비율 적용
   const root = getRoot();

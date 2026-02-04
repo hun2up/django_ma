@@ -1,24 +1,19 @@
 // django_ma/static/js/partner/manage_rate/input_rows.js
 // ======================================================
-// 📘 요율변경 요청 페이지 - 입력행 관리 (FINAL)
-// - 요청자/대상자 컬럼 통합 UI 대응 (rq_display / tg_display)
-// - superuser에서 branch 선택 후에도 드롭다운 미적용 되는 문제 해결
-// - 행 추가/삭제/초기화/저장 버튼 바인딩 + 모달 선택 이벤트 처리
-// - 중복 바인딩 방지(페이지 BFCache/재진입 안전)
+// 📘 Manage Rate - Input Rows
+// - Add / Remove / Reset / Save bindings
+// - Modal userSelected event -> fill target + apply dropdowns
+// - Superuser branch change: clear cache + reset + apply dropdowns
 // ======================================================
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
 import { saveRows } from "./save.js";
-import {
-  fetchBranchTables,
-  applyTableDropdownToRow,
-  clearTableCache,
-} from "./table_dropdown.js";
+import { fetchBranchTables, applyTableDropdownToRow, clearTableCache } from "./table_dropdown.js";
 
-/* ==========================
-   ✅ Utils
-========================== */
+/* =========================================================
+   Small utils
+========================================================= */
 function toStr(v) {
   return String(v ?? "").trim();
 }
@@ -30,18 +25,17 @@ function fmtPerson(name, id) {
   return n || i || "";
 }
 
-/* ==========================
-   ✅ grade/branch helpers
-========================== */
+/* =========================================================
+   Grade / Branch helpers
+========================================================= */
 function getGrade() {
   return toStr(els.root?.dataset?.userGrade || window.currentUser?.grade);
 }
 
 /**
- * ✅ superuser branch 값을 "확실히" 잡기
- * - 1순위: branchSelect.value
- * - 2순위: root.dataset.defaultBranch
- * - 3순위: window.currentUser.branch
+ * Effective branch resolution (same behavior as before)
+ * - superuser: branchSelect > dataset.defaultBranch > currentUser.branch
+ * - others: currentUser.branch > dataset.defaultBranch
  */
 function getEffectiveBranch() {
   const grade = getGrade();
@@ -54,13 +48,11 @@ function getEffectiveBranch() {
   return toStr(window.currentUser?.branch || els.root?.dataset?.defaultBranch);
 }
 
-/* ==========================
-   ✅ Requester auto-fill
-   - rq_display + hidden rq_name/rq_id
-========================== */
+/* =========================================================
+   Requester auto-fill (rq_display + hidden fields)
+========================================================= */
 function fillRequesterInfo(row) {
   const u = window.currentUser || {};
-
   const rqName = toStr(u.name);
   const rqId = toStr(u.id);
 
@@ -73,62 +65,59 @@ function fillRequesterInfo(row) {
   if (rqDispEl) rqDispEl.value = fmtPerson(rqName, rqId);
 }
 
-/* ==========================
-   ✅ Row reset
-========================== */
+/* =========================================================
+   Row reset (new row / reset)
+========================================================= */
 function resetRowInputs(row) {
-  // input 초기화 (checkbox는 안전 처리)
+  // inputs reset
   row.querySelectorAll("input").forEach((el) => {
     if (el.type === "checkbox") {
       el.checked = false;
       return;
     }
     el.value = "";
-    el.readOnly = true; // 기본은 readonly로 잠금 (필요한 필드만 아래에서 해제)
+    el.readOnly = true; // base: readonly, then unlock needed fields below
   });
 
-  // select 초기화
+  // selects reset
   row.querySelectorAll("select").forEach((sel) => {
     sel.value = "";
   });
 
-  // 요청자 자동 입력 + 표시
+  // requester auto-fill
   fillRequesterInfo(row);
 
-  // memo는 입력 가능
+  // memo: editable
   const memo = row.querySelector('[name="memo"]');
   if (memo) memo.readOnly = false;
 
-  // 드롭다운 적용 전 대비(입력 허용)
+  // after tables: editable until dropdown swap happens
   const aftF = row.querySelector('input[name="after_ftable"]');
   const aftL = row.querySelector('input[name="after_ltable"]');
   if (aftF) aftF.readOnly = false;
   if (aftL) aftL.readOnly = false;
 
-  // 표시용 display는 항상 readonly 유지
+  // display fields remain readonly
   const rqDisp = row.querySelector(".rq_display");
   const tgDisp = row.querySelector(".tg_display");
   if (rqDisp) rqDisp.readOnly = true;
   if (tgDisp) tgDisp.readOnly = true;
 }
 
-/* ==========================
-   ✅ Active row (for modal)
-========================== */
+/* =========================================================
+   Active row (modal target selection applies to active row)
+========================================================= */
 function setActiveRow(row) {
   els.inputTable?.querySelectorAll(".input-row").forEach((r) => r.classList.remove("active"));
   row.classList.add("active");
 }
 
-/* ==========================
-   ✅ Target detail fetch
-========================== */
+/* =========================================================
+   Target detail fetch
+========================================================= */
 async function fetchTargetDetail(targetId) {
   const base = toStr(els.root?.dataset?.targetDetailUrl);
-  const url = base
-    ? new URL(base, window.location.origin)
-    : new URL("/partner/ajax/rate-user-detail/", window.location.origin);
-
+  const url = base ? new URL(base, window.location.origin) : new URL("/partner/ajax/rate-user-detail/", window.location.origin);
   url.searchParams.set("user_id", toStr(targetId));
 
   const res = await fetch(url.toString(), {
@@ -136,7 +125,7 @@ async function fetchTargetDetail(targetId) {
     credentials: "same-origin",
   });
 
-  let data = null;
+  let data;
   try {
     data = await res.json();
   } catch {
@@ -146,23 +135,21 @@ async function fetchTargetDetail(targetId) {
   return { ok: res.ok, data };
 }
 
-/* ==========================
-   ✅ (핵심) 현재 branch 기준 테이블 목록 로드 후
-   모든 입력행에 드롭다운 강제 적용
-========================== */
+/* =========================================================
+   Dropdown apply (branch → tables → apply to all rows)
+========================================================= */
 async function ensureDropdownsOnAllRows() {
   const branch = getEffectiveBranch();
-  if (!branch) return; // superuser가 아직 지점 선택 안 했으면 종료
+  if (!branch) return; // superuser may not have selected branch yet
 
   const tables = await fetchBranchTables(branch);
   const rows = els.inputTable?.querySelectorAll("tbody tr.input-row") || [];
   rows.forEach((row) => applyTableDropdownToRow(row, tables));
 }
 
-/* ==========================
-   ✅ Target fill + dropdown apply
-   - tg_display + hidden tg_name/tg_id
-========================== */
+/* =========================================================
+   Target fill (tg_display + hidden fields + before table/rate)
+========================================================= */
 export async function fillTargetInfo(row, targetId) {
   const id = toStr(targetId);
   if (!id) return;
@@ -175,56 +162,54 @@ export async function fillTargetInfo(row, targetId) {
 
     const info = data.data || {};
 
-    // 요청자(비어있으면) 채움 + rq_display도 갱신
+    // requester fill if missing
     const rqNameEl = row.querySelector('[name="rq_name"]');
     const rqIdEl = row.querySelector('[name="rq_id"]');
     if (rqNameEl && !toStr(rqNameEl.value)) rqNameEl.value = toStr(window.currentUser?.name);
     if (rqIdEl && !toStr(rqIdEl.value)) rqIdEl.value = toStr(window.currentUser?.id);
+
     const rqDispEl = row.querySelector(".rq_display");
     if (rqDispEl) rqDispEl.value = fmtPerson(toStr(rqNameEl?.value), toStr(rqIdEl?.value));
 
-    // 안전 setter
+    // safe set
     const set = (name, val) => {
       const el = row.querySelector(`[name="${name}"]`);
       if (el) el.value = val ?? "";
     };
 
-    // ✅ 대상자 hidden
+    // target hidden + display
     const tgName = toStr(info.target_name || info.name);
     const tgId = toStr(info.target_id || info.id);
     set("tg_name", tgName);
     set("tg_id", tgId);
 
-    // ✅ 대상자 display
     const tgDisp = row.querySelector(".tg_display");
     if (tgDisp) tgDisp.value = fmtPerson(tgName, tgId);
 
-    // 변경전 테이블/요율
+    // before table/rate
     set("before_ftable", info.non_life_table || "");
     set("before_frate", info.non_life_rate || "");
     set("before_ltable", info.life_table || "");
     set("before_lrate", info.life_rate || "");
 
-    // ✅ branch 체크 (superuser는 branch 먼저)
+    // branch guard (superuser must choose branch first)
     const branch = getEffectiveBranch();
     if (!branch) {
-      if (getGrade() === "superuser") {
-        alertBox("먼저 부서/지점을 선택한 뒤 대상자를 선택해주세요.");
-      }
+      if (getGrade() === "superuser") alertBox("먼저 부서/지점을 선택한 뒤 대상자를 선택해주세요.");
       return;
     }
 
-    // ✅ 현재 branch 기준 드롭다운 강제 적용
+    // apply dropdowns for current branch
     await ensureDropdownsOnAllRows();
   } catch (err) {
-    console.error("❌ [rate/input_rows] 대상자 정보 로드 실패:", err);
+    console.error("❌ [rate/input_rows] fillTargetInfo error:", err);
     alertBox("대상자 정보를 불러오는 중 오류가 발생했습니다.");
   }
 }
 
-/* ==========================
-   ✅ Reset input section
-========================== */
+/* =========================================================
+   Reset input section (keeps first row only)
+========================================================= */
 export function resetInputSection() {
   if (!els.inputTable) return;
 
@@ -243,9 +228,9 @@ export function resetInputSection() {
   }
 }
 
-/* ==========================
-   📘 Init bindings (once)
-========================== */
+/* =========================================================
+   Init bindings (once)
+========================================================= */
 let bound = false;
 
 export function initInputRowEvents() {
@@ -257,14 +242,16 @@ export function initInputRowEvents() {
   const tbody = els.inputTable.querySelector("tbody");
   if (!tbody) return;
 
-  // 최초 행 초기화
+  // first row init
   const firstRow = tbody.querySelector(".input-row");
   if (firstRow) {
     resetRowInputs(firstRow);
     setActiveRow(firstRow);
   }
 
-  // ✅ 행 추가
+  /* -------------------------
+     Add row
+     ------------------------- */
   els.btnAddRow?.addEventListener("click", async () => {
     const rows = tbody.querySelectorAll(".input-row");
     if (rows.length >= 10) return alertBox("대상자는 한 번에 10명까지 입력 가능합니다.");
@@ -274,23 +261,28 @@ export function initInputRowEvents() {
     tbody.appendChild(newRow);
     setActiveRow(newRow);
 
-    // 지점 선택되어 있으면 즉시 드롭다운 적용
     await ensureDropdownsOnAllRows();
   });
 
-  // ✅ 초기화
+  /* -------------------------
+     Reset
+     ------------------------- */
   els.btnResetRows?.addEventListener("click", async () => {
     if (!confirm("입력 내용을 모두 초기화하시겠습니까?")) return;
     resetInputSection();
     await ensureDropdownsOnAllRows();
   });
 
-  // ✅ 저장
+  /* -------------------------
+     Save
+     ------------------------- */
   els.btnSaveRows?.addEventListener("click", () => {
     saveRows();
   });
 
-  // ✅ 테이블 내부 이벤트 위임 (삭제 / active 처리)
+  /* -------------------------
+     Table delegation: remove row / set active
+     ------------------------- */
   els.inputTable.addEventListener("click", (e) => {
     const removeBtn = e.target.closest(".btnRemoveRow");
     if (removeBtn) {
@@ -304,8 +296,9 @@ export function initInputRowEvents() {
     if (tr) setActiveRow(tr);
   });
 
-  // ✅ 모달에서 사용자 선택 이벤트
-  // - 공용 모달은 document/window 둘 다 dispatch할 수 있어 document로 수신 유지
+  /* -------------------------
+     Modal event: userSelected
+     ------------------------- */
   document.addEventListener("userSelected", async (e) => {
     const targetId = e.detail?.id || e.detail?.user_id || e.detail?.pk;
     if (!targetId) return;
@@ -321,12 +314,14 @@ export function initInputRowEvents() {
     }
   });
 
-  // ✅ superuser 지점 변경 시: 캐시 초기화 + 입력 리셋 + 드롭다운 미리 적용
+  /* -------------------------
+     Superuser: branch change → clear cache + reset + dropdown apply
+     ------------------------- */
   if (els.branchSelect) {
     els.branchSelect.addEventListener("change", async () => {
       clearTableCache();
       resetInputSection();
-      await ensureDropdownsOnAllRows(); // ⭐ input으로 남는 케이스 방지
+      await ensureDropdownsOnAllRows();
     });
   }
 }

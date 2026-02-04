@@ -1,10 +1,10 @@
 <!-- django_ma/board/templates/board/includes/_edit_form.html -->
 
 <!--
-  Board Edit Form Include (create/edit 공용)
-  - post/task 작성/수정 폼 공용
-  - 실제 필드/첨부 UI는 _form_common.html
-  - 버튼 레이아웃 create/edit 동일
+  Board Edit Form Include (Create/Edit Shared)
+  - Used by: post_create/post_edit/task_create/task_edit
+  - Renders a full HTML <form> wrapper and action buttons
+  - Actual fields + attachment UI are delegated to: board/includes/_form_common.html
 
   Required context:
   - mode: "create" | "edit"
@@ -12,27 +12,35 @@
   - list_url
   - cancel_url
 
-  Optional:
-  - attachments (edit일 때만 의미 있음)
-  - form_id (default: "boardForm")
+  Optional context:
+  - action_url: explicit form action (recommended for create)
+  - attachments: edit-only existing attachments list
+  - attachment_download_name: download url name for existing attachments
+  - form_id: DOM id for submit lock / file utils (default: "boardForm")
 -->
 
 {% with fid=form_id|default:"boardForm" %}
-  <form method="post"
-        enctype="multipart/form-data"
-        id="{{ fid }}"
-        class="board-edit-form"
-        novalidate>
+  <form
+    id="{{ fid }}"
+    method="post"
+    action="{{ action_url|default:request.path }}"
+    enctype="multipart/form-data"
+  >
+    <!-- CSRF Token -->
     {% csrf_token %}
 
-    <!-- 공용 필드/첨부 UI -->
+    <!-- Shared Fields + Attachment UI -->
     {% include "board/includes/_form_common.html" with form=form mode=mode attachments=attachments attachment_download_name=attachment_download_name only %}
 
-    <!-- 액션 버튼 -->
+    <!-- Action Buttons -->
     <div class="d-flex flex-column flex-md-row justify-content-between mt-4 gap-2 board-edit-actions">
+      <!-- List -->
       <a href="{{ list_url }}" class="btn btn-outline-secondary w-100 w-md-auto">목록으로</a>
+
+      <!-- Cancel (back to detail on edit, back to list on create) -->
       <a href="{{ cancel_url }}" class="btn btn-outline-secondary w-100 w-md-auto">취소</a>
 
+      <!-- Submit -->
       <button type="submit" id="submitBtn" class="btn btn-primary w-100 w-md-auto">
         {% if mode == "edit" %}수정 완료{% else %}등록하기{% endif %}
       </button>

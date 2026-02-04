@@ -8,6 +8,7 @@
 <div class="container mt-5">
   <div class="mx-auto board-narrow">
 
+    <!-- Permission Guard (UI Notice) -->
     {% if user.grade != 'superuser' and user.grade != 'head' and user.grade != 'leader' %}
       <div class="alert alert-danger">접근 권한이 없습니다.</div>
     {% endif %}
@@ -17,16 +18,17 @@
 
     <div class="card shadow p-4 border-0 rounded-4">
 
-      <!-- Form Errors -->
+      <!-- Form Non-field Errors -->
       {% if form.non_field_errors %}
         <div class="alert alert-danger text-center">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <!-- URLs -->
+      <!-- URLs (Create Form Needs Explicit action_url) -->
       {% url "board:post_list" as list_url %}
+      {% url "board:post_create" as action_url %}
 
-      <!-- Main Form (shared partial) -->
-      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url form_id="postForm" %}
+      <!-- Main Form (Shared Partial) -->
+      {% include "board/includes/_edit_form.html" with mode="create" form=form attachments=None list_url=list_url cancel_url=list_url action_url=action_url form_id="postForm" %}
     </div>
 
     <!-- Back to Home -->

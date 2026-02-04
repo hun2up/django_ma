@@ -1,4 +1,10 @@
 // django_ma/static/js/partner/manage_rate/fetch.js
+// =========================================================
+// ✅ Fetch + Render (Refactor Final)
+// - DataTables 렌더
+// - 처리일자 인라인 저장
+// - ✅ 삭제 버튼: superuser/head만 렌더링 (leader는 버튼 DOM 생성 X)
+// =========================================================
 
 import { els } from "./dom_refs.js";
 import { showLoading, hideLoading, alertBox } from "./utils.js";
@@ -9,7 +15,7 @@ let delegationBound = false;
 let resizeBound = false;
 
 /* =========================================================
-   Dataset/URL helpers (키 변화/오타 대응)
+   Dataset/URL helpers
 ========================================================= */
 function toDashed(camel) {
   return String(camel || "").replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
@@ -24,7 +30,6 @@ function pickDatasetUrl(root, keys = []) {
     if (v && String(v).trim()) return String(v).trim();
   }
 
-  // data-xxx attribute fallback
   for (const k of keys) {
     const attr = `data-${toDashed(k)}`;
     const v = root.getAttribute?.(attr);
@@ -42,11 +47,19 @@ function getUpdateProcessDateUrl() {
   return pickDatasetUrl(els.root, ["updateProcessDateUrl", "dataUpdateProcessDateUrl", "updateProcessDateURL"]);
 }
 
+/* =========================================================
+   Grade / Permission
+========================================================= */
 function getUserGrade() {
   return String(els.root?.dataset?.userGrade || window.currentUser?.grade || "").trim();
 }
 
 function canEditProcessDate() {
+  const g = getUserGrade();
+  return g === "superuser" || g === "head";
+}
+
+function canRenderDeleteButton() {
   const g = getUserGrade();
   return g === "superuser" || g === "head";
 }
@@ -74,13 +87,14 @@ function escapeHtml(v) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 function escapeAttr(v) {
   return escapeHtml(v);
 }
 
 function squeezeSpaces(s) {
   return String(s || "")
-    .replaceAll(">", " ") // 혹시 들어오면 제거
+    .replaceAll(">", " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -89,10 +103,8 @@ function squeezeSpaces(s) {
    UI helpers
 ========================================================= */
 function revealSections() {
-  const inputSec = document.getElementById("inputSection");
-  const mainSec = document.getElementById("mainSheet");
-  if (inputSec) inputSec.hidden = false;
-  if (mainSec) mainSec.hidden = false;
+  if (els.inputSection) els.inputSection.hidden = false;
+  if (els.mainSheet) els.mainSheet.hidden = false;
 
   requestAnimationFrame(() => requestAnimationFrame(() => adjustDT()));
 }
@@ -150,10 +162,17 @@ function renderAfterCell(val) {
   return `<span class="cell-after">${escapeHtml(v)}</span>`;
 }
 
+/**
+ * ✅ 삭제 버튼 렌더링 규칙 (최종)
+ * - superuser/head: 표시
+ * - leader: 미표시(버튼 DOM 생성 X)
+ */
 function buildActionButtons(row) {
-  // ✅ 삭제는 delete.js(attachDeleteHandlers)가 담당, 여기서는 버튼만 렌더
-  const id = String(row.id || "").trim();
+  if (!canRenderDeleteButton()) return "";
+
+  const id = String(row?.id || "").trim();
   if (!id) return "";
+
   return `
     <button type="button"
             class="btn btn-sm btn-outline-danger btnDeleteRow"
@@ -164,32 +183,28 @@ function buildActionButtons(row) {
 }
 
 function renderProcessDateCell(_value, _type, row) {
-  const grade = getUserGrade();
-  const val = (row.process_date || "").trim();
+  const val = String(row?.process_date || "").trim();
 
-  // leader는 보기만
-  if (grade === "leader") {
-    return `<span>${escapeHtml(val || "")}</span>`;
+  // leader는 입력 UI가 의미가 없고 권한도 없으므로 텍스트로만 표시
+  if (!canEditProcessDate()) {
+    return `<span>${escapeHtml(val)}</span>`;
   }
 
-  const disabledAttr = canEditProcessDate() ? "" : "disabled";
   return `
     <input type="date"
            class="form-control form-control-sm processDateInput"
-           data-id="${escapeAttr(row.id || "")}"
-           value="${escapeAttr(val)}"
-           ${disabledAttr} />
+           data-id="${escapeAttr(row?.id || "")}"
+           value="${escapeAttr(val)}" />
   `;
 }
 
 /* =========================================================
    DataTables columns
-   ✅ "대상자" 다음에 "소속" 컬럼 추가
 ========================================================= */
 const MAIN_COLUMNS = [
-  { data: "rq_display", defaultContent: "", width: "140px" }, // 요청자
-  { data: "tg_display", defaultContent: "", width: "140px" }, // 대상자
-  { data: "tg_affiliation", defaultContent: "-", width: "220px" }, // 소속
+  { data: "rq_display", defaultContent: "", width: "140px" },
+  { data: "tg_display", defaultContent: "", width: "140px" },
+  { data: "tg_affiliation", defaultContent: "-", width: "220px" },
 
   { data: "before_ftable", defaultContent: "", width: "70px" },
   { data: "before_frate", defaultContent: "", width: "70px" },
@@ -204,7 +219,6 @@ const MAIN_COLUMNS = [
   { data: "after_lrate", defaultContent: "", width: "70px" },
 
   { data: "memo", defaultContent: "", width: "150px" },
-
   { data: "request_date", defaultContent: "", width: "120px" },
 
   {
@@ -248,10 +262,6 @@ function destroyIfExists() {
   mainDT = null;
 }
 
-/**
- * ✅ thead <th> 개수와 columns 개수가 다르면 DataTables가 헤더를 망가뜨릴 수 있음.
- * 컬럼 구조 변경/캐시/부분갱신 등에도 안전하게 “강제 재생성” 하도록 체크.
- */
 function needRebuildDT() {
   if (!els.mainTable) return false;
   const thCount = els.mainTable.querySelectorAll("thead th").length;
@@ -261,11 +271,9 @@ function needRebuildDT() {
 function ensureMainDT() {
   if (!canUseDataTables()) return null;
 
-  // ✅ 컬럼 mismatch면 무조건 재생성
   if (needRebuildDT()) {
     destroyIfExists();
   }
-
   if (mainDT) return mainDT;
 
   destroyIfExists();
@@ -297,7 +305,7 @@ function ensureMainDT() {
 }
 
 /* =========================================================
-   Fallback render (thead와 동일한 컬럼 순서로)
+   Fallback render
 ========================================================= */
 function renderMainSheetFallback(rows) {
   if (!els.mainTable) return;
@@ -313,11 +321,11 @@ function renderMainSheetFallback(rows) {
     return;
   }
 
-  const grade = getUserGrade();
+  const canProcEdit = canEditProcessDate();
 
   rows.forEach((r) => {
     const tr = document.createElement("tr");
-    const proc = (r.process_date || "").trim();
+    const proc = String(r.process_date || "").trim();
 
     tr.innerHTML = `
       <td>${escapeHtml(r.rq_display || "")}</td>
@@ -337,18 +345,16 @@ function renderMainSheetFallback(rows) {
       <td class="text-center">${escapeHtml(r.after_lrate || "")}</td>
 
       <td>${escapeHtml(r.memo || "")}</td>
-
       <td class="text-center">${escapeHtml(r.request_date || "")}</td>
 
       <td class="text-center">
         ${
-          grade === "leader"
-            ? `<span>${escapeHtml(proc)}</span>`
-            : `<input type="date"
+          canProcEdit
+            ? `<input type="date"
                       class="form-control form-control-sm processDateInput"
                       data-id="${escapeAttr(r.id || "")}"
-                      value="${escapeAttr(proc)}"
-                      ${canEditProcessDate() ? "" : "disabled"} />`
+                      value="${escapeAttr(proc)}" />`
+            : `<span>${escapeHtml(proc)}</span>`
         }
       </td>
 
@@ -403,11 +409,7 @@ function bindResizeOnce() {
   if (resizeBound) return;
   resizeBound = true;
 
-  window.addEventListener(
-    "resize",
-    () => requestAnimationFrame(() => adjustDT()),
-    { passive: true }
-  );
+  window.addEventListener("resize", () => requestAnimationFrame(() => adjustDT()), { passive: true });
 }
 
 /* =========================================================
@@ -423,10 +425,7 @@ function formatNameId(name, id) {
 }
 
 function joinTeams(a, b, c) {
-  const arr = [a, b, c]
-    .map((x) => String(x ?? "").trim())
-    .filter((x) => x && x !== "-");
-  // ✅ 요청사항: "팀A 팀B 팀C" (구분자 공백)
+  const arr = [a, b, c].map((x) => String(x ?? "").trim()).filter((x) => x && x !== "-");
   return arr.length ? arr.join(" ") : "-";
 }
 
@@ -437,7 +436,6 @@ function normalizeRateRow(row = {}) {
   const target_name = row.target_name || row.tg_name || "";
   const target_id = row.target_id || row.tg_id || "";
 
-  // ✅ 서버 호환 키: tg_affiliation / target_affiliation / (팀A/B/C)
   const rawAff =
     String(row.tg_affiliation || row.target_affiliation || "").trim() ||
     joinTeams(row.tg_team_a, row.tg_team_b, row.tg_team_c);
@@ -446,10 +444,8 @@ function normalizeRateRow(row = {}) {
 
   return {
     id: row.id || "",
-
     rq_display: formatNameId(requester_name, requester_id),
     tg_display: formatNameId(target_name, target_id),
-
     tg_affiliation: tgAff,
 
     before_ftable: row.before_ftable || "",
@@ -477,7 +473,6 @@ function normalizeRateRow(row = {}) {
 export async function fetchData(payload = {}) {
   if (!els.root) return;
 
-  // ✅ 삭제 후 재조회 등에 사용 (delete.js에서 활용)
   window.__lastRateFetchPayload = payload;
 
   bindDelegationOnce();

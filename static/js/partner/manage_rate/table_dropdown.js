@@ -1,45 +1,49 @@
 // django_ma/static/js/partner/manage_rate/table_dropdown.js
 // ======================================================
-// 📘 요율변경 페이지 - 테이블 드롭다운
-//  - dataset(data-table-fetch-url) 기반 조회
-//  - 캐시(Map) 관리
-//  - after_ftable/after_ltable input→select 교체
-//  - 옵션은 테이블명만 표시
-//  - 선택 시 after_frate/after_lrate 자동 동기화
+// 📘 Manage Rate - Table Dropdown
+// - Fetches TableSetting rows per branch (cached)
+// - Replaces after_ftable/after_ltable inputs with selects
+// - Syncs after_frate/after_lrate automatically
 // ======================================================
 
 import { els } from "./dom_refs.js";
 
-const tableCache = new Map();
+const cache = new Map();
 
+/* ======================================================
+   Cache controls
+====================================================== */
 export function clearTableCache(branch = "") {
   const b = String(branch || "").trim();
-  if (b) tableCache.delete(b);
-  else tableCache.clear();
+  if (b) cache.delete(b);
+  else cache.clear();
 }
 
+/* ======================================================
+   Safe JSON
+====================================================== */
 async function safeJson(res) {
   try {
     return await res.json();
   } catch {
-    return null; // 404 HTML 등
+    return null; // HTML/404 etc.
   }
 }
 
-/**
- * ✅ branch의 TableSetting 목록을 서버에서 가져옴
- * return: [{ table, rate }, ...]
- */
+/* ======================================================
+   Fetch branch tables (cached)
+   returns: [{ table, rate }, ...]
+====================================================== */
 export async function fetchBranchTables(branch) {
   const b = String(branch || "").trim();
   if (!b) return [];
 
-  if (tableCache.has(b)) return tableCache.get(b);
+  if (cache.has(b)) return cache.get(b);
 
   const base = String(els.root?.dataset?.tableFetchUrl || "").trim(); // data-table-fetch-url
   if (!base) {
-    console.warn("[rate] data-table-fetch-url 누락");
-    tableCache.set(b, []);
+    console.warn("[rate/table_dropdown] data-table-fetch-url missing");
+    cache.set(b, []);
     return [];
   }
 
@@ -48,13 +52,13 @@ export async function fetchBranchTables(branch) {
 
   const res = await fetch(url.toString(), {
     headers: { "X-Requested-With": "XMLHttpRequest" },
+    credentials: "same-origin",
   });
 
   const data = await safeJson(res);
-
   if (!res.ok || !data || data.status !== "success") {
-    console.warn("[rate] 테이블 목록 조회 실패:", res.status, data);
-    tableCache.set(b, []);
+    console.warn("[rate/table_dropdown] fetch failed:", res.status, data);
+    cache.set(b, []);
     return [];
   }
 
@@ -66,27 +70,25 @@ export async function fetchBranchTables(branch) {
     }))
     .filter((x) => x.table);
 
-  tableCache.set(b, tables);
+  cache.set(b, tables);
   return tables;
 }
 
-/**
- * ✅ after_ftable/after_ltable을 select로 교체하고
- * 옵션에는 "테이블명만" 표시
- * 선택시 after_frate/after_lrate 자동 입력
- */
+/* ======================================================
+   Apply dropdown to a row
+====================================================== */
 export function applyTableDropdownToRow(rowEl, tables = []) {
   if (!rowEl) return;
 
   /* ---------------------------
-     select 생성/교체
+     Ensure selects exist (replace inputs if needed)
   --------------------------- */
-  const makeSelect = (name) => {
+  const ensureSelect = (name) => {
     const existing = rowEl.querySelector(`select[name="${name}"]`);
     if (existing) return existing;
 
     const input = rowEl.querySelector(`input[name="${name}"]`);
-    const keep = input?.value || "";
+    const keepValue = input?.value || "";
 
     const sel = document.createElement("select");
     sel.name = name;
@@ -95,25 +97,27 @@ export function applyTableDropdownToRow(rowEl, tables = []) {
     if (input && input.parentNode) input.parentNode.replaceChild(sel, input);
     else rowEl.appendChild(sel);
 
-    if (keep) sel.value = keep;
+    if (keepValue) sel.value = keepValue;
     return sel;
   };
 
-  const afterFSelect = makeSelect("after_ftable");
-  const afterLSelect = makeSelect("after_ltable");
+  const afterFSelect = ensureSelect("after_ftable");
+  const afterLSelect = ensureSelect("after_ltable");
 
   /* ---------------------------
-     옵션 채우기
+     Fill options (table name only)
   --------------------------- */
   const fillOptions = (sel) => {
     const current = sel.value || "";
     sel.innerHTML = `<option value="">선택</option>`;
+
     for (const t of tables) {
       const opt = document.createElement("option");
       opt.value = t.table;
-      opt.textContent = t.table; // ✅ 테이블명만
+      opt.textContent = t.table;
       sel.appendChild(opt);
     }
+
     if (current) sel.value = current;
   };
 
@@ -121,7 +125,7 @@ export function applyTableDropdownToRow(rowEl, tables = []) {
   fillOptions(afterLSelect);
 
   /* ---------------------------
-     rate 동기화
+     Sync rates
   --------------------------- */
   const rateMap = new Map(tables.map((t) => [t.table, t.rate]));
   const afterFRateInput = rowEl.querySelector(`[name="after_frate"]`);
@@ -132,7 +136,7 @@ export function applyTableDropdownToRow(rowEl, tables = []) {
     if (afterLRateInput) afterLRateInput.value = rateMap.get(afterLSelect.value) || "";
   };
 
-  // onchange 덮어쓰기(중복 방지)
+  // overwrite onchange (prevents multiple bindings)
   afterFSelect.onchange = syncRates;
   afterLSelect.onchange = syncRates;
 

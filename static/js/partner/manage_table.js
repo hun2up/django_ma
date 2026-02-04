@@ -1,40 +1,46 @@
 /**
  * django_ma/static/js/partner/manage_table.js
- * ✅ Table Management (Final Refactor - Safer)
+ * ============================================================
+ * ✅ Table Management (Final Refactor)
  * ------------------------------------------------------------
- * - mainTable: DataTables 사용 금지(정책 유지) (전역 destroy 제거)
- * - rateUserTable: DataTables 있으면 사용, 없으면 fallback
- * - 엑셀: 다운로드 / 업로드 / 업로드 양식 다운로드(정적)
- * - superuser: 검색 버튼 조회 / main_admin: 자동조회
- * - ✅ $ is not defined 완전 차단: DT 접근은 hasDT() 내부에서만
- * ------------------------------------------------------------
+ * - mainTable: DataTables 사용 금지(정책 유지)
+ * - rateUserTable: DataTables 있으면 사용, 없으면 plain fallback
+ * - 컬럼폭 고정 + 말줄임 + hover title:
+ *   · CSS(table-layout:fixed + ellipsis)
+ *   · JS(셀 title 자동 주입) + DataTables draw마다 재적용
+ * - superuser: 검색 버튼으로 조회
+ * - main_admin: 자동조회
+ * - 안전장치: root 1회 초기화, $ is not defined 차단
+ * ============================================================
  */
 
 document.addEventListener("DOMContentLoaded", () => {
   const root = document.getElementById("manage-table");
   if (!root) return;
-
   if (root.dataset.inited === "1") return;
   root.dataset.inited = "1";
 
+  /* ==========================================================
+   * 0) DOM Refs / State
+   * ========================================================== */
   const els = {
     part: document.getElementById("partSelect"),
     branch: document.getElementById("branchSelect"),
     btnSearch: document.getElementById("btnSearch"),
 
+    btnToggleEdit: document.getElementById("btnToggleEdit"),
     btnAdd: document.getElementById("btnAddRow"),
     btnSave: document.getElementById("btnSave"),
     btnReset: document.getElementById("btnReset"),
-    btnToggleEdit: document.getElementById("btnToggleEdit"),
 
     btnDownloadExcel: document.getElementById("btnDownloadExcel"),
     btnUploadExcel: document.getElementById("btnUploadExcel"),
     btnDownloadTemplate: document.getElementById("btnDownloadTemplate"),
-
     inputExcel: document.getElementById("rateExcelInput"),
 
     tableBody: document.getElementById("tableBody"),
     overlay: document.getElementById("loadingOverlay"),
+    overlayText: document.querySelector("#loadingOverlay .loading-text"),
 
     rateUserTable: document.getElementById("rateUserTable"),
   };
@@ -45,20 +51,30 @@ document.addEventListener("DOMContentLoaded", () => {
   let editMode = false;
   let dtInstance = null;
 
-  /* ---------------- helpers ---------------- */
+  /* ==========================================================
+   * 1) Helpers (UI / Env / Security)
+   * ========================================================== */
+  function isSuper() {
+    return userGrade === "superuser";
+  }
+  function isMain() {
+    return userGrade === "main_admin";
+  }
+
+  function alertBox(msg) {
+    window.alert(msg);
+  }
+
   function showLoading(msg = "처리 중...") {
     if (!els.overlay) return;
-    const label = els.overlay.querySelector(".mt-2");
-    if (label) label.textContent = msg;
+    if (els.overlayText) els.overlayText.textContent = msg;
     els.overlay.hidden = false;
   }
   function hideLoading() {
     if (!els.overlay) return;
     els.overlay.hidden = true;
   }
-  function alertBox(msg) {
-    window.alert(msg);
-  }
+
   function enc(v) {
     return encodeURIComponent(v ?? "");
   }
@@ -72,24 +88,10 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  function isSuper() {
-    return userGrade === "superuser";
-  }
-  function isMain() {
-    return userGrade === "main_admin";
-  }
-
-  function resolveBranchFromUI() {
-    if (isSuper()) return String(els.branch?.value || "").trim();
-    if (isMain()) return userBranch;
-    return "";
-  }
-
   function urls() {
     const tableFetch = String(root.dataset.fetchUrl || "").trim();
     const tableSave = String(root.dataset.saveUrl || "").trim();
-
-    const rateTemplateStatic =
+    const rateTemplate =
       String(root.dataset.rateTemplateUrl || "").trim() ||
       "/static/excel/%EC%96%91%EC%8B%9D_%ED%85%8C%EC%9D%B4%EB%B8%94%EA%B4%80%EB%A6%AC.xlsx";
 
@@ -99,10 +101,11 @@ document.addEventListener("DOMContentLoaded", () => {
       rateList: "/partner/ajax/rate-userlist/",
       rateExcel: "/partner/ajax/rate-userlist-excel/",
       rateUpload: "/partner/ajax/rate-userlist-upload/",
-      rateTemplate: rateTemplateStatic,
+      rateTemplate,
     };
   }
 
+  /* ---------------- jQuery / DataTables Safe Access ---------------- */
   function hasJQ() {
     return typeof window.jQuery === "function" && typeof window.$ === "function";
   }
@@ -110,33 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return hasJQ() && !!(window.$.fn && window.$.fn.DataTable);
   }
 
-  /* ---------------------------------------------------------
-   * ✅ mainTable DataTables 차단(전역 destroy 제거 버전)
-   * --------------------------------------------------------- */
-  function blockDTOnlyForMainTable() {
-    if (!hasDT()) return;
-
-    const $ = window.$;
-    $.fn.dataTable.ext.errMode = "none";
-
-    // 이미 패치된 경우 중복 패치 방지
-    if ($.fn.DataTable.__mainTableBlocked) return;
-
-    const original = $.fn.DataTable;
-    function patchedDataTable(...args) {
-      // jQuery object의 첫 번째 DOM의 id 체크
-      const id = this?.attr?.("id");
-      if (id === "mainTable") {
-        console.warn("[manage_table] DataTables blocked for #mainTable");
-        return this;
-      }
-      return original.apply(this, args);
-    }
-    patchedDataTable.__mainTableBlocked = true;
-
-    $.fn.DataTable = patchedDataTable;
-  }
-
+  /* ---------------- HTML Escape ---------------- */
   function escapeHtml(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -146,6 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#039;");
   }
 
+  /* ---------------- JSON Safe Parse ---------------- */
   async function safeJson(res) {
     const text = await res.text();
     try {
@@ -155,13 +133,69 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /* ---------------- main boot ---------------- */
+  /* ==========================================================
+   * 2) UX: Ellipsis + Hover Title
+   * - DataTables는 DOM을 계속 갈아끼우므로 draw마다 재적용 필요
+   * ========================================================== */
+  function applyCellTitles(tableEl) {
+    if (!tableEl) return;
+
+    const cells = tableEl.querySelectorAll("tbody td");
+    cells.forEach((td) => {
+      // 편집요소가 있으면 title 적용은 스킵(의도치 않은 UX 방지)
+      if (td.querySelector("input, select, textarea, button, a")) return;
+
+      const text = (td.textContent || "").trim();
+      if (!text) {
+        td.removeAttribute("title");
+        return;
+      }
+      if (td.getAttribute("title") !== text) td.setAttribute("title", text);
+    });
+  }
+
+  /* ==========================================================
+   * 3) Policy: mainTable DataTables 차단
+   * ========================================================== */
+  function blockDTOnlyForMainTable() {
+    if (!hasDT()) return;
+
+    const $ = window.$;
+    $.fn.dataTable.ext.errMode = "none";
+
+    if ($.fn.DataTable.__mainTableBlocked) return;
+
+    const original = $.fn.DataTable;
+    function patchedDataTable(...args) {
+      const id = this?.attr?.("id");
+      if (id === "mainTable") {
+        console.warn("[manage_table] DataTables blocked for #mainTable");
+        return this;
+      }
+      return original.apply(this, args);
+    }
+    patchedDataTable.__mainTableBlocked = true;
+    $.fn.DataTable = patchedDataTable;
+  }
+
+  /* ==========================================================
+   * 4) Branch Resolve (Superuser UI vs main_admin fixed)
+   * ========================================================== */
+  function resolveBranchFromUI() {
+    if (isSuper()) return String(els.branch?.value || "").trim();
+    if (isMain()) return userBranch;
+    return "";
+  }
+
+  /* ==========================================================
+   * 5) Main Boot
+   * ========================================================== */
   blockDTOnlyForMainTable();
   bindGlobalClickDelegation();
   bindTopButtons();
   bindRateCellGuards();
 
-  // main_admin 자동조회
+  // main_admin: 자동조회
   if (isMain() && userBranch) {
     setTimeout(() => {
       const b = resolveBranchFromUI();
@@ -171,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 250);
   }
 
-  // superuser 검색조회
+  // superuser: 검색 버튼으로 조회
   if (isSuper() && els.btnSearch) {
     els.btnSearch.addEventListener("click", () => {
       const b = resolveBranchFromUI();
@@ -181,8 +215,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* ---------------- top buttons ---------------- */
+  /* ==========================================================
+   * 6) Top Buttons (Edit/Add/Save/Reset + Excel)
+   * ========================================================== */
   function bindTopButtons() {
+    // 6-1) 수정 모드 토글
     els.btnToggleEdit?.addEventListener("click", () => {
       editMode = !editMode;
       els.btnToggleEdit.textContent = editMode ? "읽기 모드 전환" : "수정 모드 전환";
@@ -199,6 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // 6-2) 행 추가
     els.btnAdd?.addEventListener("click", () => {
       const b = resolveBranchFromUI();
       if (!b) return alertBox("지점을 먼저 선택해주세요.");
@@ -224,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateOrderNumbers();
     });
 
+    // 6-3) 저장
     els.btnSave?.addEventListener("click", async () => {
       const b = resolveBranchFromUI();
       if (!b) return alertBox("지점 정보가 없습니다.");
@@ -260,6 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    // 6-4) 초기화(재조회)
     els.btnReset?.addEventListener("click", async () => {
       const b = resolveBranchFromUI();
       if (!b) return alertBox("지점을 먼저 선택해주세요.");
@@ -267,6 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await fetchTables(b);
     });
 
+    // 6-5) 엑셀 다운로드
     els.btnDownloadExcel?.addEventListener("click", () => {
       const b = resolveBranchFromUI();
       if (!b) return alertBox("지점을 먼저 선택해주세요.");
@@ -274,12 +315,14 @@ document.addEventListener("DOMContentLoaded", () => {
       window.location.href = `${u.rateExcel}?branch=${enc(b)}`;
     });
 
+    // 6-6) 양식 다운로드(정적)
     els.btnDownloadTemplate?.addEventListener("click", () => {
       const u = urls();
       if (!u.rateTemplate) return alertBox("양식 파일 경로가 설정되지 않았습니다.");
       window.location.href = u.rateTemplate;
     });
 
+    // 6-7) 엑셀 업로드
     if (els.btnUploadExcel && els.inputExcel) {
       els.btnUploadExcel.addEventListener("click", () => els.inputExcel.click());
 
@@ -325,7 +368,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /* ---------------- main table render/collect ---------------- */
+  /* ==========================================================
+   * 7) mainTable: collect / render / ordering
+   * ========================================================== */
   function collectMainRows() {
     const rows = Array.from(els.tableBody?.querySelectorAll("tr.data-row") || []);
     return rows.map((tr) => {
@@ -341,8 +386,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderMainTable(rows = [], branch) {
     if (!els.tableBody) return;
-    els.tableBody.innerHTML = "";
 
+    els.tableBody.innerHTML = "";
     const safeRows = rows && rows.length ? rows : [{ order: 1, branch, table: "", rate: "" }];
 
     safeRows.forEach((r, idx) => {
@@ -379,7 +424,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* ---------------- delegation: ▲/▼/삭제 ---------------- */
+  /* ==========================================================
+   * 8) Delegation: ▲/▼/삭제 (mainTable)
+   * ========================================================== */
   function bindGlobalClickDelegation() {
     document.addEventListener("click", (e) => {
       if (!editMode) return;
@@ -412,7 +459,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* ---------------- rate-cell guards ---------------- */
+  /* ==========================================================
+   * 9) rate-cell 입력 가드 (0~100 + % 유지)
+   * ========================================================== */
   function bindRateCellGuards() {
     if (!els.tableBody) return;
 
@@ -421,7 +470,8 @@ document.addEventListener("DOMContentLoaded", () => {
       (e) => {
         const cell = e.target.closest(".rate-cell");
         if (!cell || !editMode) return;
-        let val = cell.textContent.trim();
+
+        const val = cell.textContent.trim();
         if (!val) {
           cell.textContent = "%";
           placeCaretAtStart(cell);
@@ -454,9 +504,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const cell = e.target.closest(".rate-cell");
         if (!cell || !editMode) return;
 
-        let val = cell.textContent.trim();
-        if (val === "%") cell.textContent = "";
-        else if (!val.endsWith("%")) {
+        const val = cell.textContent.trim();
+        if (val === "%") {
+          cell.textContent = "";
+          return;
+        }
+
+        if (!val.endsWith("%")) {
           let n = parseInt(val.replace(/[^0-9]/g, ""), 10);
           if (isNaN(n) || n < 0) n = 0;
           if (n > 100) n = 100;
@@ -490,7 +544,9 @@ document.addEventListener("DOMContentLoaded", () => {
     sel.addRange(range);
   }
 
-  /* ---------------- fetch TableSetting ---------------- */
+  /* ==========================================================
+   * 10) Fetch TableSetting (mainTable)
+   * ========================================================== */
   async function fetchTables(branch) {
     if (!branch) return;
 
@@ -514,7 +570,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /* ---------------- RateUserList ---------------- */
+  /* ==========================================================
+   * 11) RateUserList (rateUserTable)
+   *  - DataTables 있으면 DT 렌더링 + draw마다 title 적용
+   *  - 없으면 plain 렌더링 + title 적용
+   * ========================================================== */
   async function loadRateUserTable(branch) {
     if (!branch || !els.rateUserTable) return;
 
@@ -533,6 +593,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const rows = Array.isArray(payload?.data) ? payload.data : [];
 
+    // 11-1) DataTables 렌더
     if (hasDT()) {
       const $ = window.$;
 
@@ -545,6 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       dtInstance = $("#rateUserTable").DataTable({
         destroy: true,
+        autoWidth: false, // ✅ colgroup 폭 유지 핵심
         searching: true,
         paging: true,
         pageLength: 10,
@@ -560,6 +622,10 @@ document.addEventListener("DOMContentLoaded", () => {
         },
       });
 
+      // draw마다 title 재적용 (검색/페이징/정렬 모두 포함)
+      dtInstance.off("draw.manage_table_titles");
+      dtInstance.on("draw.manage_table_titles", () => applyCellTitles(els.rateUserTable));
+
       dtInstance.clear();
       rows.forEach((u) => {
         dtInstance.row.add([
@@ -573,10 +639,15 @@ document.addEventListener("DOMContentLoaded", () => {
           u.life_table || "",
         ]);
       });
+
       dtInstance.draw();
+
+      // 초기 1회 보장
+      applyCellTitles(els.rateUserTable);
       return;
     }
 
+    // 11-2) Plain 렌더
     renderRateUserPlain(rows);
   }
 
@@ -599,5 +670,8 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
       tbody.appendChild(tr);
     });
+
+    // plain에서도 hover title 적용
+    applyCellTitles(els.rateUserTable);
   }
 });

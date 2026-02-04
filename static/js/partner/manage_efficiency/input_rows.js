@@ -62,8 +62,12 @@ function getUser() {
 }
 function fillRequesterInfo(row) {
   const user = getUser();
+  const name = user.name || "";
+  const id = user.id || "";
+
   setVal(row, "rq_name", user.name || "");
   setVal(row, "rq_id", user.id || "");
+  setVal(row, "rq_display", (name && id) ? `${name}(${id})` : (name || id || ""));
   setVal(row, "rq_branch", user.branch || "");
 }
 
@@ -253,14 +257,19 @@ function injectToRow(row, target, id, name) {
   if (!row) return false;
   if (!id && !name) return false;
 
+  const display = (name && id) ? `${name}(${id})` : (name || id || "");
+
   if (target === "ded") {
     setVal(row, "ded_name", name);
     setVal(row, "ded_id", id);
+    setVal(row, "ded_display", display); 
     return true;
   }
   if (target === "pay") {
+    
     setVal(row, "pay_name", name);
     setVal(row, "pay_id", id);
+    setVal(row, "pay_display", display);
     return true;
   }
   return false;

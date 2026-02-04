@@ -7,6 +7,9 @@ from django.contrib.auth.views import LoginView
 from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse, JsonResponse, FileResponse, Http404
 from django.urls import reverse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.cache import never_cache
 
 from .constants import (
     CACHE_ERROR_PREFIX,
@@ -17,6 +20,36 @@ from .constants import (
 )
 from .forms import ActiveOnlyAuthenticationForm
 from .search_api import search_users_for_api
+
+import logging
+from django.http import HttpResponseForbidden
+
+logger = logging.getLogger("django.security.csrf")
+
+def csrf_failure(request, reason=""):
+    logger.warning(
+        "CSRF FAILED | reason=%s | path=%s | method=%s | host=%s | secure=%s | "
+        "xf_proto=%s | xf_host=%s | referer=%s | origin=%s | cookie=%s | ua=%s",
+        reason,
+        request.path,
+        request.method,
+        request.get_host(),
+        request.is_secure(),
+        request.META.get("HTTP_X_FORWARDED_PROTO"),
+        request.META.get("HTTP_X_FORWARDED_HOST"),
+        request.META.get("HTTP_REFERER"),
+        request.META.get("HTTP_ORIGIN"),
+        request.META.get("HTTP_COOKIE"),
+        request.META.get("HTTP_USER_AGENT"),
+    )
+    return HttpResponseForbidden(f"CSRF Failed: {reason}")
+
+def _set_no_store_headers(response: HttpResponse) -> HttpResponse:
+    # 로그인 페이지/CSRF 관련 페이지는 캐시되면 안 됨
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 # =============================================================================
@@ -69,9 +102,20 @@ def upload_result_view(request: HttpRequest, task_id: str) -> FileResponse:
 # =============================================================================
 # Auth (로그인 후 브라우저 종료 시 세션 만료)
 # =============================================================================
-
+@method_decorator(never_cache, name="dispatch")
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class SessionCloseLoginView(LoginView):
     authentication_form = ActiveOnlyAuthenticationForm
+
+    def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        """
+        ✅ CSRF cookie not set 방지
+        - ensure_csrf_cookie로 GET /login 시점에 csrftoken 강제 발급
+        - never_cache + no-store 헤더로 캐시 재사용 이슈 차단
+        """
+        response = super().dispatch(request, *args, **kwargs)
+        return _set_no_store_headers(response)
+
 
     def form_valid(self, form) -> HttpResponse:
         response = super().form_valid(form)

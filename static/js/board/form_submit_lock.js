@@ -9,6 +9,12 @@
 // ✅ base.css 모듈화 반영
 // - 인라인 style 제거 → .is-busy(전역 유틸) + disabled 사용
 //
+// ✅ 중요(버그픽스)
+// - file_upload_utils가 submit을 preventDefault() 할 수 있으므로
+//   1) initFileUpload를 먼저 실행하고
+//   2) submit 이벤트에서 e.defaultPrevented면 잠금을 걸지 않음
+// - 그렇지 않으면 "처리 중..." 무한 로딩처럼 보일 수 있음
+//
 // ✅ 전제(권장)
 // - 폼 id: #postForm 또는 #taskForm
 // - submit 버튼 id: #submitBtn (없으면 form 내 submit 버튼 fallback)
@@ -21,6 +27,7 @@
   "use strict";
 
   const INIT_FLAG = "__boardFormSubmitLockInited";
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   /* =========================================================
    * 0) DOM helpers
@@ -36,6 +43,28 @@
   function findSubmitBtn(form) {
     if (!form) return null;
     return qs("#submitBtn", form) || qs('button[type="submit"]', form);
+  }
+
+  function ensureDeleteContainer(form) {
+    if (!form) return null;
+
+    let el = qs("#deleteContainer", form);
+    if (el) return el;
+
+    // create 화면에는 deleteContainer가 없을 수 있으므로 자동 생성
+    el = document.createElement("div");
+    el.id = "deleteContainer";
+    el.className = "d-none";
+    form.appendChild(el);
+    return el;
+  }
+
+  function hasFileInput(form) {
+    if (!form) return false;
+    return (
+      !!qs('#fileInput[type="file"]', form) ||
+      !!qs('input[type="file"][name="attachments"]', form)
+    );
   }
 
   /* =========================================================
@@ -55,6 +84,17 @@
       "처리 중...";
   }
 
+  function unlockSubmitButton(btn) {
+    if (!btn) return;
+
+    btn.disabled = false;
+    btn.classList.remove("is-busy");
+
+    if (btn.dataset.prevHtml) {
+      btn.innerHTML = btn.dataset.prevHtml;
+    }
+  }
+
   function initSubmitLock(form) {
     const submitBtn = findSubmitBtn(form);
     if (!submitBtn) return;
@@ -64,6 +104,10 @@
     form.dataset.submitLockBound = "1";
 
     form.addEventListener("submit", (e) => {
+      // ✅ file_upload_utils 등 다른 로직이 제출을 막은 경우:
+      // 잠금을 걸면 "처리 중..." 상태로 남아 무한 로딩처럼 보일 수 있음
+      if (e.defaultPrevented) return;
+
       // 이미 submitting이면 중복 제출 차단
       if (form.dataset.submitting === "1") {
         e.preventDefault();
@@ -84,21 +128,11 @@
     if (typeof window.initFileUpload !== "function") return;
     if (!form) return;
 
-    // 파일 입력 존재 여부(둘 중 하나만 있어도 OK)
-    const hasFileInput =
-      !!qs('#fileInput[type="file"]', form) ||
-      !!qs('input[type="file"][name="attachments"]', form);
+    // 파일 업로드 UI가 없으면 조용히 종료
+    if (!hasFileInput(form)) return;
 
-    if (!hasFileInput) return;
-
-    // create 화면에는 deleteContainer가 없을 수 있으므로 자동 생성
-    let deleteContainer = qs("#deleteContainer", form);
-    if (!deleteContainer) {
-      deleteContainer = document.createElement("div");
-      deleteContainer.id = "deleteContainer";
-      deleteContainer.className = "d-none";
-      form.appendChild(deleteContainer);
-    }
+    // deleteContainer 보장
+    ensureDeleteContainer(form);
 
     // formSelector 필요(유틸이 selector 기반이므로)
     const formSelector = form.id ? `#${form.id}` : null;
@@ -108,7 +142,7 @@
       formSelector,
       existingFileSelector: ".remove-existing",
       deleteContainerSelector: "#deleteContainer",
-      maxFileSize: 10 * 1024 * 1024, // 10MB
+      maxFileSize: MAX_FILE_SIZE,
     });
   }
 
@@ -123,8 +157,11 @@
     const form = findForm();
     if (!form) return;
 
-    initSubmitLock(form);
+    // ✅ 중요: file_upload_utils가 submit을 막을 수 있으므로 먼저 초기화
     initFileUploadIfPossible(form);
+
+    // ✅ 그 다음 submit lock 바인딩( defaultPrevented 감지 가능 )
+    initSubmitLock(form);
   }
 
   if (document.readyState === "loading") {
@@ -133,15 +170,25 @@
     boot();
   }
 
-  // ✅ BFCache 복원 시 재초기화(특히 뒤로가기)
+  /* =========================================================
+   * 4) BFCache restore (뒤로가기/앞으로가기)
+   * ========================================================= */
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;
+
+    // 전역 init 플래그 해제 → 재부팅
     document.body.dataset[INIT_FLAG] = "0";
+
+    // 폼 상태 초기화 + 버튼 원복
     const form = findForm();
     if (form) {
       form.dataset.submitLockBound = "0";
       form.dataset.submitting = "0";
+
+      const btn = findSubmitBtn(form);
+      unlockSubmitButton(btn);
     }
+
     boot();
   });
 })();

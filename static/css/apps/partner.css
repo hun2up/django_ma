@@ -106,6 +106,52 @@
 }
 
 /* ==========================================================
+ 1-2) Top Controls (Efficiency 공통 규칙) ✅ 추가
+  - Structure/Rate와 동일한 드랍다운 폭/배치 정책을 Efficiency에도 적용
+========================================================== */
+#manage-efficiency{
+  --ctl-w-ym: 90px;
+  --ctl-w-org: 160px;
+  --ctl-gap: 12px;
+}
+
+/* select 폭 */
+#manage-efficiency #yearSelect,
+#manage-efficiency #monthSelect { max-width: var(--ctl-w-ym); }
+
+#manage-efficiency #channelSelect,
+#manage-efficiency #partSelect,
+#manage-efficiency #branchSelect { max-width: var(--ctl-w-org); }
+
+/* 드랍다운 폰트 통일 */
+#manage-efficiency #controlsForm .form-select {
+  font-size: .875rem;
+}
+
+/* md 이상: grid(col-md-*) 무력화 → 내용폭 기준 flex 배치 (Structure/Rate와 동일) */
+@media (min-width: 768px) {
+  #manage-efficiency #controlsForm{
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--ctl-gap);
+    align-items: flex-end;
+  }
+
+  #manage-efficiency #controlsForm > div{
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  #manage-efficiency #controlsForm .form-label { white-space: nowrap; }
+
+  #manage-efficiency #controlsForm .btn-search{
+    white-space: nowrap;
+    min-width: 88px;
+  }
+}
+
+/* ==========================================================
  2) Input Header (공통)
 ========================================================== */
 #manage-structure .manage-input-head,
@@ -341,7 +387,7 @@
   --c-before-rank: 150px;
   --c-after-rank: 150px;
 
-  --c-or: 44px;     /* 요청 반영: 60 → 40~50 추천 */
+  --c-or: 45px;     /* 요청 반영: 60 → 40~50 추천 */
   --c-memo: 350px;
 }
 
@@ -407,8 +453,8 @@
   --c-after-ltable: 150px;
   --c-after-lrate: 90px;
 
-  --c-memo: 200px;
-  --c-del: 75px;
+  --c-memo: 210px;
+  --rate-del-col: 15;
 }
 
 /* colgroup 바인딩 */
@@ -434,6 +480,16 @@
   min-width: 0 !important;
 }
 
+/* ==========================================================
+ 7-1) RATE: leader 삭제열 숨김 (mainTable)
+  - 목표: leader는 "삭제 권한 없음" 알림이 아니라 버튼 자체가 안 보이게
+  - 범위: #manage-rate 화면만
+  - 주의: DataTables 렌더에서도 th/td 자체는 유지되므로 display:none으로 열 제거 가능
+========================================================== */
+#manage-rate[data-user-grade="leader"] #mainTable thead th:nth-child(var(--rate-del-col)),
+#manage-rate[data-user-grade="leader"] #mainTable tbody td:nth-child(var(--rate-del-col)) {
+  display: none !important;
+}
 
 /* ==========================================================
  8) MainSheet Policy (Structure / Rate)
@@ -614,51 +670,52 @@
   padding-right: 6px;
 }
 
-/* ---------- Efficiency vars & col widths ---------- */
-#manage-efficiency {
-  --c-rq_name: 90px;
-  --c-rq_id: 100px;
-  --c-rq_branch: 180px;
-
-  --c-category: 120px;
-  --c-amount: 120px;
-  --c-tax: 110px;
-
-  --c-ded_name: 90px;
-  --c-ded_id: 100px;
-  --c-ded_search: 80px;
-
-  --c-pay_name: 90px;
-  --c-pay_id: 100px;
-  --c-pay_search: 80px;
-
-  --c-content: 320px;
-  --c-remove: 80px;
-
-  --main-content-width: 320px;
-  --eff-header-minw: 1100px;
-
-  /* Accordion header vars */
-  --eff-header-minh: 46px;
-  --eff-toggle-left-pad: 44px;
-  --eff-confirm-gap: 8px;
-  --eff-confirm-file-w: 260px;
+/* ==========================================================
+  10-0) EFFICIENCY: inputTable 폰트 통일
+  - 목표: 내용입력 테이블의 데이터 텍스트 폰트를 헤더(th) 폰트 크기로 통일
+========================================================== */
+#manage-efficiency #inputTable{
+  --eff-input-font: 12px; /* 헤더(th)와 동일하게 */
 }
 
-#manage-efficiency #inputTable col[data-col="rq_name"]   { width: var(--c-rq_name); }
-#manage-efficiency #inputTable col[data-col="rq_id"]     { width: var(--c-rq_id); }
-#manage-efficiency #inputTable col[data-col="rq_branch"] { width: var(--c-rq_branch); }
-#manage-efficiency #inputTable col[data-col="category"]  { width: var(--c-category); }
-#manage-efficiency #inputTable col[data-col="amount"]    { width: var(--c-amount); }
-#manage-efficiency #inputTable col[data-col="tax"]       { width: var(--c-tax); }
-#manage-efficiency #inputTable col[data-col="ded_name"]  { width: var(--c-ded_name); }
-#manage-efficiency #inputTable col[data-col="ded_id"]    { width: var(--c-ded_id); }
-#manage-efficiency #inputTable col[data-col="ded_search"]{ width: var(--c-ded_search); }
-#manage-efficiency #inputTable col[data-col="pay_name"]  { width: var(--c-pay_name); }
-#manage-efficiency #inputTable col[data-col="pay_id"]    { width: var(--c-pay_id); }
-#manage-efficiency #inputTable col[data-col="pay_search"]{ width: var(--c-pay_search); }
-#manage-efficiency #inputTable col[data-col="content"]   { width: var(--c-content); }
-#manage-efficiency #inputTable col[data-col="remove"]    { width: var(--c-remove); }
+/* td 자체 + td 안의 input/select/button 전부 통일 */
+#manage-efficiency #inputTable tbody td{
+  font-size: var(--eff-input-font) !important;
+}
+
+#manage-efficiency #inputTable tbody td :is(
+  input, select, textarea,
+  .form-control, .form-select,
+  .btn, .input-group-text
+){
+  font-size: var(--eff-input-font) !important;
+  line-height: 1.2;
+}
+
+/* ---------- Efficiency vars & col widths ---------- */
+#manage-efficiency{
+  /* inputTable column widths */
+  --c-rq: 150px;        /* 요청자 */
+  --c-rq-branch: 200px; /* 소속(요청자) */
+  --c-category: 100px;  /* 구분 */
+  --c-amount: 150px;    /* 금액 */
+  --c-tax: 120px;       /* 세액 */
+  --c-ded: 200px;       /* 공제자(검색버튼 포함 input-group) */
+  --c-pay: 200px;       /* 지급자(검색버튼 포함 input-group) */
+  --c-content: 400px;   /* 내용 */
+  --c-del: 90px;        /* 삭제 */
+}
+
+/* colgroup 바인딩 */
+#manage-efficiency #inputTable col.c-rq        { width: var(--c-rq); }
+#manage-efficiency #inputTable col.c-rq-branch { width: var(--c-rq-branch); }
+#manage-efficiency #inputTable col.c-category  { width: var(--c-category); }
+#manage-efficiency #inputTable col.c-amount    { width: var(--c-amount); }
+#manage-efficiency #inputTable col.c-tax       { width: var(--c-tax); }
+#manage-efficiency #inputTable col.c-ded       { width: var(--c-ded); }
+#manage-efficiency #inputTable col.c-pay       { width: var(--c-pay); }
+#manage-efficiency #inputTable col.c-content   { width: var(--c-content); }
+#manage-efficiency #inputTable col.c-del       { width: var(--c-del); }
 
 /* ---------- Efficiency accordion body scroll ---------- */
 #manage-efficiency #mainSheet { min-width: 0; }
@@ -728,19 +785,20 @@
   align-items: center;
   border-radius: 12px;
   position: relative;
-  padding-left: var(--eff-toggle-left-pad);
-  padding-right: 14px;
+  padding-left: 14px;
+  padding-right: 44px;
   padding-top: 8px;
   padding-bottom: 8px;
   white-space: nowrap;
   line-height: 1.2;
 }
 
-#manage-efficiency .eff-acc-toggle::after {
+/* AFTER: 토글(chevron)을 오른쪽 끝으로 */
+#manage-efficiency .eff-acc-toggle::after{
   position: absolute;
-  left: 12px;
-  right: auto;
-  margin: 0;
+  left: auto !important;
+  right: 12px !important;
+  margin: 0 !important;
 }
 
 /* inner scroll area */
@@ -939,4 +997,94 @@
 #manage-table #loadingOverlay .loading-text{
   margin-top: 8px;
   font-weight: 700;
+}
+
+/* ==========================================================
+  11-7) (추가) 권한관리 테이블: 고정폭 + 말줄임 + hover(title)
+  - 스코프: #manage-table 내부
+========================================================== */
+
+/* 공통: 고정폭 + ellipsis */
+#manage-table :is(#subAdminTable, #rateUserTable){
+  width: 100%;
+  table-layout: fixed;
+}
+
+#manage-table :is(#subAdminTable, #rateUserTable) :is(th, td){
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* ✅ 기본 hover는 "title"로 처리 (JS에서 주입) */
+
+/* -------------------------
+  A) 중간관리자 명단(예: #subAdminTable)
+-------------------------- */
+#manage-table{
+  /* subAdminTable widths */
+  --sa-branch: 14%;
+  --sa-teamA: 14%;
+  --sa-teamB: 14%;
+  --sa-teamC: 14%;
+  --sa-name: 12%;
+  --sa-id: 12%;
+  --sa-grade: 12%;
+  --sa-del: 12%;
+
+  /* rateUserTable widths */
+  --ru-branch: 13%;
+  --ru-teamA: 13%;
+  --ru-teamB: 13%;
+  --ru-teamC: 13%;
+  --ru-name: 10%;
+  --ru-id: 10%;
+  --ru-nonlife: 14%;
+  --ru-life: 14%;
+}
+
+#manage-table #subAdminTable col.sa-col-branch { width: var(--sa-branch); }
+#manage-table #subAdminTable col.sa-col-teamA  { width: var(--sa-teamA); }
+#manage-table #subAdminTable col.sa-col-teamB  { width: var(--sa-teamB); }
+#manage-table #subAdminTable col.sa-col-teamC  { width: var(--sa-teamC); }
+#manage-table #subAdminTable col.sa-col-name   { width: var(--sa-name); }
+#manage-table #subAdminTable col.sa-col-id     { width: var(--sa-id); }
+#manage-table #subAdminTable col.sa-col-grade  { width: var(--sa-grade); }
+#manage-table #subAdminTable col.sa-col-del    { width: var(--sa-del); }
+
+/* -------------------------
+  B) 전체설계사 명단(#rateUserTable)
+-------------------------- */
+#manage-table #rateUserTable col.ru-col-branch  { width: var(--ru-branch); }
+#manage-table #rateUserTable col.ru-col-teamA   { width: var(--ru-teamA); }
+#manage-table #rateUserTable col.ru-col-teamB   { width: var(--ru-teamB); }
+#manage-table #rateUserTable col.ru-col-teamC   { width: var(--ru-teamC); }
+#manage-table #rateUserTable col.ru-col-name    { width: var(--ru-name); }
+#manage-table #rateUserTable col.ru-col-id      { width: var(--ru-id); }
+#manage-table #rateUserTable col.ru-col-nonlife { width: var(--ru-nonlife); }
+#manage-table #rateUserTable col.ru-col-life    { width: var(--ru-life); }
+
+/* DataTables가 감싸는 wrapper에서도 폭 정책이 깨지지 않게 */
+#manage-table #rateUserTable_wrapper{
+  width: 100% !important;
+}
+
+
+/* =====================================================
+   12) EFFICIENCY: partner-sheet-wrap 폭 복원 (Structure/Rate와 동일)
+===================================================== */
+#manage-efficiency .partner-sheet-wrap{
+  width: 100%;
+  max-width: none;     /* ✅ 1400px 제한 제거 */
+  margin: 0;           /* ✅ 가운데 고정도 불필요 (루트가 86vw 센터링함) */
+}
+
+/* 모바일은 기존 정책 유지 */
+@media (max-width: 768px){
+  #manage-efficiency .partner-sheet-wrap{
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
 }

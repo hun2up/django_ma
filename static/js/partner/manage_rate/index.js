@@ -1,19 +1,16 @@
 // django_ma/static/js/partner/manage_rate/index.js
 // =========================================================
-// ✅ Manage Rate - Index (Final Refactor + No Inline Styles)
-// - dataset/key 안전화
-// - requester autofill 안정화
-// - superuser parts/branches loader 대기
-// - table check modal 안전화 (bootstrap 유무 대응: fallback overlay 제공)
-// - ✅ autoload 중복 방지 강화 (manage_boot vs index 전역 가드)
-// - ✅ 검색 버튼 id 혼재(btnSearchPeriod/btnSearch) 대응
-// - ✅ 인라인 style 0개: overlay/table-check UI는 partner.css로 이동
+// ✅ Manage Rate - Index (Refactor Final)
+// - 검색/자동조회/모달/입력행 초기화
+// - ✅ 삭제 이벤트 핸들러 연결(attachDeleteHandlers)
+//   -> leader는 delete.js 내부에서 바인딩 자체를 하지 않음
 // =========================================================
 
 import { els } from "./dom_refs.js";
 import { fetchData } from "./fetch.js";
 import { pad2, alertBox } from "./utils.js";
 import { initInputRowEvents } from "./input_rows.js";
+import { attachDeleteHandlers } from "./delete.js";
 
 /* =========================================================
    constants / guards
@@ -72,7 +69,6 @@ function fillRequesterRow(row) {
     const el = row?.querySelector?.(`[name="${name}"]`);
     if (el) el.value = val ?? "";
   };
-
   set("rq_name", u.name || "");
   set("rq_id", u.id || "");
 }
@@ -84,19 +80,17 @@ function fillRequesterAllRows() {
 }
 
 /* =========================================================
-   period dropdown (Boot 우선, 단독 실행 대비 fallback 유지)
+   period dropdown
 ========================================================= */
 function fillDropdown(el, start, end, selected, suffix) {
   if (!el) return;
   el.innerHTML = "";
-
   for (let v = start; v <= end; v++) {
     const opt = document.createElement("option");
     opt.value = String(v);
     opt.textContent = `${v}${suffix}`;
     el.appendChild(opt);
   }
-
   el.value = String(selected);
 }
 
@@ -176,12 +170,11 @@ function initSuperuserPartsBranchesWait() {
 }
 
 /* =========================================================
-   table check modal (bootstrap 유무 대응)
+   table check modal
 ========================================================= */
 function getTableFetchUrl(branch) {
   const base = ds("tableFetchUrl");
   if (!base) return "";
-
   const url = new URL(base, window.location.origin);
   url.searchParams.set("branch", branch);
   return url.toString();
@@ -234,10 +227,6 @@ function showBootstrapModal(modalEl) {
   return true;
 }
 
-/* =========================================================
-   fallback overlay (bootstrap 없을 때)
-   - ✅ 인라인 style 0개: partner.css에서 전부 처리
-========================================================= */
 let __rateTableOverlayEl = null;
 
 function ensureFallbackOverlay() {
@@ -252,16 +241,12 @@ function ensureFallbackOverlay() {
     <div class="rate-table-check-modal" role="dialog" aria-modal="true" aria-label="테이블 확인">
       <div class="rate-table-check-header">
         <div class="rate-table-check-title">테이블 확인</div>
-        <button type="button"
-                id="rateTableOverlayClose"
-                class="rate-table-check-close"
-                aria-label="close">✕</button>
+        <button type="button" id="rateTableOverlayClose" class="rate-table-check-close" aria-label="close">✕</button>
       </div>
       <div id="rateTableOverlayBody" class="rate-table-check-body"></div>
     </div>
   `;
 
-  // overlay 바깥 클릭 시 닫기
   wrap.addEventListener("click", (e) => {
     if (e.target === wrap) hideFallbackOverlay();
   });
@@ -270,7 +255,6 @@ function ensureFallbackOverlay() {
 
   wrap.querySelector("#rateTableOverlayClose")?.addEventListener("click", hideFallbackOverlay);
 
-  // ESC로 닫기
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hideFallbackOverlay();
   });
@@ -312,14 +296,11 @@ function initTableCheckModal() {
 
     const loadingHTML = `<div class="py-4 text-muted">불러오는 중...</div>`;
 
-    // bootstrap modal 우선
     let useBootstrap = false;
     if (modalBody && modalEl) {
       modalBody.innerHTML = loadingHTML;
       useBootstrap = showBootstrapModal(modalEl);
     }
-
-    // 없으면 fallback overlay
     if (!useBootstrap) showFallbackOverlay(loadingHTML);
 
     try {
@@ -349,7 +330,7 @@ function initTableCheckModal() {
 }
 
 /* =========================================================
-   autoload (중복 방지 강화)
+   autoload
 ========================================================= */
 function markAutoLoaded() {
   window[AUTOLOAD_FLAG] = true;
@@ -445,6 +426,9 @@ function init() {
   initSuperuserPartsBranchesWait();
   initSearchButton();
   initTableCheckModal();
+
+  // ✅ 내부에서 leader면 바인딩하지 않도록 처리됨
+  attachDeleteHandlers();
 
   initAutoLoadAssist();
   attachEllipsisTitleBehavior();

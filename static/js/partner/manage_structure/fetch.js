@@ -1,11 +1,10 @@
 // django_ma/static/js/partner/manage_structure/fetch.js
 // =========================================================
-// ✅ Structure - Fetch/Render (FINAL)
+// ✅ Structure - Fetch/Render (FINAL, 정리본)
 // - DataTables 우선 + fallback 렌더
-// - 말줄임: .dt-ellipsis (base.css)
-// - 변경후 강조: .cell-after (base.css)
-// - Tooltip: Bootstrap Tooltip 사용 (container: body)
-// - 처리일자 저장/삭제 위임: root 범위로 제한(충돌 방지)
+// - 말줄임(.dt-ellipsis), 변경후 강조(.cell-after) 유지
+// - Tooltip: Bootstrap Tooltip (container: body)
+// - 처리일자 저장/삭제: root 범위 이벤트 위임(충돌 방지)
 // - dataset URL 키 안전화 + 서버 키 normalize
 // =========================================================
 
@@ -20,14 +19,14 @@ let delegationBound = false;
 let resizeBound = false;
 
 /* =========================================================
-   Small utils
+   Small helpers
 ========================================================= */
 function toStr(v) {
   return String(v ?? "").trim();
 }
 
 /* =========================================================
-   Dataset helpers
+   Dataset URL helpers
 ========================================================= */
 function dsUrl(keys = []) {
   const ds = els.root?.dataset;
@@ -50,7 +49,7 @@ function getDeleteUrl() {
 }
 
 /* =========================================================
-   Permission helpers
+   Permission helpers (기존 규칙 유지)
 ========================================================= */
 function getUserGrade() {
   return toStr(els.root?.dataset?.userGrade || window.currentUser?.grade || "");
@@ -110,9 +109,8 @@ function escapeAttr(v) {
 function initTooltipsInMainTable() {
   if (!window.bootstrap?.Tooltip) return;
 
-  // mainTable 범위에서만 탐색
-  const root = els.mainTable?.closest?.("#mainSheet") || els.root || document;
-  const nodes = root.querySelectorAll('[data-bs-toggle="tooltip"]');
+  const scope = els.mainTable?.closest?.("#mainSheet") || els.root || document;
+  const nodes = scope.querySelectorAll('[data-bs-toggle="tooltip"]');
 
   nodes.forEach((el) => {
     const inst = window.bootstrap.Tooltip.getInstance(el);
@@ -120,7 +118,7 @@ function initTooltipsInMainTable() {
 
     new window.bootstrap.Tooltip(el, {
       trigger: "hover focus",
-      container: "body", // overflow 영향 회피
+      container: "body",
       boundary: "viewport",
     });
   });
@@ -136,7 +134,6 @@ function fmtPerson(name, id) {
   return n || i || "";
 }
 
-/** ✅ 말줄임 + tooltip (base.css: .dt-ellipsis) */
 function renderEllipsisCell(val) {
   const raw = toStr(val);
   if (!raw) return "";
@@ -153,7 +150,6 @@ function renderEllipsisCell(val) {
   `;
 }
 
-/** ✅ 변경후 값 강조 + 말줄임 */
 function renderAfterEllipsis(val) {
   const raw = toStr(val);
   if (!raw) return "";
@@ -170,7 +166,6 @@ function renderAfterEllipsis(val) {
   `;
 }
 
-/** ✅ OR: 체크박스(읽기전용) */
 function renderOrFlag(val) {
   const checked = !!val ? "checked" : "";
   return `
@@ -261,14 +256,7 @@ const MAIN_COLUMNS = [
   { data: "chg_branch", defaultContent: "", render: (v) => renderAfterEllipsis(v) },
   { data: "rank", defaultContent: "", render: (v) => renderEllipsisCell(v) },
   { data: "chg_rank", defaultContent: "", render: (v) => renderAfterEllipsis(v) },
-  {
-    data: "or_flag",
-    defaultContent: false,
-    className: "or-cell",
-    orderable: false,
-    searchable: false,
-    render: (v) => renderOrFlag(!!v),
-  },
+  { data: "or_flag", defaultContent: false, className: "or-cell", orderable: false, searchable: false, render: (v) => renderOrFlag(!!v) },
   { data: "memo", defaultContent: "", render: (v) => renderEllipsisCell(v) },
   { data: "request_date", defaultContent: "", render: (v) => renderEllipsisCell(v) },
   { data: "process_date", orderable: false, searchable: false, render: renderProcessDateCell, defaultContent: "" },
@@ -321,14 +309,10 @@ function ensureMainDT() {
     ordering: false,
     pageLength: 10,
     lengthChange: true,
-
     autoWidth: false,
     destroy: true,
-
-    // partner.css에서 wrapper/overflow 정책을 잡고 있으므로 scrollX는 굳이 켤 필요 없음
     scrollX: false,
     scrollCollapse: false,
-
     language: {
       emptyTable: "데이터가 없습니다.",
       search: "검색:",
@@ -337,9 +321,7 @@ function ensureMainDT() {
       infoEmpty: "0건",
       paginate: { previous: "이전", next: "다음" },
     },
-
     columns: MAIN_COLUMNS,
-
     drawCallback: () => {
       initTooltipsInMainTable();
       adjustDT();
@@ -470,10 +452,7 @@ function bindDelegationOnce() {
       const m = toStr(els.month?.value || "");
       const ym = `${y}-${pad2(m)}`;
 
-      const branch =
-        toStr(els.branch?.value || "") ||
-        toStr(window.currentUser?.branch || "") ||
-        "";
+      const branch = toStr(els.branch?.value || "") || toStr(window.currentUser?.branch || "") || "";
 
       // 재조회
       await fetchData(ym, branch);
@@ -506,7 +485,6 @@ function normalizeRow(row = {}) {
     chg_rank: row.chg_rank || row.after_rank || row.new_rank || "",
 
     rank: row.rank || row.target_rank || row.tg_rank || "",
-
     or_flag: !!row.or_flag,
 
     memo: row.memo || "",

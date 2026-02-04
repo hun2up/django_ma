@@ -245,13 +245,19 @@ def _detect_col(
 def _find_exact_or_space_removed(columns: Sequence, target: str):
     """
     컬럼명이 '정확히' 맞거나(공백/특수문자 제거 후) 동일하면 컬럼명을 반환한다.
-    - deposit.handle_upload_guarantee_increase 등에서 사용
-
-    예:
-      "3개월 장기 총수수료(지급월+직전2개월)" == "3개월장기총수수료(지급월+직전2개월)" (공백 제거)
     """
-    if not columns:
+    # ❌ if not columns:  (pandas.Index면 ambiguous)
+    if columns is None:
         return None
+    try:
+        if len(columns) == 0:
+            return None
+    except TypeError:
+        # 혹시 len 불가한 타입이면 list로 방어
+        columns = list(columns)
+        if len(columns) == 0:
+            return None
+
     if target is None:
         return None
 

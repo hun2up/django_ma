@@ -167,33 +167,19 @@ class DepositOther(models.Model):
 
 
 class DepositUploadLog(models.Model):
-    """
-    채권 업로드 로그(부서 + 업로드구분 unique)
-
-    정합성 포인트:
-    - upload_handlers.deposit._update_upload_log() 및 api_upload.py에서
-      row_count / file_name 키를 사용하므로 모델 필드명을 동일하게 유지.
-    - 운영 DB에 기존 컬럼명이 rows_count/filename일 수 있어 db_column으로 호환.
-    """
-
     part = models.CharField(max_length=50, db_index=True, verbose_name="부서")
     upload_type = models.CharField(max_length=50, db_index=True, verbose_name="업로드 구분")
     uploaded_at = models.DateTimeField(auto_now=True, verbose_name="마지막 업로드 일시")
 
-    # 모델 필드명(코드 표준) <-> DB 컬럼명(기존 운영) 호환
-    row_count = models.IntegerField(default=0, verbose_name="행 수(추정)", db_column="rows_count")
-    file_name = models.CharField(max_length=255, blank=True, default="", verbose_name="파일명", db_column="filename")
+    # ✅ db_column 제거 (DB 컬럼이 row_count / file_name 이기 때문)
+    row_count = models.IntegerField(default=0, verbose_name="행 수(추정)")
+    file_name = models.CharField(max_length=255, blank=True, default="", verbose_name="파일명")
 
     class Meta:
         db_table = "deposit_upload_log"
-        verbose_name = "채권 업로드 로그"
-        verbose_name_plural = "채권 업로드 로그"
         constraints = [
             UniqueConstraint(fields=["part", "upload_type"], name="uq_deposit_uploadlog_part_type"),
         ]
-
-    def __str__(self) -> str:
-        return f"{self.part}/{self.upload_type} ({self.uploaded_at:%Y-%m-%d %H:%M})"
 
 
 # =============================================================================

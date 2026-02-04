@@ -1,25 +1,8 @@
 /**
  * django_ma/static/js/common/search_user_modal.js
- * ============================================================================
+ * =============================================================================
  * ✅ 공통 대상자 검색 모달 (FINAL REFACTOR - affiliation_display 지원)
- *
- * 핵심 개선
- * - readyState 기반 즉시 init (늦게 로드되어도 안전)
- * - root(dataset) 우선으로 search URL 결정: data-search-user-url
- * - /api/accounts/search-user/ 404면 fallback URL로 자동 재시도
- * - 결과 클릭 시:
- *    1) activeRow(또는 fallback row)에 대상자 필드 자동 입력
- *    2) tg_display가 있으면 "성명(사번)" 형태로 동기화
- *    3) ✅ 소속(변경전) tg_branch는 affiliation_display 우선 적용
- *    4) userSelected 이벤트(document/window) 발행
- * - 동적 행 대응(active row tracking)
- *
- * 서버(Search API) 응답에 아래가 포함되면 자동 사용:
- * - affiliation_display: "지점 > 팀" 형태 (권한관리 기반)
- *
- * (참고) 서버 패치 후:
- * - accounts/search_api.py 응답에 affiliation_display 추가 권장
- * ============================================================================
+ * =============================================================================
  */
 
 (() => {
@@ -68,6 +51,12 @@
     } catch {
       return { _raw: text.slice(0, 300) };
     }
+  }
+
+  function dispatchUserSelected(selected) {
+    const ev = new CustomEvent("userSelected", { detail: selected });
+    document.dispatchEvent(ev);
+    window.dispatchEvent(ev);
   }
 
   /* =======================================================
@@ -194,7 +183,7 @@
   }
 
   /* =======================================================
-   * Field helpers (robust)
+   * Field helpers
    * ======================================================= */
   function findField(row, key) {
     if (!row || !key) return null;
@@ -233,25 +222,19 @@
 
     const n = toStr(name);
     const i = toStr(id);
-    disp.value = n && i ? `${n}(${i})` : (n || i || "");
+    disp.value = n && i ? `${n}(${i})` : n || i || "";
     disp.dispatchEvent(new Event("input", { bubbles: true }));
     disp.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
   }
 
   function buildTeamLabel(selected) {
-    const teamLabel = [selected?.team_a, selected?.team_b, selected?.team_c]
+    return [selected?.team_a, selected?.team_b, selected?.team_c]
       .map(toStr)
       .filter(Boolean)
       .join(" ");
-    return teamLabel;
   }
 
-  /**
-   * ✅ 선택된 유저를 input row에 반영
-   * - tg_branch(소속 변경전)는 affiliation_display 우선
-   * - 없으면 branch > (teamLabel) 순으로 fallback
-   */
   function autofillSelectedUser(row, selected) {
     if (!row) return;
 
@@ -262,29 +245,23 @@
     const part = toStr(selected?.part || "");
     const affiliation = toStr(selected?.affiliation_display || selected?.affiliationDisplay || "");
 
-    // fallback: branch + teamLabel
     const teamLabel = buildTeamLabel(selected);
     const fallbackAff = [branch, teamLabel].filter(Boolean).join(" > ");
     const tgBranchValue = affiliation || fallbackAff || branch || teamLabel || "-";
 
-    // ✅ hidden 필드 채우기
     setValueIfExists(row, "tg_name", name) || setValueIfExists(row, "target_name", name);
     setValueIfExists(row, "tg_id", id) || setValueIfExists(row, "target_id", id);
 
-    // ✅ 소속(변경전)
-    setValueIfExists(row, "tg_branch", tgBranchValue) ||
-      setValueIfExists(row, "target_branch", tgBranchValue);
+    setValueIfExists(row, "tg_branch", tgBranchValue) || setValueIfExists(row, "target_branch", tgBranchValue);
 
     setValueIfExists(row, "tg_rank", rank) || setValueIfExists(row, "rank", rank);
     setValueIfExists(row, "tg_part", part) || setValueIfExists(row, "target_part", part);
 
-    // ✅ 표시용(대상자) "성명(사번)"
-    syncDisplayIfExists(row, ".tg_display", name, id) ||
-      syncDisplayIfExists(row, ".target_display", name, id);
+    syncDisplayIfExists(row, ".tg_display", name, id) || syncDisplayIfExists(row, ".target_display", name, id);
   }
 
   /* =======================================================
-   * URL Resolver + 404 fallback fetch
+   * Search
    * ======================================================= */
   function resolveSearchUrls(modalEl, root) {
     const modalUrl = toStr(modalEl?.dataset?.searchUrl || "");
@@ -304,7 +281,7 @@
 
         if (params.q) {
           u.searchParams.set("q", params.q);
-          u.searchParams.set("keyword", params.q); // legacy 호환
+          u.searchParams.set("keyword", params.q);
         }
         if (params.scope) u.searchParams.set("scope", params.scope);
         if (params.branch) u.searchParams.set("branch", params.branch);
@@ -319,7 +296,6 @@
         }
 
         const data = await safeReadJson(res);
-
         if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
 
         return { ok: true, url: u.toString(), data };
@@ -346,9 +322,11 @@
   function renderLoading(resultsBox) {
     resultsBox.innerHTML = `<div class="text-center py-3 text-muted">검색 중...</div>`;
   }
+
   function renderEmpty(resultsBox) {
     resultsBox.innerHTML = `<div class="text-center py-3 text-danger">검색 결과가 없습니다.</div>`;
   }
+
   function renderError(resultsBox) {
     resultsBox.innerHTML = `<div class="text-center text-danger py-3">검색 실패</div>`;
   }
@@ -357,14 +335,12 @@
     resultsBox.innerHTML = list
       .map((u0) => {
         const u = u0 || {};
-
         const name = escapeHtml(u.name || "");
         const id = escapeHtml(u.id || "");
         const regist = escapeHtml(u.regist || "");
         const enter = escapeHtml(u.enter || "-");
         const quit = escapeHtml(u.quit || "재직중");
 
-        // ✅ 소속 표시: affiliation_display 우선, 없으면 branch
         const affiliation = escapeHtml(u.affiliation_display || u.affiliationDisplay || "");
         const branchV = escapeHtml(u.branch || "");
         const rightLabel = affiliation || branchV || "-";
@@ -414,7 +390,6 @@
       return;
     }
 
-    // ✅ btnOpenSearch 클릭 → activeRow 세팅 (capture=true)
     document.addEventListener(
       "click",
       (e) => {
@@ -425,7 +400,6 @@
       true
     );
 
-    // ✅ 검색 submit
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -452,7 +426,6 @@
       const params = {
         q: keyword,
         scope: scope === "branch" ? "branch" : "",
-        // ✅ 현재 정책 유지: superuser만 branch 파라미터 전달(서버 scope 정책과 호환)
         branch: scope === "branch" && grade === "superuser" ? branch : "",
       };
 
@@ -464,14 +437,12 @@
         if (!list.length) return renderEmpty(resultsBox);
 
         renderResults(resultsBox, list);
-        log("search ok", { used: r.url, count: list.length, scope, grade });
       } catch (err) {
         console.error("❌ 검색 오류:", err);
         renderError(resultsBox);
       }
     });
 
-    // ✅ 결과 클릭
     resultsBox.addEventListener("click", (e) => {
       const item = e.target?.closest?.(".search-result");
       if (!item) return;
@@ -493,25 +464,35 @@
       };
 
       const root = getActiveRoot();
-      const row = resolveTargetRow(root);
 
+      // ✅ deposit-home: 이벤트 발행 금지(=fetch 중단으로 Failed to fetch 유발 방지), 바로 이동
+      if (root?.id === "deposit-home") {
+        tryHideModal(modalEl);
+        if (input) input.value = "";
+        resultsBox.innerHTML = "";
+
+        const id = toStr(selected.id);
+        if (id) {
+          location.href = `/commission/deposit/?user=${encodeURIComponent(id)}`;
+        }
+        return;
+      }
+
+      // ✅ 일반 페이지: row autofill + 이벤트 발행
+      const row = resolveTargetRow(root);
       if (!row) {
         console.warn("[search_user_modal] target row not found");
       } else {
         autofillSelectedUser(row, selected);
       }
 
-      const ev = new CustomEvent("userSelected", { detail: selected });
-      document.dispatchEvent(ev);
-      window.dispatchEvent(ev);
-
+      dispatchUserSelected(selected);
       tryHideModal(modalEl);
 
       if (input) input.value = "";
       resultsBox.innerHTML = "";
     });
 
-    // ✅ 모달 닫힐 때 초기화
     modalEl.addEventListener("hidden.bs.modal", () => {
       if (input) input.value = "";
       resultsBox.innerHTML = "";
@@ -520,7 +501,6 @@
     log("bound ok");
   }
 
-  // ✅ DOMContentLoaded 이전/이후 로드 모두 대응
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {

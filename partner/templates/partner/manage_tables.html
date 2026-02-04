@@ -1,182 +1,208 @@
-<!-- django_ma/partner/templates/partner/manage_tables.html-->
-
+<!-- django_ma/partner/templates/partner/manage_tables.html -->
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}테이블 관리{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/apps/partner.css' %}?v={% now 'U' %}">
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <!-- Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Partner CSS -->
+  <link rel="stylesheet" href="{% static 'css/apps/partner.css' %}?v={% now 'U' %}">
+
+  <!-- SortableJS (mainTable ordering) -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 {% endblock %}
 
 {% block content %}
-<form id="csrfForm">{% csrf_token %}</form>
-<script>window.csrfToken = "{{ csrf_token }}";</script>
+  <!-- CSRF: JS에서 안전하게 사용 -->
+  <form id="csrfForm">{% csrf_token %}</form>
+  <script>window.csrfToken = "{{ csrf_token }}";</script>
 
-<div id="manage-table"
-     data-user-grade="{{ user.grade }}"
-     data-branch="{{ user.branch }}"
-     data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
-     data-save-url="{% url 'partner:ajax_table_save' %}"
-     data-rate-template-url="{% static 'excel/양식_테이블관리.xlsx' %}"
->
+  <!-- Page Root: dataset로 URL/권한 주입 -->
+  <div id="manage-table"
+       data-user-grade="{{ user.grade }}"
+       data-branch="{{ user.branch }}"
+       data-fetch-url="{% url 'partner:ajax_table_fetch' %}"
+       data-save-url="{% url 'partner:ajax_table_save' %}"
+       data-rate-template-url="{% static 'excel/양식_테이블관리.xlsx' %}"
+  >
 
-  {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
-    <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
-  {% endif %}
+    <!-- 권한 가드 -->
+    {% if user.grade != 'superuser' and user.grade != 'main_admin' %}
+      <div class="alert alert-danger text-center mt-4">접근 권한이 없습니다.</div>
+    {% endif %}
 
-  <h3 class="fw-bold text-center mb-4 manage-table-title">테이블 관리 페이지</h3>
+    <h3 class="fw-bold text-center mb-4 manage-table-title">테이블 관리 페이지</h3>
 
-  {% if user.grade == 'superuser' %}
-  <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
-    <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
-      <div class="ctl-part">
-        <label for="partSelect" class="form-label fw-semibold">부서</label>
-        <select id="partSelect" class="form-select form-select-sm">
-          <option value="">불러오는 중...</option>
-        </select>
+    <!-- SUPERUSER: 부서/지점 필터 -->
+    {% if user.grade == 'superuser' %}
+      <div class="card shadow p-3 border-0 rounded-4 mb-3" id="filterCard">
+        <form id="filterForm" class="d-flex flex-wrap align-items-end gap-3">
+          <div class="ctl-part">
+            <label for="partSelect" class="form-label fw-semibold">부서</label>
+            <select id="partSelect" class="form-select form-select-sm">
+              <option value="">불러오는 중...</option>
+            </select>
+          </div>
+
+          <div class="ctl-branch">
+            <label for="branchSelect" class="form-label fw-semibold">지점</label>
+            <select id="branchSelect" class="form-select form-select-sm" disabled>
+              <option value="">부서를 먼저 선택하세요</option>
+            </select>
+          </div>
+
+          <div class="ctl-btn">
+            <button type="button" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
+          </div>
+        </form>
       </div>
+    {% endif %}
 
-      <div class="ctl-branch">
-        <label for="branchSelect" class="form-label fw-semibold">지점</label>
-        <select id="branchSelect" class="form-select form-select-sm" disabled>
-          <option value="">부서를 먼저 선택하세요</option>
-        </select>
-      </div>
-
-      <div class="ctl-btn">
-        <button type="button" id="btnSearch" class="btn btn-primary btn-sm px-4" disabled>검색</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
-
-  <div class="card p-3">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-bold mb-0 text-primary">테이블 관리 목록</h5>
-      <div>
-        <button id="btnToggleEdit" class="btn btn-sm btn-outline-secondary me-2">수정 모드 전환</button>
-        <button id="btnAddRow" class="btn btn-outline-primary btn-sm me-2">행 추가</button>
-        <button id="btnSave" class="btn btn-success btn-sm">저장</button>
-        <button id="btnReset" class="btn btn-sm btn-secondary">초기화</button>
-      </div>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table table-bordered table-hover align-middle text-center" id="mainTable">
-        <!-- ✅ 인라인 style 제거: colgroup + CSS 변수로 폭 관리 -->
-        <colgroup>
-          <col class="mt-col-order">
-          <col class="mt-col-branch">
-          <col class="mt-col-table">
-          <col class="mt-col-rate">
-          <col class="mt-col-edit">
-          <col class="mt-col-del">
-        </colgroup>
-
-        <thead class="table-light">
-          <tr>
-            <th>순번</th>
-            <th>지점</th>
-            <th>테이블</th>
-            <th>요율(%)</th>
-            <th>편집</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-
-        <tbody id="tableBody">
-          <tr class="data-row" data-order="1">
-            <td class="order-cell">1</td>
-            <td class="branch-cell">{{ user.branch }}</td>
-            <td class="editable" contenteditable="false"></td>
-            <td class="editable rate-cell" contenteditable="false"></td>
-            <td>
-              <button class="btn btn-outline-secondary btn-sm btnMoveUp" disabled>▲</button>
-              <button class="btn btn-outline-secondary btn-sm btnMoveDown" disabled>▼</button>
-            </td>
-            <td>
-              <button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ============================================ -->
-  <!-- 🔹 지점 내 사용자 요율 현황 테이블 -->
-  <!-- ============================================ -->
-  <div class="card mt-5 shadow-sm">
-    <div class="card-body">
+    <!-- ============================= -->
+    <!-- 1) TableSetting 관리(mainTable) -->
+    <!-- ============================= -->
+    <div class="card p-3">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="fw-bold mb-0 text-primary">지점 내 요율현황</h5>
-
-        <div class="d-flex gap-2">
-          <form id="rateUploadForm" enctype="multipart/form-data">
-            {% csrf_token %}
-            <input type="file" id="rateExcelInput" name="excel_file" accept=".xlsx,.xls" hidden>
-            <button type="button" id="btnUploadExcel" class="btn btn-outline-primary btn-sm">
-              <i class="bi bi-file-earmark-arrow-up"></i> 엑셀 업로드
-            </button>
-          </form>
-
-          <button id="btnDownloadExcel" class="btn btn-success btn-sm">
-            <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
-          </button>
-
-          <button type="button" id="btnDownloadTemplate" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-file-earmark-arrow-down"></i> 양식 다운로드
-          </button>
+        <h5 class="fw-bold mb-0 text-primary">테이블 관리 목록</h5>
+        <div>
+          <button id="btnToggleEdit" class="btn btn-sm btn-outline-secondary me-2">수정 모드 전환</button>
+          <button id="btnAddRow" class="btn btn-outline-primary btn-sm me-2">행 추가</button>
+          <button id="btnSave" class="btn btn-success btn-sm">저장</button>
+          <button id="btnReset" class="btn btn-sm btn-secondary">초기화</button>
         </div>
       </div>
 
-      <table id="rateUserTable" class="table table-bordered table-hover align-middle text-center">
-        <thead class="table-light">
-          <tr>
-            <th>지점</th>
-            <th>팀A</th>
-            <th>팀B</th>
-            <th>팀C</th>
-            <th>성명</th>
-            <th>사번</th>
-            <th>손보테이블</th>
-            <th>생보테이블</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle text-center" id="mainTable">
+          <!-- colgroup 기반 고정폭 (partner.css에서 mt-col-*로 관리) -->
+          <colgroup>
+            <col class="mt-col-order">
+            <col class="mt-col-branch">
+            <col class="mt-col-table">
+            <col class="mt-col-rate">
+            <col class="mt-col-edit">
+            <col class="mt-col-del">
+          </colgroup>
+
+          <thead class="table-light">
+            <tr>
+              <th>순번</th>
+              <th>지점</th>
+              <th>테이블</th>
+              <th>요율(%)</th>
+              <th>편집</th>
+              <th>삭제</th>
+            </tr>
+          </thead>
+
+          <tbody id="tableBody">
+            <tr class="data-row" data-order="1">
+              <td class="order-cell">1</td>
+              <td class="branch-cell">{{ user.branch }}</td>
+              <td class="editable" contenteditable="false"></td>
+              <td class="editable rate-cell" contenteditable="false"></td>
+              <td>
+                <button class="btn btn-outline-secondary btn-sm btnMoveUp" disabled>▲</button>
+                <button class="btn btn-outline-secondary btn-sm btnMoveDown" disabled>▼</button>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-danger btnDeleteRow" disabled>삭제</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
 
-  <!-- ✅ base.css의 .loading-overlay 재사용 (인라인 style 제거) -->
-  <div id="loadingOverlay" class="loading-overlay" hidden>
-    <div class="spinner-border text-primary" role="status"></div>
-    <div class="loading-text">처리 중...</div>
-  </div>
+    <!-- ======================================= -->
+    <!-- 2) 지점 내 사용자 요율 현황(rateUserTable) -->
+    <!--  - DataTables 사용 (있으면), 없으면 plain -->
+    <!--  - colgroup 폭 + 말줄임 + hover title -->
+    <!-- ======================================= -->
+    <div class="card mt-5 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="fw-bold mb-0 text-primary">지점 내 요율현황</h5>
 
-</div>
+          <div class="d-flex gap-2">
+            <form id="rateUploadForm" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input type="file" id="rateExcelInput" name="excel_file" accept=".xlsx,.xls" hidden>
+              <button type="button" id="btnUploadExcel" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-file-earmark-arrow-up"></i> 엑셀 업로드
+              </button>
+            </form>
+
+            <button id="btnDownloadExcel" class="btn btn-success btn-sm">
+              <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+            </button>
+
+            <button type="button" id="btnDownloadTemplate" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-file-earmark-arrow-down"></i> 양식 다운로드
+            </button>
+          </div>
+        </div>
+
+        <table id="rateUserTable" class="table table-bordered table-hover align-middle text-center">
+          <!-- colgroup 기반 고정폭 (partner.css에서 ru-col-*로 관리) -->
+          <colgroup>
+            <col class="ru-col-branch">
+            <col class="ru-col-teamA">
+            <col class="ru-col-teamB">
+            <col class="ru-col-teamC">
+            <col class="ru-col-name">
+            <col class="ru-col-id">
+            <col class="ru-col-nonlife">
+            <col class="ru-col-life">
+          </colgroup>
+
+          <thead class="table-light">
+            <tr>
+              <th>지점</th>
+              <th>팀A</th>
+              <th>팀B</th>
+              <th>팀C</th>
+              <th>성명</th>
+              <th>사번</th>
+              <th>손보테이블</th>
+              <th>생보테이블</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" hidden>
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="loading-text">처리 중...</div>
+    </div>
+
+  </div>
 {% endblock %}
 
 {% block extra_js %}
+  <!-- jQuery (rateUserTable DataTables용) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+          integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+          crossorigin="anonymous"></script>
 
-<!-- ✅ jQuery (rateUserTable DataTables용) -->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"
-        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
-        crossorigin="anonymous"></script>
+  <!-- DataTables (rateUserTable 전용) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 
-<!-- ✅ DataTables (하단 rateUserTable 전용으로만 사용) -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <!-- Buttons (필요 시만) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-<!-- (선택) rateUserTable에서 버튼/엑셀 기능(DataTables Buttons)을 쓴다면 -->
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Superuser part/branch selector -->
+  <script type="module" src="{% static 'js/common/part_branch_selector.js' %}"></script>
 
-<script type="module" src="{% static 'js/common/part_branch_selector.js' %}"></script>
-<script type="module" src="{% static 'js/partner/manage_table.js' %}?v=20251230_1"></script>
-
+  <!-- Page JS -->
+  <script type="module" src="{% static 'js/partner/manage_table.js' %}?v=20260204_1"></script>
 {% endblock %}

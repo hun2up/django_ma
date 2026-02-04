@@ -7,13 +7,13 @@
 {% block title %}채권관리{% endblock %}
 
 {% block content %}
-<!---------------------------------------------------------------
-  Deposit Home
+<!-- -------------------------------------------------------------
+  Deposit Home (FINAL)
   - JS 의존 요소(id, data-bind, dataset URL, modal id)는 "변경 금지"
-  - 가독성 개선: 섹션 구분/정렬/주석만 추가
------------------------------------------------------------------>
+  - 가독성 개선: 섹션 구분/정렬/주석만 정리
+-------------------------------------------------------------- -->
 
-<!-- ✅ Deposit Home 전용 CSS (기존 inline <style> 제거) -->
+<!-- Deposit Home 전용 CSS -->
 <link
   rel="stylesheet"
   href="{% static 'css/commission/deposit_home.css' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"
@@ -22,10 +22,10 @@
 <div class="container mt-5">
   <div class="mx-auto deposit-maxw">
 
-    <!---------------------------------------------------------------
+    <!-- -------------------------------------------------------------
       0) Root Card (JS Boot Root)
       - dataset URL: deposit_home.js에서 읽음 (변경 금지)
-    ----------------------------------------------------------------->
+    -------------------------------------------------------------- -->
     <div
       id="deposit-home"
       class="card shadow p-4 border-0 rounded-4"
@@ -37,10 +37,10 @@
       data-support-pdf-url="{% url 'commission:api_support_pdf' %}"
     >
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         1) 상단 액션바 (대상자검색 / 초기화 / 지원신청서)
         - 버튼 id: resetUserBtn / supportPdfBtn → JS에서 사용
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0 deposit-title">채권현황</h5>
 
@@ -73,10 +73,10 @@
         </div>
       </div>
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         2) 인적사항
         - data-bind + id 유지 (deposit_home.js가 자동 바인딩)
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
 
@@ -142,10 +142,10 @@
         </div>
       </div>
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         3) 주요지표
         - data-type="money|percent"는 JS 포맷팅에 사용
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
 
@@ -153,7 +153,7 @@
             <div class="fw-bold deposit-section-title">주요지표</div>
           </div>
 
-          {# 3-1) 핵심 금액 지표 #}
+          <!-- 3-1) 핵심 금액 지표 -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
@@ -288,10 +288,10 @@
         </div>
       </div>
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         4) 수수료현황
         - 보증(O/X) 4개 테이블 id/data-bind 유지
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
 
@@ -299,7 +299,7 @@
             <div class="fw-bold deposit-section-title">수수료현황</div>
           </div>
 
-          {# 4-1) 환수/지급 (손보/생보) #}
+          <!-- 4-1) 환수/지급 (손보/생보) -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
@@ -340,7 +340,7 @@
           <!-- 4-2) 보증(O/X) 환수/지급 4개 테이블 -->
           <div class="row g-3 mb-3">
 
-            {# 보증(O) 환수 #}
+            <!-- 보증(O) 환수 -->
             <div class="col-12 col-lg-6">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0 info-table">
@@ -495,9 +495,9 @@
         </div>
       </div>
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         5) 유지율/수금율
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
 
@@ -505,7 +505,7 @@
             <div class="fw-bold deposit-section-title">유지율/수금율</div>
           </div>
 
-          {# 5-1) 13/18 회차 #}
+          <!-- 5-1) 13/18 회차 -->
           <div class="table-responsive mb-3">
             <table class="table table-sm align-middle mb-0 info-table">
               <thead>
@@ -622,10 +622,10 @@
         </div>
       </div>
 
-      <!---------------------------------------------------------------
+      <!-- -------------------------------------------------------------
         6) 채권현황 상세 (보증보험 / 기타채권)
         - tbody id: suretyTableBody / otherTableBody → JS 렌더링
-      ----------------------------------------------------------------->
+      -------------------------------------------------------------- -->
       <div class="card shadow-sm border-0 rounded-4 my-3">
         <div class="card-body p-3 p-md-4">
 
@@ -648,7 +648,6 @@
               </thead>
               <tbody id="suretyTableBody">
                 <tr>
-                  {# NOTE: colspan은 기존 값 유지 (JS 렌더 후 교체) #}
                   <td class="text-nowrap text-center" colspan="5">
                     대상자를 선택하면 보증보험 내역이 표시됩니다.
                   </td>
@@ -688,16 +687,16 @@
         </div>
       </div>
 
-      {# base.html의 block.super 유지 (기존 동작 유지) #}
+      <!-- base.html의 block.super 유지 (기존 동작 유지) -->
       {{ block.super }}
 
     </div>
   </div>
 </div>
 
-<!---------------------------------------------------------------
+<!-- -------------------------------------------------------------
   7) 데이터 업데이트 카드 (엑셀 업로드 요약)
------------------------------------------------------------------>
+-------------------------------------------------------------- -->
 <div class="container mt-5">
   <div class="mx-auto deposit-maxw">
 
@@ -718,10 +717,10 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0 info-table" id="depositUpdateSummaryTable">
+        <table class="table table-sm align-middle text-center mb-0 info-table" id="depositUpdateSummaryTable">
           <thead>
             <tr>
-              <th class="text-nowrap">구분</th>
+              <th class="text-nowrap">업로드 구분</th>
               {% for p in parts %}
                 <th class="text-nowrap">{{ p }}</th>
               {% endfor %}
@@ -729,31 +728,29 @@
           </thead>
 
           <tbody>
-            {% for c in categories %}
+            {% for ut in upload_types %}
               <tr>
-                <td class="text-nowrap fw-semibold">{{ c }}</td>
+                <td class="text-nowrap fw-semibold">{{ ut }}</td>
 
                 {% for p in parts %}
                   <td class="text-nowrap text-center">
-
-                    {# supported_upload_types에 포함된 항목만 data-upload-date 속성을 부여 (JS가 사용하는 경우 대비) #}
-                    {% if supported_upload_types and c in supported_upload_types %}
+                    {% if supported_upload_types and ut in supported_upload_types %}
                       <span
                         class="upload-date"
                         data-upload-date
-                        data-upload-type="{{ c }}"
+                        data-upload-type="{{ ut }}"
                         data-part="{{ p }}"
                       >
-                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
+                        {{ upload_dates|get_item:p|get_item:ut|default:"-" }}
                       </span>
                     {% else %}
-                      <span data-key="{{ c }}" data-part="{{ p }}">
-                        {{ upload_dates|get_item:c|get_item:p|default:"-" }}
+                      <span data-part="{{ p }}" data-upload-type="{{ ut }}">
+                        {{ upload_dates|get_item:p|get_item:ut|default:"-" }}
                       </span>
                     {% endif %}
-
                   </td>
                 {% endfor %}
+
               </tr>
             {% endfor %}
           </tbody>
@@ -764,10 +761,10 @@
   </div>
 </div>
 
-<!---------------------------------------------------------------
-  8) 엑셀 업로드 모달 / 토스트
-  - id / name / action 유지 (JS 연동 가능성)
------------------------------------------------------------------>
+<!-- -------------------------------------------------------------
+  8) 엑셀 업로드 모달
+  - id / name / action 유지 (JS 연동)
+-------------------------------------------------------------- -->
 <div
   class="modal fade"
   id="excelUploadModal"
@@ -843,22 +840,49 @@
   </div>
 </div>
 
-{# ✅ 업로드 완료 토스트 #}
-<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
-  <div id="uploadToast" class="toast align-items-center text-bg-success border-0" role="alert">
-    <div class="d-flex">
-      <div class="toast-body fw-bold">✅ 업로드가 성공적으로 완료되었습니다!</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+<!-- -------------------------------------------------------------
+  9) 업로드 결과 모달 (JSON 응답을 사람이 읽을 수 있게 표시)
+  - deposit_home.js / excel_upload.js 모두에서 사용 가능
+-------------------------------------------------------------- -->
+<div class="modal fade" id="excelUploadResultModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header bg-light">
+        <h6 class="modal-title fw-bold">엑셀 업로드 결과</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body">
+        <div id="excelUploadResultBody" class="small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
+        <button type="button" class="btn btn-primary btn-sm d-none" id="excelUploadReloadBtn">새로고침</button>
+      </div>
     </div>
   </div>
 </div>
 
-{# ✅ 공용 대상자 검색 모달 (include 분리 유지: 사용자 요청 범위상 변경하지 않음) #}
+<!-- 업로드 완료 토스트 -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+  <div id="uploadToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body fw-bold">✅ 업로드가 성공적으로 완료되었습니다!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="닫기"></button>
+    </div>
+  </div>
+</div>
+
+<!-- 공용 대상자 검색 모달 -->
 {% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
 
-{# ✅ Deposit Home 전용 JS (기존 파일 유지, 내부만 리팩토링) #}
+<!-- Deposit Home 전용 JS -->
 <script
   type="module"
   src="{% static 'js/commission/deposit_home.js' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"
+></script>
+
+<!-- 엑셀 업로드 공용 JS (모달 결과 표시 포함) -->
+<script
+  src="{% static 'js/excel_upload.js' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"
 ></script>
 {% endblock %}

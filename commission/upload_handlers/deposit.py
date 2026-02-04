@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from django.utils import timezone
+from django.core.exceptions import FieldDoesNotExist
 
 from commission.models import DepositSummary, DepositSurety, DepositOther, DepositUploadLog
 from commission.upload_utils import (
@@ -555,15 +556,34 @@ _handle_upload_ls_total_from_file = handle_upload_ls_total_from_file
 def _update_upload_log(part: str, upload_type: str, excel_file_name: str, count: int) -> str:
     """
     DepositUploadLog(part + upload_type unique) 갱신.
-    - models.py 기준: rows_count / filename / uploaded_at(auto_now)
+    - DB/모델 필드명이 row_count(rows_count) / file_name(filename) 등 환경차가 있을 수 있어
+      _meta.get_field로 안전하게 매핑한다.
     """
+    # ✅ 안전한 필드명 선택
+    def _pick_field(*candidates: str) -> str:
+        for name in candidates:
+            try:
+                DepositUploadLog._meta.get_field(name)
+                return name
+            except FieldDoesNotExist:
+                continue
+        # 여기까지 오면 모델/DB 정합성이 깨진 상태
+        raise FieldDoesNotExist(f"DepositUploadLog has none of fields: {candidates}")
+
+    count_field = _pick_field("row_count", "rows_count")
+    file_field = _pick_field("file_name", "filename")
+
+    defaults = {
+        count_field: int(count or 0),
+        file_field: (excel_file_name or "")[:255],
+    }
+
     obj, _ = DepositUploadLog.objects.update_or_create(
         part=part,
         upload_type=upload_type,
-        defaults={
-            "rows_count": int(count or 0),
-            "filename": (excel_file_name or "")[:255],
-        },
+        defaults=defaults,
     )
+
     ts = getattr(obj, "uploaded_at", None) or timezone.now()
     return ts.strftime("%Y-%m-%d %H:%M")
+

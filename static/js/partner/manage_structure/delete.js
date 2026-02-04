@@ -1,8 +1,10 @@
 // django_ma/static/js/partner/manage_structure/delete.js
-// ✅ 삭제 로직은 fetch.js(bindDelegationOnce)로 일원화했습니다.
-// 이 파일은 기존 import 호환을 위해 남겨두되, 실제 바인딩은 하지 않습니다.
+// ------------------------------------------------------
+// ✅ (호환 유지용) 삭제 로직은 fetch.js(bindDelegationOnce)로 일원화됨
+// - 기존 import 경로가 남아있는 경우를 대비해 파일은 유지
+// - 실제 이벤트 바인딩은 하지 않음 (no-op)
+// ------------------------------------------------------
 
 export function attachDeleteHandlers() {
-  // no-op (의도적으로 비활성)
-  // console.debug("[delete] handlers are disabled; handled in fetch.js");
+  // intentionally no-op
 }

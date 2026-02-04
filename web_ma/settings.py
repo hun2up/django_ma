@@ -109,6 +109,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # ✅ login/admin login GET에서 csrftoken 강제 발급(뷰/캐시 의존 제거)
+    "web_ma.middleware.ForceCSRFCookieOnLoginMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -207,10 +209,18 @@ SESSION_COOKIE_AGE = 60 * 60  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
 
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False
 
 SESSION_COOKIE_SECURE = IS_PROD
 CSRF_COOKIE_SECURE = IS_PROD
+
+# ✅ 서브도메인/Edge 환경 안정화 (둘 다 쓰는 경우 권장)
+SESSION_COOKIE_DOMAIN = ".ma-support.kr"
+CSRF_COOKIE_DOMAIN = ".ma-support.kr"
+
+# ✅ CSRF/세션 기본 권장 (로그인 폼은 top-level navigation이므로 Lax가 안전)
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 
 # =============================================================================
 # 10) Redis / Celery
@@ -301,3 +311,15 @@ LOGGING = {
 # runserver 요청 로그 소음 제거 (유지)
 logging.getLogger("django.server").setLevel(logging.ERROR)
 
+
+CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
+
+LOGGING["loggers"]["django.security.csrf"] = {
+    "handlers": ["file", "console"],
+    "level": "WARNING",
+    "propagate": False,
+}
+
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True

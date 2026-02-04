@@ -13,7 +13,7 @@
 
 import { createQuillManager } from "./quill.js";
 import { createSectionSubnavManager } from "./section_subnav.js";
-import { initBlockSortable } from "./sort_block.js";
+import { initBlockSortable } from "./sort_blocks.js";
 
 (() => {
   const S = window.ManualShared;
