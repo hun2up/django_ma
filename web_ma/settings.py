@@ -172,8 +172,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
+LOGIN_REDIRECT_URL = "manual:manual_list"
+LOGOUT_REDIRECT_URL = "manual:manual_list"
 
 # =============================================================================
 # 7) I18N / Timezone

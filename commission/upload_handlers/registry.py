@@ -6,7 +6,6 @@ from typing import Callable, Dict, Iterable, Literal
 
 from . import deposit
 
-
 Mode = Literal["df", "file"]
 
 
@@ -40,12 +39,23 @@ _REGISTRY: Dict[str, UploadSpec] = {
         fn=deposit.handle_upload_refund_pay_expected,
         msg_tpl="✅ 환수/지급예상 업로드 완료 ({n}건)",
     ),
+
+    # 기존 보증증액(호환 유지) → 내부적으로 채권지표 로직과 동일
     "보증증액": UploadSpec(
         upload_type="보증증액",
         mode="df",
         fn=deposit.handle_upload_guarantee_increase,
         msg_tpl="✅ 보증증액 업로드 완료 ({n}건)",
     ),
+
+    # ✅ 신규: 채권지표
+    "채권지표": UploadSpec(
+        upload_type="채권지표",
+        mode="df",
+        fn=deposit.handle_upload_deposit_metrics,
+        msg_tpl="✅ 채권지표 업로드 완료 ({n}건)",
+    ),
+
     "응당생보": UploadSpec(
         upload_type="응당생보",
         mode="df",

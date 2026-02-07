@@ -96,7 +96,7 @@
           <!-- 3) Action Buttons -->
           <div class="d-flex justify-content-between mt-4">
             <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">뒤로가기</a>
-            <button type="button" id="generatePdfBtn" class="btn btn-primary px-5 fw-bold">제작하기</button>
+            <button type="button" id="generatePdfBtn" class="btn btn-primary px-5 fw-bold" data-pdf-url="{% url 'board:generate_request_states' %}">제작하기</button>
           </div>
 
           <!-- 4) Loading Overlay (JS 제어) -->
@@ -117,5 +117,5 @@
 {% block extra_js %}
 <!-- Page JS -->
 <script src="{% static 'js/board/common/status_ui.js' %}?v=20260127"></script>
-<script src="{% static 'js/board/states_form.js' %}"></script>
+<script type="module" src="{% static 'js/board/states_form.js' %}?v=20260206"></script>
 {% endblock %}

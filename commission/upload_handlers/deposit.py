@@ -2,29 +2,28 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
-from django.utils import timezone
 from django.core.exceptions import FieldDoesNotExist
+from django.utils import timezone
 
-from commission.models import DepositSummary, DepositSurety, DepositOther, DepositUploadLog
+from commission.models import DepositOther, DepositSummary, DepositSurety, DepositUploadLog
 from commission.upload_utils import (
     DEC2,
-    _to_int,
-    _to_decimal,
-    _to_date,
-    _to_div,
-    _norm_emp_id,
-    _safe_decimal_q2,
-    _extract_emp7_from_a,
     _bulk_existing_user_ids,
     _detect_col,
-    _find_exact_or_space_removed,
     _detect_emp_id_col,
     _detect_refundpay_col,
+    _extract_emp7_from_a,
+    _find_exact_or_space_removed,
+    _norm_emp_id,
     _read_excel_raw_matrix,
+    _safe_decimal_q2,
+    _to_date,
+    _to_decimal,
+    _to_div,
+    _to_int,
 )
-
 
 # =============================================================================
 # Internal helpers
@@ -45,11 +44,11 @@ def _update_summary(uid: str, defaults: Dict):
 
 
 # =============================================================================
-# DepositSummary upload handlers
+# DepositSummary upload handlers (DataFrame)
 # =============================================================================
 def handle_upload_final_payment(df):
     """
-    최종지급액 업로드:
+    최종지급액 업로드
     - user_id + final_payment(최종지급액)
     """
     col_user = _detect_emp_id_col(df) or _detect_col(df, must_include=("사번",), any_include=())
@@ -88,7 +87,7 @@ def handle_upload_final_payment(df):
 
 def handle_upload_refund_pay_expected(df):
     """
-    환수/지급예상 업로드:
+    환수/지급예상 업로드
     - 일반/보증(O)/보증(X) 환수/지급 손/생/합계 필드들을 DepositSummary에 반영
     """
     col_user = _detect_emp_id_col(df)
@@ -176,51 +175,69 @@ def handle_upload_refund_pay_expected(df):
     }
 
 
-def handle_upload_guarantee_increase(df):
+# =============================================================================
+# DepositSummary upload handlers (채권지표 / 보증증액 공용)
+# =============================================================================
+_DEPOSIT_METRICS_COL_MAP = {
+    "3개월 장기 총수수료(지급월+직전2개월)": "comm_3m",
+    "6개월 장기 총수수료(지급월+직전5개월)": "comm_6m",
+    "9개월 장기 총수수료(지급월+직전8개월)": "comm_9m",
+    "12개월 장기 총수수료(지급월+직전11개월)": "comm_12m",
+    "당월 계속분 인정": "inst_current",
+    "전월 계속분 인정": "inst_prev",
+    "장기 총실적": "sales_total",
+    "손생보 합산 통산유지율": "maint_total",
+    "보증/채권 합계": "debt_total",
+    "1개월전 분급여부": "div_1m",
+    "2개월전 분급여부": "div_2m",
+    "3개월전 분급여부": "div_3m",
+    "최종 초과금액": "final_excess_amount",
+}
+
+
+def handle_upload_deposit_metrics(df):
     """
-    보증증액 업로드:
-    - 여러 필드를 DepositSummary에 반영
-    - 엑셀 컬럼명은 "정확히" 맞는 경우가 많아서 exact-or-space-removed 기반으로 찾음
+    채권지표 업로드 (사번 기준 주요 지표 업데이트)
+    - 엑셀 컬럼(요청표) → DepositSummary 필드 업데이트
+    - 기존 '보증증액'에서 쓰던 컬럼 매핑을 그대로 사용(호환)
     """
-    col_user = _detect_col(df, must_include=("사원", "코드"), any_include=()) or _detect_col(df, must_include=("사번",), any_include=())
+    col_user = (
+        _detect_col(df, must_include=("사원", "코드"), any_include=())
+        or _detect_col(df, must_include=("사번",), any_include=())
+        or _detect_emp_id_col(df)
+    )
     if not col_user:
         raise ValueError("엑셀 컬럼을 찾지 못했습니다. (필수: 사원코드/사번)")
 
-    col_map = {
-        "3개월 장기 총수수료(지급월+직전2개월)": "comm_3m",
-        "6개월 장기 총수수료(지급월+직전5개월)": "comm_6m",
-        "9개월 장기 총수수료(지급월+직전8개월)": "comm_9m",
-        "12개월 장기 총수수료(지급월+직전11개월)": "comm_12m",
-        "당월 계속분 인정": "inst_current",
-        "전월 계속분 인정": "inst_prev",
-        "장기 총실적": "sales_total",
-        "손생보 합산 통산유지율": "maint_total",
-        "보증/채권 합계": "debt_total",
-        "1개월전 분급여부": "div_1m",
-        "2개월전 분급여부": "div_2m",
-        "3개월전 분급여부": "div_3m",
-        "최종 초과금액": "final_excess_amount",
-    }
-
     detected: Dict[str, str] = {}
-    for excel_col in col_map.keys():
+    for excel_col in _DEPOSIT_METRICS_COL_MAP.keys():
         found = _find_exact_or_space_removed(df.columns, excel_col)
         if found is None:
             raise ValueError(f"엑셀 컬럼을 찾지 못했습니다: [{excel_col}]")
         detected[excel_col] = found
 
-    use_cols = [col_user] + [detected[k] for k in col_map.keys()]
+    use_cols = [col_user] + [detected[k] for k in _DEPOSIT_METRICS_COL_MAP.keys()]
     df2 = df[use_cols].copy()
 
     rename_map = {col_user: "user_id"}
-    for excel_col, model_field in col_map.items():
+    for excel_col, model_field in _DEPOSIT_METRICS_COL_MAP.items():
         rename_map[detected[excel_col]] = model_field
     df2.rename(columns=rename_map, inplace=True)
 
     df2["user_id"] = df2["user_id"].apply(_norm_emp_id)
     df2 = df2[df2["user_id"].astype(str).str.len() > 0].copy()
 
-    int_fields = {"comm_3m", "comm_6m", "comm_9m", "comm_12m", "inst_current", "inst_prev", "sales_total", "debt_total", "final_excess_amount"}
+    int_fields = {
+        "comm_3m",
+        "comm_6m",
+        "comm_9m",
+        "comm_12m",
+        "inst_current",
+        "inst_prev",
+        "sales_total",
+        "debt_total",
+        "final_excess_amount",
+    }
     div_fields = {"div_1m", "div_2m", "div_3m"}
 
     for f in int_fields:
@@ -240,6 +257,7 @@ def handle_upload_guarantee_increase(df):
         if uid not in existing_ids:
             missing_users += 1
             continue
+
         defaults = {
             "comm_3m": int(r.comm_3m or 0),
             "comm_6m": int(r.comm_6m or 0),
@@ -258,9 +276,25 @@ def handle_upload_guarantee_increase(df):
         _update_summary(uid, defaults)
         updated += 1
 
-    return {"updated": updated, "missing_users": missing_users, "existing_users": len(existing_ids), "missing_sample": missing_sample}
+    return {
+        "updated": updated,
+        "missing_users": missing_users,
+        "existing_users": len(existing_ids),
+        "missing_sample": missing_sample,
+    }
 
 
+def handle_upload_guarantee_increase(df):
+    """
+    보증증액 업로드 (기존 호환 유지)
+    - 내부적으로는 채권지표 업로드 로직과 동일
+    """
+    return handle_upload_deposit_metrics(df)
+
+
+# =============================================================================
+# Due rates (DataFrame)
+# =============================================================================
 def _handle_due_common(df, *, field_2_6: str, field_2_13: str):
     col_user = _detect_col(df, must_include=("사원", "코드"), any_include=()) or _detect_emp_id_col(df)
     col_2_6 = _detect_col(df, must_include=("2~6", "합산"), any_include=())
@@ -290,7 +324,12 @@ def _handle_due_common(df, *, field_2_6: str, field_2_13: str):
         _update_summary(uid, {field_2_6: getattr(r, field_2_6), field_2_13: getattr(r, field_2_13)})
         updated += 1
 
-    return {"updated": updated, "missing_users": missing_users, "existing_users": len(existing_ids), "missing_sample": missing_sample}
+    return {
+        "updated": updated,
+        "missing_users": missing_users,
+        "existing_users": len(existing_ids),
+        "missing_sample": missing_sample,
+    }
 
 
 def handle_upload_ls_due(df):
@@ -301,9 +340,12 @@ def handle_upload_ns_due(df):
     return _handle_due_common(df, field_2_6="ns_2_6_due", field_2_13="ns_2_13_due")
 
 
+# =============================================================================
+# Detail uploads (DataFrame)
+# =============================================================================
 def handle_upload_surety(df):
     """
-    보증보험 상세 업로드:
+    보증보험 상세 업로드
     - 파일 기준이 “현재 상태 스냅샷”이므로 해당 user_id들 기존 rows 삭제 후 재삽입
     """
     col_user = (
@@ -383,7 +425,7 @@ def handle_upload_surety(df):
 
 def handle_upload_other_debt(df):
     """
-    기타채권 상세 업로드:
+    기타채권 상세 업로드
     - 일부 파일은 첫 행에 header가 또 들어가는 경우가 있어 1행 스킵 방어
     - 파일 기준 스냅샷: 대상 user_id별 delete 후 bulk_create
     """
@@ -471,6 +513,9 @@ def handle_upload_other_debt(df):
     }
 
 
+# =============================================================================
+# Raw matrix file handlers (통산손/생보)
+# =============================================================================
 def _handle_total_from_file_common(file_path: str, original_name: str, *, prefix: str):
     """
     통산손/생보 raw matrix 업로드 공통
@@ -555,11 +600,10 @@ _handle_upload_ls_total_from_file = handle_upload_ls_total_from_file
 
 def _update_upload_log(part: str, upload_type: str, excel_file_name: str, count: int) -> str:
     """
-    DepositUploadLog(part + upload_type unique) 갱신.
+    DepositUploadLog(part + upload_type unique) 갱신
     - DB/모델 필드명이 row_count(rows_count) / file_name(filename) 등 환경차가 있을 수 있어
       _meta.get_field로 안전하게 매핑한다.
     """
-    # ✅ 안전한 필드명 선택
     def _pick_field(*candidates: str) -> str:
         for name in candidates:
             try:
@@ -567,7 +611,6 @@ def _update_upload_log(part: str, upload_type: str, excel_file_name: str, count:
                 return name
             except FieldDoesNotExist:
                 continue
-        # 여기까지 오면 모델/DB 정합성이 깨진 상태
         raise FieldDoesNotExist(f"DepositUploadLog has none of fields: {candidates}")
 
     count_field = _pick_field("row_count", "rows_count")
@@ -586,4 +629,3 @@ def _update_upload_log(part: str, upload_type: str, excel_file_name: str, count:
 
     ts = getattr(obj, "uploaded_at", None) or timezone.now()
     return ts.strftime("%Y-%m-%d %H:%M")
-

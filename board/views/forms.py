@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -101,14 +102,22 @@ def generate_request_support(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_POST
 def generate_request_states(request: HttpRequest) -> HttpResponse:
     """FA소명서 PDF (inactive 외 모두)"""
     if is_inactive(request.user):
+        # ✅ fetch(AJAX)로 호출되는 경우: JSON 에러로 명확히 반환
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "message": "접근 권한이 없습니다."}, status=403)
         messages.error(request, "접근 권한이 없습니다.")
         return redirect("home")
 
+
     pdf_response = build_states(request)
     if pdf_response is None:
+        # ✅ fetch(AJAX)로 호출되는 경우: JSON 에러로 명확히 반환
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "message": "PDF 생성 중 오류가 발생했습니다."}, status=400)
         messages.error(request, "PDF 생성 중 오류가 발생했습니다.")
         return redirect(STATES_FORM)
     return pdf_response

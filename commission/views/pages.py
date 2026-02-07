@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from accounts.decorators import grade_required
 from accounts.models import CustomUser
 
-from commission.views.constants import UPLOAD_CATEGORIES, SUPPORTED_UPLOAD_TYPES
-from commission.upload_handlers.registry import supported_upload_types
 from commission.models import DepositUploadLog
 from commission.upload_handlers.registry import supported_upload_types
 
@@ -73,6 +72,8 @@ def deposit_home(request):
         "upload_types": upload_types,   # 행 (업로드구분)
         "upload_dates": upload_dates,   # dict[part][upload_type] = date str
         "supported_upload_types": upload_types,  # 템플릿에서 data-upload-date 부여용
+        # ✅ 공용 대상자 검색 모달 SSOT (deposit_home.html에서 include 시 사용)
+        "accounts_search_url": reverse("accounts:api_search_user"),
         # 기존 deposit_home이 쓰는 다른 ctx들도 그대로 유지
     }
     return render(request, "commission/deposit_home.html", ctx)

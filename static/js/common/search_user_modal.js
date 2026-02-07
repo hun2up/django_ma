@@ -6,7 +6,7 @@
  */
 
 (() => {
-  const DEBUG = false;
+  const DEBUG = false; // 필요시 true로 바꿔서 콘솔 확인
   const log = (...a) => DEBUG && console.log("[search_user_modal]", ...a);
 
   /** @type {HTMLTableRowElement|null} */
@@ -298,6 +298,11 @@
         const data = await safeReadJson(res);
         if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
 
+        // ✅ ok 플래그가 있는 API 대비 (ok:false면 200이어도 실패로 처리)
+        if (data && data.ok === false) {
+          throw new Error(data?.message || "검색 API 응답 ok=false");
+        }
+
         return { ok: true, url: u.toString(), data };
       } catch (e) {
         lastErr = e;
@@ -310,9 +315,30 @@
 
   function normalizeUserList(data) {
     if (!data) return [];
+
+    // 1) 가장 흔한 케이스
     if (Array.isArray(data.results)) return data.results;
     if (Array.isArray(data.items)) return data.items;
     if (Array.isArray(data.users)) return data.users;
+    if (Array.isArray(data.data)) return data.data; // { data: [...] }
+
+    // 2) 중첩 응답 케이스: { ok: true, data: { results:[...] } } 등
+    const d = data.data || data.payload || data.result || null;
+    if (d) {
+      if (Array.isArray(d.results)) return d.results;
+      if (Array.isArray(d.items)) return d.items;
+      if (Array.isArray(d.users)) return d.users;
+      if (Array.isArray(d.data)) return d.data;
+      if (Array.isArray(d)) return d;
+    }
+
+    // 3) 마지막 방어: 단일 key 아래 배열이 들어있는 경우 자동 탐색
+    try {
+      for (const k of Object.keys(data)) {
+        if (Array.isArray(data[k])) return data[k];
+      }
+    } catch (_) {}
+
     return [];
   }
 
@@ -434,6 +460,11 @@
         if (!r.ok) throw r.error;
 
         const list = normalizeUserList(r.data);
+        if (DEBUG) {
+          console.log("[search_user_modal] response url:", r.url);
+          console.log("[search_user_modal] raw json:", r.data);
+          console.log("[search_user_modal] normalized list len:", list.length);
+        }
         if (!list.length) return renderEmpty(resultsBox);
 
         renderResults(resultsBox, list);

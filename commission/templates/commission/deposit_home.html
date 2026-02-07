@@ -1,4 +1,4 @@
-{# django_ma/commission/templates/commission/deposit_home.html #}
+<!-- django_ma/commission/templates/commission/deposit_home.html -->
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
@@ -14,10 +14,7 @@
 -------------------------------------------------------------- -->
 
 <!-- Deposit Home 전용 CSS -->
-<link
-  rel="stylesheet"
-  href="{% static 'css/commission/deposit_home.css' %}{% if STATIC_VERSION %}?v={{ STATIC_VERSION }}{% endif %}"
->
+<link rel="stylesheet" href="{% static 'css/apps/commission.css' %}">
 
 <div class="container mt-5">
   <div class="mx-auto deposit-maxw">
@@ -29,11 +26,11 @@
     <div
       id="deposit-home"
       class="card shadow p-4 border-0 rounded-4"
-      data-user-detail-url="/commission/api/user-detail/"
-      data-deposit-summary-url="/commission/api/deposit-summary/"
+      data-user-detail-url="{% url 'commission:api_user_detail' %}"
+      data-deposit-summary-url="{% url 'commission:api_deposit_summary' %}"
       data-deposit-surety-url="{% url 'commission:api_deposit_surety_list' %}"
       data-deposit-other-url="{% url 'commission:api_deposit_other_list' %}"
-      data-reset-url="/commission/deposit/"
+      data-reset-url="{% url 'commission:deposit_home' %}"
       data-support-pdf-url="{% url 'commission:api_support_pdf' %}"
     >
 
@@ -648,7 +645,7 @@
               </thead>
               <tbody id="suretyTableBody">
                 <tr>
-                  <td class="text-nowrap text-center" colspan="5">
+                  <td class="text-nowrap text-center" colspan="6">
                     대상자를 선택하면 보증보험 내역이 표시됩니다.
                   </td>
                 </tr>
@@ -806,6 +803,10 @@
               <option value="최종지급액">최종지급액</option>
               <option value="환수지급예상">환수지급예상</option>
               <option value="보증증액">보증증액</option>
+
+              <!-- ✅ 추가: 채권지표(사번 기준 주요 지표 업데이트) -->
+              <option value="채권지표">채권지표</option>
+
               <option value="보증보험">보증보험</option>
               <option value="기타채권">기타채권</option>
               <option value="통산생보">통산생보</option>
@@ -873,7 +874,7 @@
 </div>
 
 <!-- 공용 대상자 검색 모달 -->
-{% include 'components/search_user_modal.html' with search_url='/api/accounts/search-user/' %}
+{% include 'components/search_user_modal.html' with search_url=accounts_search_url %}
 
 <!-- Deposit Home 전용 JS -->
 <script

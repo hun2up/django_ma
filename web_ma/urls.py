@@ -18,8 +18,8 @@ from accounts.views import SessionCloseLoginView
 
 
 def home_redirect(request):
-    """홈(/) 접속 시 게시판으로 리다이렉트"""
-    return redirect("board:post_list")
+    """홈(/) 접속 시 매뉴얼로 리다이렉트"""
+    return redirect("manual:manual_list")
 
 
 urlpatterns = [
@@ -27,7 +27,7 @@ urlpatterns = [
     # Auth
     # ---------------------------------------------------------------------
     path("login/", SessionCloseLoginView.as_view(template_name="registration/login.html"), name="login"),
-    path("logout/", auth_views.LogoutView.as_view(next_page="/"), name="logout"),
+    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
 
     # ---------------------------------------------------------------------
     # Admin (custom admin site)

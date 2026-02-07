@@ -127,6 +127,21 @@ def _safe_str(v) -> str:
     return (str(v) if v is not None else "").strip()
 
 
+def _post_get_any(post, keys: list[str], default: str = "") -> str:
+    """
+    템플릿/JS 변경으로 필드명이 달라도 PDF 생성이 되도록 방어.
+    예) insurer_1 / insurer1 / insurer-1 등
+    """
+    for k in keys:
+        try:
+            v = post.get(k, None)
+        except Exception:
+            v = None
+        if v is not None and str(v).strip() != "":
+            return str(v)
+    return default
+
+
 def _fmt_user_enter(u: CustomUser) -> str:
     enter = getattr(u, "enter", "") or ""
     if hasattr(enter, "strftime"):
@@ -248,10 +263,26 @@ def generate_request_states(request, *, task_only: bool = False):
         contract_rows = [["보험사", "증권번호", "계약자(피보험자)", "보험료"]]
         for i in range(1, 6):
             row = [
-                _safe_str(request.POST.get(f"insurer_{i}", "-")) or "-",
-                _safe_str(request.POST.get(f"policy_no_{i}", "-")) or "-",
-                _safe_str(request.POST.get(f"contractor_{i}", "-")) or "-",
-                _fmt_money_from_post(request.POST.get(f"premium_{i}", "")),
+                _safe_str(_post_get_any(
+                    request.POST,
+                    [f"insurer_{i}", f"insurer{i}", f"insurer-{i}"],
+                    "-"
+                )) or "-",
+                _safe_str(_post_get_any(
+                    request.POST,
+                    [f"policy_no_{i}", f"policy_no{i}", f"policy_no-{i}"],
+                   "-"
+                )) or "-",
+                _safe_str(_post_get_any(
+                    request.POST,
+                    [f"contractor_{i}", f"contractor{i}", f"contractor-{i}"],
+                    "-"
+                )) or "-",
+                _fmt_money_from_post(_post_get_any(
+                    request.POST,
+                    [f"premium_{i}", f"premium{i}", f"premium-{i}"],
+                    ""
+                )),
             ]
             if _is_meaningful_row(row):
                 contract_rows.append(row)

@@ -186,14 +186,23 @@
     async function fetchJSON(url) {
       const res = await fetch(url, {
         headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
       });
 
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const isJson = ct.includes("application/json");
+
+      // JSON이 아니면(HTML/redirect/404페이지 등) 바로 텍스트로 읽어서 에러로 처리
+      if (!isJson) {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          `JSON 아님: ${res.status} ${res.statusText}\n` +
+          `url=${url}\ncontent-type=${ct}\n` +
+          `body=${text.slice(0, 200)}`
+        );
       }
+
+      const data = await res.json();
 
       if (!res.ok) {
         const msg = data?.message || `요청 실패 (${res.status})`;
@@ -208,13 +217,20 @@
     function unwrapFirstObject(data, candidates = []) {
       if (!data || typeof data !== "object") return null;
 
+      // ✅ rows: [] 형태 지원 (첫 번째 row를 객체로 취급)
+      if (Array.isArray(data.rows) && data.rows.length) return data.rows[0];
+      if (Array.isArray(data.items) && data.items.length) return data.items[0];
+
       for (const k of candidates) {
         const v = data?.[k];
-        if (v && typeof v === "object") return v;
+        if (v && typeof v === "object" && !Array.isArray(v)) return v;
+        if (Array.isArray(v) && v.length) return v[0];
       }
+
       for (const k of ["user", "summary", "data", "result", "payload", "item"]) {
         const v = data?.[k];
-        if (v && typeof v === "object") return v;
+        if (v && typeof v === "object" && !Array.isArray(v)) return v;
+        if (Array.isArray(v) && v.length) return v[0];
       }
       return null;
     }
@@ -225,6 +241,10 @@
         const v = data?.[k];
         if (Array.isArray(v)) return v;
       }
+      // ✅ rows 배열 기본 지원
+      if (Array.isArray(data.rows)) return data.rows;
+      if (Array.isArray(data.items)) return data.items;
+
       for (const k of ["items", "results", "data", "list", "rows"]) {
         const v = data?.[k];
         if (Array.isArray(v)) return v;
